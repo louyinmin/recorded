@@ -1,16 +1,43 @@
+# Qoder AI 生成的文件
+.qoder/
+
+# OpenSpec 变更管理
+openspec/
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-.env
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
 venv/
+ENV/
+env/
+.venv/
 
-# 数据库（敏感数据）
-data.db
+# 数据库文件
 *.db
+*.sqlite
+*.sqlite3
 
-# 日志
-flask.log
+# 日志文件
 *.log
 
 # 密码文件
@@ -20,7 +47,14 @@ flask.log
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
 
-# 系统文件
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+
+# 敏感配置
+.env
+.env.local
