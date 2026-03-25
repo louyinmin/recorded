@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
+  <title>旅游记账 - 旅行列表</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <div class="navbar">
+    <h1>✈️ 旅行列表</h1>
+    <div>
+      <button class="navbar-btn" id="settingsBtn">⚙️ 设置</button>
+      <button class="navbar-btn" id="newTripBtn" style="margin-left:6px;">+ 新建旅行</button>
+      <button class="navbar-btn" id="logoutBtn" style="margin-left:6px;">退出</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- 统计栏 -->
+    <div class="stats-bar" id="statsBar"></div>
+    <!-- 旅行列表 -->
+    <div id="tripList"></div>
+  </div>
+
+  <!-- 新建旅行模态框 -->
+  <div class="modal-overlay" id="newTripModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">新建旅行</div>
+        <button class="modal-close" id="closeNewTrip">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">旅行名称 *</label>
+        <input class="form-input" type="text" id="tripName" placeholder="例如：北京三日游">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">开始日期</label>
+          <input class="form-input" type="date" id="tripStart">
+        </div>
+        <div class="form-group">
+          <label class="form-label">结束日期</label>
+          <input class="form-input" type="date" id="tripEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="tripNote" placeholder="备注信息（可选）"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" id="saveTripBtn">创建旅行</button>
+    </div>
+  </div>
+
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/trips.js"></script>
+</body>
+</html>

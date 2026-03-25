@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
+  <title>旅游记账 - 记账详情</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <div class="navbar">
+    <div style="display:flex;align-items:center;">
+      <button class="navbar-back" id="backBtn">◀</button>
+      <h1 id="tripTitle">旅行记账</h1>
+    </div>
+    <div>
+      <button class="navbar-btn" id="exportBtn">📥 导出</button>
+      <button class="navbar-btn" id="editTripBtn" style="margin-left:6px;">编辑</button>
+      <button class="navbar-btn" id="deleteTripBtn" style="margin-left:6px;">删除</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- 旅行信息 -->
+    <div id="tripInfo" class="card" style="margin-bottom:16px;"></div>
+
+    <!-- 统计栏 -->
+    <div class="stats-bar" id="statsBar"></div>
+
+    <!-- 新增记录 -->
+    <div class="section-title">📝 添加记录</div>
+    <div class="card" id="addRecordCard">
+      <div class="form-row">
+        <div class="form-group" style="flex:2;">
+          <label class="form-label">类别 *</label>
+          <select class="form-select" id="recCategory">
+            <!-- 动态填充 -->
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">金额 *</label>
+          <input class="form-input" type="number" id="recAmount" placeholder="0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div id="customCatGroup" class="form-group" style="display:none;">
+        <label class="form-label">自定义类别名称</label>
+        <input class="form-input" type="text" id="recCustomCat" placeholder="输入新类别名称">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">支付人 *</label>
+          <select class="form-select" id="recPayer">
+            <!-- 动态填充 -->
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">日期</label>
+          <input class="form-input" type="date" id="recDate">
+        </div>
+      </div>
+      <div id="newPayerGroup" class="form-group" style="display:none;">
+        <label class="form-label">新增支付人姓名</label>
+        <input class="form-input" type="text" id="recNewPayer" placeholder="输入姓名">
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <input class="form-input" type="text" id="recNote" placeholder="备注（可选）">
+      </div>
+      <button class="btn btn-accent btn-block" id="addRecordBtn">添加记录</button>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="section-title">📋 记录列表 (<span id="recordCount">0</span>)</div>
+    <div class="card" id="recordList"></div>
+
+    <!-- 总结区域 -->
+    <div class="section-title">📊 费用总结</div>
+    <div id="summaryArea"></div>
+  </div>
+
+  <!-- 编辑旅行信息模态框 -->
+  <div class="modal-overlay" id="editTripModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">编辑旅行信息</div>
+        <button class="modal-close" id="closeEditTrip">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">旅行名称 *</label>
+        <input class="form-input" type="text" id="editTripName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">开始日期</label>
+          <input class="form-input" type="date" id="editTripStart">
+        </div>
+        <div class="form-group">
+          <label class="form-label">结束日期</label>
+          <input class="form-input" type="date" id="editTripEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="editTripNote"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" id="saveEditTripBtn">保存</button>
+    </div>
+  </div>
+
+  <!-- 编辑记录模态框 -->
+  <div class="modal-overlay" id="editRecordModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">编辑记录</div>
+        <button class="modal-close" id="closeEditRecord">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">类别</label>
+        <select class="form-select" id="editRecCategory"></select>
+      </div>
+      <div id="editCustomCatGroup" class="form-group" style="display:none;">
+        <label class="form-label">自定义类别名称</label>
+        <input class="form-input" type="text" id="editRecCustomCat">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">金额 *</label>
+          <input class="form-input" type="number" id="editRecAmount" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">日期</label>
+          <input class="form-input" type="date" id="editRecDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">支付人</label>
+        <select class="form-select" id="editRecPayer"></select>
+      </div>
+      <div id="editNewPayerGroup" class="form-group" style="display:none;">
+        <label class="form-label">新增支付人姓名</label>
+        <input class="form-input" type="text" id="editRecNewPayer">
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <input class="form-input" type="text" id="editRecNote">
+      </div>
+      <button class="btn btn-primary btn-block" id="saveEditRecordBtn">保存修改</button>
+    </div>
+  </div>
+
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/trip.js"></script>
+</body>
+</html>

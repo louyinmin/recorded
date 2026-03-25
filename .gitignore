@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+
+# 数据库（敏感数据）
+data.db
+*.db
+
+# 日志
+flask.log
+*.log
+
+# 密码文件
+.password
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统文件
+.DS_Store
+Thumbs.db

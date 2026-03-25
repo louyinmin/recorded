@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
+  <title>旅游记账 - 设置</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <div class="navbar">
+    <div style="display:flex;align-items:center;">
+      <button class="navbar-back" id="backBtn">◀</button>
+      <h1>设置</h1>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="container">
+    <!-- 修改密码 -->
+    <div class="section-title">🔐 修改密码</div>
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">原密码</label>
+        <input class="form-input" type="password" id="oldPassword" placeholder="输入原密码">
+      </div>
+      <div class="form-group">
+        <label class="form-label">新密码</label>
+        <input class="form-input" type="password" id="newPassword" placeholder="输入新密码（至少3位）">
+      </div>
+      <div class="form-group">
+        <label class="form-label">确认新密码</label>
+        <input class="form-input" type="password" id="confirmPassword" placeholder="再次输入新密码">
+      </div>
+      <button class="btn btn-primary btn-block" id="changePasswordBtn">修改密码</button>
+    </div>
+
+    <!-- 支付人管理 -->
+    <div class="section-title">👤 支付人管理</div>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <input class="form-input" type="text" id="newPayerName" placeholder="新增支付人姓名">
+        </div>
+        <button class="btn btn-accent" id="addPayerBtn">添加</button>
+      </div>
+      <div id="payerList" class="manage-list"></div>
+    </div>
+
+    <!-- 类别管理 -->
+    <div class="section-title">📂 类别管理</div>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <input class="form-input" type="text" id="newCategoryName" placeholder="新增类别名称">
+        </div>
+        <button class="btn btn-accent" id="addCategoryBtn">添加</button>
+      </div>
+      <div id="categoryList" class="manage-list"></div>
+    </div>
+  </div>
+
+  <!-- 编辑模态框 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="editModalTitle">编辑</div>
+        <button class="modal-close" id="closeEditModal">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="editLabel">名称</label>
+        <input class="form-input" type="text" id="editInput">
+      </div>
+      <button class="btn btn-primary btn-block" id="saveEditBtn">保存</button>
+    </div>
+  </div>
+
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/settings.js"></script>
+</body>
+</html>
