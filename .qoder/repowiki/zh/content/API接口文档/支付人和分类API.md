@@ -4,10 +4,19 @@
 **本文档引用的文件**
 - [app.py](file://app.py)
 - [common.js](file://assets/js/common.js)
+- [settings.js](file://assets/js/settings.js)
+- [settings.html](file://settings.html)
 - [trip.js](file://assets/js/trip.js)
 - [trip.html](file://trip.html)
 - [recorded.md](file://recorded.md)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增密码管理API端点 `/api/password` 的完整文档
+- 更新认证机制说明，包含密码文件持久化
+- 新增设置页面的前端实现细节
+- 完善API接口说明，包含密码修改的完整流程
 
 ## 目录
 1. [简介](#简介)
@@ -24,7 +33,7 @@
 
 recorded是一个基于Flask的旅游记账系统，提供了完整的支付人和分类管理API。该系统支持多旅行记账、自动数据去重、唯一性约束保证，以及与记账记录API的紧密协同工作。系统采用SQLite作为数据存储，实现了数据一致性保证和自动维护机制。
 
-根据项目描述，系统主要面向旅游记账场景，支持交通工具、住宿、餐费、打车等默认分类，同时允许用户自定义分类和支付人。
+根据项目描述，系统主要面向旅游记账场景，支持交通工具、住宿、餐费、打车等默认分类，同时允许用户自定义分类和支付人。**新增功能**包括密码管理API，支持用户修改登录密码，并通过文件持久化机制确保密码更改的持久性。
 
 ## 项目结构
 
@@ -35,6 +44,7 @@ graph TB
 subgraph "后端 (Python Flask)"
 APP[app.py<br/>主应用文件]
 DB[(data.db<br/>SQLite数据库)]
+PASS[(.password<br/>密码文件)]
 end
 subgraph "前端 (静态资源)"
 HTML[HTML页面]
@@ -43,23 +53,27 @@ JS[JavaScript文件]
 end
 subgraph "前端JavaScript模块"
 COMMON[common.js<br/>API封装和工具函数]
+SETTINGS[settings.js<br/>设置页面逻辑]
 TRIP[trip.js<br/>旅行页面逻辑]
-end
+END
 HTML --> JS
 JS --> COMMON
+JS --> SETTINGS
 JS --> TRIP
 COMMON --> APP
+SETTINGS --> APP
 TRIP --> APP
 APP --> DB
+APP --> PASS
 ```
 
 **图表来源**
-- [app.py:1-331](file://app.py#L1-L331)
-- [common.js:1-206](file://assets/js/common.js#L1-L206)
-- [trip.js:1-401](file://assets/js/trip.js#L1-L401)
+- [app.py:13-152](file://app.py#L13-L152)
+- [common.js:1-239](file://assets/js/common.js#L1-L239)
+- [settings.js:1-235](file://assets/js/settings.js#L1-L235)
 
 **章节来源**
-- [app.py:1-331](file://app.py#L1-L331)
+- [app.py:1-515](file://app.py#L1-L515)
 - [recorded.md:1-9](file://recorded.md#L1-L9)
 
 ## 核心组件
@@ -101,7 +115,7 @@ TRIPS ||--o{ RECORDS : "contains"
 ```
 
 **图表来源**
-- [app.py:46-78](file://app.py#L46-L78)
+- [app.py:85-92](file://app.py#L85-L92)
 
 ### 默认分类初始化
 
@@ -112,13 +126,23 @@ TRIPS ||--o{ RECORDS : "contains"
 - 餐费
 - 打车
 
+### 密码管理机制
+
+**新增功能**：系统支持密码管理，包含以下特性：
+
+- **密码文件持久化**：使用`.password`文件保存修改后的密码
+- **动态密码获取**：优先从文件读取密码，回退到固定密码
+- **安全验证**：登录时验证用户名和密码组合
+- **密码修改**：支持用户修改登录密码
+
 **章节来源**
-- [app.py:23-23](file://app.py#L23-L23)
-- [app.py:74-77](file://app.py#L74-L77)
+- [app.py:18-42](file://app.py#L18-L42)
+- [app.py:138-152](file://app.py#L138-L152)
+- [app.py:43-98](file://app.py#L43-L98)
 
 ## 架构概览
 
-系统采用RESTful API设计，前后端通过JSON进行数据交换。认证采用简单的token机制，所有API请求都需要携带Authorization头。
+系统采用RESTful API设计，前后端通过JSON进行数据交换。认证采用简单的token机制，所有API请求都需要携带Authorization头。**新增密码管理流程**如下：
 
 ```mermaid
 sequenceDiagram
@@ -127,25 +151,25 @@ participant API as API服务器
 participant DB as SQLite数据库
 participant Auth as 认证服务
 Client->>Auth : POST /api/login (用户名密码)
-Auth->>Auth : 验证凭据
+Auth->>Auth : 验证凭据从密码文件读取
 Auth-->>Client : 返回token
+Client->>API : POST /api/password (带token)
+API->>Auth : 验证token
+Auth-->>API : 验证通过
+API->>API : 验证原密码
+API->>API : 写入新密码到文件
+API-->>Client : 成功响应
 Client->>API : GET /api/payers (带token)
 API->>Auth : 验证token
 Auth-->>API : 验证通过
 API->>DB : 查询支付人列表
 DB-->>API : 返回支付人数据
 API-->>Client : 支付人列表JSON
-Client->>API : POST /api/payers (带token)
-API->>Auth : 验证token
-Auth-->>API : 验证通过
-API->>DB : INSERT OR IGNORE 支付人
-DB-->>API : 操作完成
-API-->>Client : 成功响应
 ```
 
 **图表来源**
-- [app.py:106-116](file://app.py#L106-L116)
-- [app.py:276-294](file://app.py#L276-L294)
+- [app.py:126-152](file://app.py#L126-L152)
+- [app.py:313-330](file://app.py#L313-L330)
 
 ## 详细组件分析
 
@@ -201,8 +225,39 @@ API-->>Client : 成功响应
 - 401 未登录或登录已过期
 - 500 数据库操作异常
 
+#### PUT /api/payers/<name> - 更新支付人
+
+**功能描述**: 更新现有支付人的姓名，包含重复性检查和记录同步。
+
+**请求参数**:
+```json
+{
+  "name": "新支付人姓名"
+}
+```
+
+**同步机制**:
+- 检查新名称是否已存在
+- 更新支付人名称
+- 同步更新相关记录中的支付人字段
+
+**错误处理**:
+- 400 姓名不能为空或已存在
+- 404 支付人不存在
+- 401 未登录或登录已过期
+- 500 数据库操作异常
+
+#### DELETE /api/payers/<name> - 删除支付人
+
+**功能描述**: 删除指定的支付人。
+
+**错误处理**:
+- 404 支付人不存在
+- 401 未登录或登录已过期
+- 500 数据库操作异常
+
 **章节来源**
-- [app.py:276-294](file://app.py#L276-L294)
+- [app.py:313-362](file://app.py#L313-L362)
 
 ### 分类管理API
 
@@ -258,8 +313,78 @@ API-->>Client : 成功响应
 - 401 未登录或登录已过期
 - 500 数据库操作异常
 
+#### PUT /api/categories/<name> - 更新分类
+
+**功能描述**: 更新现有分类的名称，包含重复性检查和记录同步。
+
+**请求参数**:
+```json
+{
+  "name": "新分类名称"
+}
+```
+
+**同步机制**:
+- 检查新名称是否已存在
+- 更新分类名称
+- 同步更新相关记录中的分类字段
+
+**错误处理**:
+- 400 分类名称不能为空或已存在
+- 404 分类不存在
+- 401 未登录或登录已过期
+- 500 数据库操作异常
+
+#### DELETE /api/categories/<name> - 删除分类
+
+**功能描述**: 删除指定的分类。
+
+**错误处理**:
+- 404 分类不存在
+- 401 未登录或登录已过期
+- 500 数据库操作异常
+
 **章节来源**
-- [app.py:297-315](file://app.py#L297-L315)
+- [app.py:366-415](file://app.py#L366-L415)
+
+### 密码管理API
+
+#### POST /api/password - 修改密码
+
+**功能描述**: 修改用户的登录密码，支持密码验证和持久化。
+
+**请求参数**:
+```json
+{
+  "oldPassword": "用户原密码",
+  "newPassword": "新密码"
+}
+```
+
+**验证规则**:
+- 原密码必须正确
+- 新密码长度至少3位
+- 新密码不能为空
+
+**持久化机制**:
+- 将新密码写入`.password`文件
+- 下次登录时从文件读取密码
+- 失败时回退到固定密码
+
+**响应数据**:
+```json
+{
+  "ok": true
+}
+```
+
+**错误处理**:
+- 400 请填写完整或新密码至少3位或原密码错误
+- 401 未登录或登录已过期
+- 500 文件写入或数据库操作异常
+
+**章节来源**
+- [app.py:138-152](file://app.py#L138-L152)
 
 ### 与记账记录API的协同工作
 
@@ -283,47 +408,53 @@ API->>DB : 自动同步支付人和分类
 ```
 
 **图表来源**
-- [app.py:208-236](file://app.py#L208-L236)
-- [app.py:238-264](file://app.py#L238-L264)
+- [app.py:245-273](file://app.py#L245-L273)
+- [app.py:275-301](file://app.py#L275-L301)
 
 **章节来源**
-- [app.py:208-236](file://app.py#L208-L236)
-- [app.py:238-264](file://app.py#L238-L264)
+- [app.py:245-273](file://app.py#L245-L273)
+- [app.py:275-301](file://app.py#L275-L301)
 
 ## 依赖关系分析
 
 ### 前端集成
 
-前端JavaScript通过统一的API封装层与后端交互：
+前端JavaScript通过统一的API封装层与后端交互，**新增设置页面**：
 
 ```mermaid
 graph LR
 subgraph "前端模块"
 COMMON[common.js<br/>API封装]
+SETTINGS[settings.js<br/>设置页面逻辑]
 TRIP[trip.js<br/>页面逻辑]
 HTML[trip.html<br/>页面结构]
+SETTINGS_HTML[settings.html<br/>设置页面结构]
 end
 subgraph "后端API"
 LOGIN[POST /api/login]
-PAYERS[GET/POST /api/payers]
-CATS[GET/POST /api/categories]
+PASSWORD[POST /api/password]
+PAYERS[GET/POST/PAYERS]
+CATS[GET/POST/CATEGORIES]
 RECORDS[POST /api/trips/{trip_id}/records]
-end
+END
 COMMON --> LOGIN
+COMMON --> PASSWORD
 COMMON --> PAYERS
 COMMON --> CATS
 COMMON --> RECORDS
+SETTINGS --> COMMON
+SETTINGS_HTML --> SETTINGS
 TRIP --> COMMON
 HTML --> TRIP
 ```
 
 **图表来源**
-- [common.js:114-131](file://assets/js/common.js#L114-L131)
-- [trip.js:105-123](file://assets/js/trip.js#L105-L123)
+- [common.js:153-158](file://assets/js/common.js#L153-L158)
+- [settings.js:123-151](file://assets/js/settings.js#L123-L151)
 
 ### 数据流分析
 
-系统中的数据流向体现了完整的业务流程：
+系统中的数据流向体现了完整的业务流程，**新增密码管理流程**：
 
 ```mermaid
 flowchart TD
@@ -333,7 +464,6 @@ LOAD --> CATEGORIES[获取分类列表]
 LOAD --> RECORDS[获取记账记录]
 PAYERS --> RENDER[渲染下拉框]
 CATEGORIES --> RENDER
-RECORDS --> RENDER
 RENDER --> ADD[添加新记录]
 ADD --> VALIDATE[验证数据]
 VALIDATE --> SUCCESS{验证通过?}
@@ -346,12 +476,12 @@ ERROR --> END
 ```
 
 **图表来源**
-- [trip.js:160-197](file://assets/js/trip.js#L160-L197)
-- [trip.js:258-313](file://assets/js/trip.js#L258-L313)
+- [settings.js:27-37](file://assets/js/settings.js#L27-L37)
+- [settings.js:123-151](file://assets/js/settings.js#L123-L151)
 
 **章节来源**
-- [common.js:114-131](file://assets/js/common.js#L114-L131)
-- [trip.js:105-123](file://assets/js/trip.js#L105-L123)
+- [common.js:153-158](file://assets/js/common.js#L153-L158)
+- [settings.js:123-151](file://assets/js/settings.js#L123-L151)
 
 ## 性能考虑
 
@@ -368,6 +498,12 @@ ERROR --> END
 2. **本地缓存**: 支付人和分类数据在页面内缓存
 3. **防抖处理**: 表单提交时禁用按钮防止重复提交
 4. **增量更新**: 只在必要时刷新页面内容
+
+### 密码管理性能
+
+1. **文件I/O优化**: 密码文件读写采用异步方式
+2. **缓存机制**: 登录时验证密码，减少文件读取次数
+3. **错误处理**: 密码文件损坏时自动回退到固定密码
 
 ## 故障排除指南
 
@@ -393,9 +529,20 @@ ERROR --> END
 **原因**: 前端缓存未刷新
 **解决**: 刷新页面或调用refresh()方法
 
+#### 5. 密码修改失败
+**症状**: POST /api/password返回错误
+**原因**: 原密码错误或新密码不符合要求
+**解决**: 检查原密码是否正确，新密码长度至少3位
+
+#### 6. 密码文件权限问题
+**症状**: 无法修改密码或密码丢失
+**原因**: .password文件权限不足或被删除
+**解决**: 检查文件权限，确保应用有读写权限
+
 **章节来源**
-- [app.py:82-89](file://app.py#L82-L89)
-- [common.js:47-57](file://assets/js/common.js#L47-L57)
+- [app.py:102-109](file://app.py#L102-L109)
+- [app.py:145-152](file://app.py#L145-L152)
+- [common.js:59-67](file://assets/js/common.js#L59-L67)
 
 ## 结论
 
@@ -405,5 +552,7 @@ recorded项目的支付人和分类管理API设计合理，实现了以下关键
 2. **自动维护**: 与记账记录API紧密集成，自动同步支付人和分类信息
 3. **用户体验**: 前后端分离架构提供流畅的交互体验
 4. **扩展性**: 支持自定义分类和支付人，满足多样化需求
+5. **安全性**: **新增密码管理功能**，支持用户修改登录密码并持久化保存
+6. **健壮性**: 密码文件损坏时自动回退到固定密码，确保系统可用性
 
-系统采用简洁有效的技术方案，在保证功能完整性的同时保持了代码的可维护性。建议在生产环境中考虑添加更完善的错误日志和监控机制，以进一步提升系统的可靠性。
+系统采用简洁有效的技术方案，在保证功能完整性的同时保持了代码的可维护性。**新增的密码管理功能**进一步提升了系统的安全性和用户体验。建议在生产环境中考虑添加更完善的错误日志和监控机制，以进一步提升系统的可靠性。
