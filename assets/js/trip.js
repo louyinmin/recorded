@@ -52,19 +52,33 @@
 
   var editingRecordId = null;
 
+  function normalizeNameList(items) {
+    var names = [];
+    for (var i = 0; i < (items || []).length; i++) {
+      var item = items[i];
+      if (typeof item === 'string') {
+        names.push(item);
+      } else if (item && typeof item === 'object' && item.name) {
+        names.push(item.name);
+      }
+    }
+    return names;
+  }
+
   // ===== 填充下拉框 =====
   function fillCategorySelect(sel, categories, selectedVal) {
+    var names = normalizeNameList(categories);
     sel.innerHTML = '';
-    for (var i = 0; i < categories.length; i++) {
+    for (var i = 0; i < names.length; i++) {
       var opt = document.createElement('option');
-      opt.value = categories[i]; opt.textContent = categories[i];
-      if (categories[i] === selectedVal) opt.selected = true;
+      opt.value = names[i]; opt.textContent = names[i];
+      if (names[i] === selectedVal) opt.selected = true;
       sel.appendChild(opt);
     }
     var customOpt = document.createElement('option');
     customOpt.value = '__custom__'; customOpt.textContent = '+ 自定义类别';
     sel.appendChild(customOpt);
-    if (selectedVal && categories.indexOf(selectedVal) === -1) {
+    if (selectedVal && names.indexOf(selectedVal) === -1) {
       var existOpt = document.createElement('option');
       existOpt.value = selectedVal; existOpt.textContent = selectedVal;
       existOpt.selected = true;
@@ -73,14 +87,15 @@
   }
 
   function fillPayerSelect(sel, payers, selectedVal) {
+    var names = normalizeNameList(payers);
     sel.innerHTML = '';
     var emptyOpt = document.createElement('option');
     emptyOpt.value = ''; emptyOpt.textContent = '-- 选择支付人 --';
     sel.appendChild(emptyOpt);
-    for (var i = 0; i < payers.length; i++) {
+    for (var i = 0; i < names.length; i++) {
       var opt = document.createElement('option');
-      opt.value = payers[i]; opt.textContent = payers[i];
-      if (payers[i] === selectedVal) opt.selected = true;
+      opt.value = names[i]; opt.textContent = names[i];
+      if (names[i] === selectedVal) opt.selected = true;
       sel.appendChild(opt);
     }
     var newOpt = document.createElement('option');

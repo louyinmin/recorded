@@ -314,8 +314,21 @@ def delete_record(rec_id):
 @require_auth
 def get_payers():
     db = get_db()
-    rows = db.execute('SELECT name FROM payers ORDER BY id').fetchall()
-    return jsonify([r['name'] for r in rows])
+    rows = db.execute('''
+        SELECT p.name, COUNT(r.id) AS used_count
+        FROM payers p
+        LEFT JOIN records r ON r.payer = p.name
+        GROUP BY p.name
+        ORDER BY p.id
+    ''').fetchall()
+    return jsonify([
+        {
+            'name': r['name'],
+            'used_count': r['used_count'],
+            'in_use': r['used_count'] > 0
+        }
+        for r in rows
+    ])
 
 @app.route('/api/payers', methods=['POST'])
 @require_auth
@@ -357,6 +370,9 @@ def delete_payer(name):
     existing = db.execute('SELECT id FROM payers WHERE name=?', (name,)).fetchone()
     if not existing:
         return jsonify({'error': '支付人不存在'}), 404
+    used_count = db.execute('SELECT COUNT(*) AS c FROM records WHERE payer=?', (name,)).fetchone()['c']
+    if used_count > 0:
+        return jsonify({'error': '该支付人正在被账单使用，无法删除'}), 400
     db.execute('DELETE FROM payers WHERE name=?', (name,))
     db.commit()
     return jsonify({'ok': True})
@@ -367,8 +383,21 @@ def delete_payer(name):
 @require_auth
 def get_categories():
     db = get_db()
-    rows = db.execute('SELECT name FROM categories ORDER BY id').fetchall()
-    return jsonify([r['name'] for r in rows])
+    rows = db.execute('''
+        SELECT c.name, COUNT(r.id) AS used_count
+        FROM categories c
+        LEFT JOIN records r ON r.category = c.name
+        GROUP BY c.name
+        ORDER BY c.id
+    ''').fetchall()
+    return jsonify([
+        {
+            'name': r['name'],
+            'used_count': r['used_count'],
+            'in_use': r['used_count'] > 0
+        }
+        for r in rows
+    ])
 
 @app.route('/api/categories', methods=['POST'])
 @require_auth
@@ -410,6 +439,9 @@ def delete_category(name):
     existing = db.execute('SELECT id FROM categories WHERE name=?', (name,)).fetchone()
     if not existing:
         return jsonify({'error': '类别不存在'}), 404
+    used_count = db.execute('SELECT COUNT(*) AS c FROM records WHERE category=?', (name,)).fetchone()['c']
+    if used_count > 0:
+        return jsonify({'error': '该类别正在被账单使用，无法删除'}), 400
     db.execute('DELETE FROM categories WHERE name=?', (name,))
     db.commit()
     return jsonify({'ok': True})

@@ -36,20 +36,47 @@
     });
   }
 
+  function normalizeManageItems(items) {
+    var normalized = [];
+    for (var i = 0; i < (items || []).length; i++) {
+      var item = items[i];
+      if (typeof item === 'string') {
+        normalized.push({ name: item, usedCount: 0, inUse: false });
+        continue;
+      }
+      if (!item || typeof item !== 'object' || !item.name) continue;
+      var usedCount = Number(item.used_count);
+      if (!isFinite(usedCount) || usedCount < 0) usedCount = 0;
+      normalized.push({
+        name: item.name,
+        usedCount: usedCount,
+        inUse: !!item.in_use || usedCount > 0
+      });
+    }
+    return normalized;
+  }
+
   // ===== 渲染支付人列表 =====
-  function renderPayers(payers) {
+  function renderPayers(rawPayers) {
+    var payers = normalizeManageItems(rawPayers);
     if (payers.length === 0) {
       payerListEl.innerHTML = '<div class="empty-state" style="padding:16px;text-align:center;color:var(--text-muted);">暂无支付人</div>';
       return;
     }
     var html = '';
     for (var i = 0; i < payers.length; i++) {
+      var payer = payers[i];
       html +=
         '<div class="manage-item">' +
-          '<span class="manage-item-name">' + escapeHtml(payers[i]) + '</span>' +
+          '<div class="manage-item-main">' +
+            '<span class="manage-item-name">' + escapeHtml(payer.name) + '</span>' +
+            '<span class="manage-item-usage ' + (payer.inUse ? 'is-used' : 'is-free') + '">' +
+              (payer.inUse ? ('账单使用中 · ' + payer.usedCount + ' 条') : '未被账单使用') +
+            '</span>' +
+          '</div>' +
           '<div class="manage-item-actions">' +
-            '<button class="btn btn-sm btn-outline edit-payer-btn" data-name="' + escapeHtml(payers[i]) + '">编辑</button>' +
-            '<button class="btn btn-sm btn-danger del-payer-btn" data-name="' + escapeHtml(payers[i]) + '">删除</button>' +
+            '<button class="btn btn-sm btn-outline edit-payer-btn" data-name="' + escapeHtml(payer.name) + '">编辑</button>' +
+            '<button class="btn btn-sm btn-danger del-payer-btn" data-name="' + escapeHtml(payer.name) + '" data-in-use="' + (payer.inUse ? '1' : '0') + '"' + (payer.inUse ? ' disabled title="正在被账单使用，无法删除"' : '') + '>删除</button>' +
           '</div>' +
         '</div>';
     }
@@ -66,7 +93,11 @@
     for (var k = 0; k < delBtns.length; k++) {
       delBtns[k].addEventListener('click', function() {
         var name = this.getAttribute('data-name');
-        showConfirm('确定要删除支付人「' + name + '」吗？', function() {
+        if (this.getAttribute('data-in-use') === '1') {
+          showToast('该支付人正在被账单使用，无法删除');
+          return;
+        }
+        showConfirm('确定要删除支付人「' + name + '」吗？删除后不可恢复。', function() {
           api.deletePayer(name).then(function() {
             showToast('已删除');
             loadData();
@@ -79,19 +110,26 @@
   }
 
   // ===== 渲染类别列表 =====
-  function renderCategories(categories) {
+  function renderCategories(rawCategories) {
+    var categories = normalizeManageItems(rawCategories);
     if (categories.length === 0) {
       categoryListEl.innerHTML = '<div class="empty-state" style="padding:16px;text-align:center;color:var(--text-muted);">暂无类别</div>';
       return;
     }
     var html = '';
     for (var i = 0; i < categories.length; i++) {
+      var category = categories[i];
       html +=
         '<div class="manage-item">' +
-          '<span class="manage-item-name">' + escapeHtml(categories[i]) + '</span>' +
+          '<div class="manage-item-main">' +
+            '<span class="manage-item-name">' + escapeHtml(category.name) + '</span>' +
+            '<span class="manage-item-usage ' + (category.inUse ? 'is-used' : 'is-free') + '">' +
+              (category.inUse ? ('账单使用中 · ' + category.usedCount + ' 条') : '未被账单使用') +
+            '</span>' +
+          '</div>' +
           '<div class="manage-item-actions">' +
-            '<button class="btn btn-sm btn-outline edit-cat-btn" data-name="' + escapeHtml(categories[i]) + '">编辑</button>' +
-            '<button class="btn btn-sm btn-danger del-cat-btn" data-name="' + escapeHtml(categories[i]) + '">删除</button>' +
+            '<button class="btn btn-sm btn-outline edit-cat-btn" data-name="' + escapeHtml(category.name) + '">编辑</button>' +
+            '<button class="btn btn-sm btn-danger del-cat-btn" data-name="' + escapeHtml(category.name) + '" data-in-use="' + (category.inUse ? '1' : '0') + '"' + (category.inUse ? ' disabled title="正在被账单使用，无法删除"' : '') + '>删除</button>' +
           '</div>' +
         '</div>';
     }
@@ -108,7 +146,11 @@
     for (var k = 0; k < delBtns.length; k++) {
       delBtns[k].addEventListener('click', function() {
         var name = this.getAttribute('data-name');
-        showConfirm('确定要删除类别「' + name + '」吗？', function() {
+        if (this.getAttribute('data-in-use') === '1') {
+          showToast('该类别正在被账单使用，无法删除');
+          return;
+        }
+        showConfirm('确定要删除类别「' + name + '」吗？删除后不可恢复。', function() {
           api.deleteCategory(name).then(function() {
             showToast('已删除');
             loadData();

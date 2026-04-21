@@ -121,6 +121,10 @@ a { color: var(--primary); text-decoration: none; }
   width: 32px; height: 32px; padding: 0;
   border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
 }
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ===== 卡片 ===== */
 .card {
@@ -280,3 +284,20 @@ a { color: var(--primary); text-decoration: none; }
 .manage-item:last-child { border-bottom: none; }
 .manage-item-name { font-size: 0.95rem; color: var(--text); }
 .manage-item-actions { display: flex; gap: 6px; }
+.manage-item-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.manage-item-usage {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: 0.75rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.manage-item-usage.is-used {
+  background: #fff1f0;
+  color: #cf1322;
+}
+.manage-item-usage.is-free {
+  background: #f6ffed;
+  color: #389e0d;
+}
