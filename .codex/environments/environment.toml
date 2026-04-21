@@ -3,12 +3,12 @@ version = 1
 name = "recorded"
 
 [setup]
-script = """
-python3 -m venv .venv
-.venv/bin/python3 -m pip install -r requirements.txt
-"""
+script = ""
 
 [[actions]]
 name = "运行"
 icon = "run"
-command = ".venv/bin/python3 app.py"
+command = '''
+cd /Users/mark/codex/recorded
+.venv/bin/python3 app.py
+'''
