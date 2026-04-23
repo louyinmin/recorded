@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="format-detection" content="telephone=no">
+  <title>续费雷达 - 设置中心</title>
+  <link rel="stylesheet" href="/expiry/assets/css/expiry.css">
+</head>
+<body class="expiry-body">
+  <div class="expiry-gridlines"></div>
+  <div class="expiry-app-shell">
+    <aside class="expiry-sidebar">
+      <div class="expiry-brand-block">
+        <div class="expiry-brand-mark">ER</div>
+        <div>
+          <div class="expiry-brand-name">续费雷达</div>
+          <div class="expiry-brand-subtitle">Settings Control Room</div>
+        </div>
+      </div>
+      <nav class="expiry-nav">
+        <a class="expiry-nav-link" href="/expiry/dashboard.html">仪表盘</a>
+        <a class="expiry-nav-link active" href="/expiry/settings.html">设置中心</a>
+        <a class="expiry-nav-link hidden" id="adminLink" href="/expiry/admin-users.html">账号管理</a>
+      </nav>
+    </aside>
+
+    <main class="expiry-main">
+      <header class="expiry-topbar">
+        <div>
+          <div class="expiry-kicker">Control Layer</div>
+          <h1>设置中心</h1>
+        </div>
+        <div class="expiry-topbar-actions">
+          <div class="expiry-user-pill" id="currentUser"></div>
+          <button class="expiry-btn expiry-btn-light" id="logoutBtn">退出</button>
+        </div>
+      </header>
+
+      <section class="expiry-board-grid">
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Account</span>
+              <h2 class="expiry-panel-title">账号资料</h2>
+            </div>
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">账号名</label>
+            <input class="expiry-input" id="profileUsername" type="text" disabled>
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">接收邮箱</label>
+            <input class="expiry-input" id="profileEmail" type="email" placeholder="提醒邮件接收地址">
+          </div>
+          <button class="expiry-btn expiry-btn-primary" id="saveProfileBtn">保存账号资料</button>
+        </div>
+
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Reminder</span>
+              <h2 class="expiry-panel-title">默认提醒规则</h2>
+            </div>
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">提醒阈值</label>
+            <input class="expiry-input" id="defaultOffsets" type="text" placeholder="30,7,1">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">时区</label>
+            <input class="expiry-input" id="timezone" type="text" value="Asia/Shanghai">
+          </div>
+          <button class="expiry-btn expiry-btn-primary" id="saveReminderBtn">保存提醒设置</button>
+        </div>
+      </section>
+
+      <section class="expiry-board-grid">
+        <div class="expiry-panel expiry-panel-wide">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">SMTP</span>
+              <h2 class="expiry-panel-title">邮件发送配置</h2>
+            </div>
+          </div>
+
+          <div class="expiry-form-grid expiry-form-grid-2">
+            <div class="expiry-form-group">
+              <label class="expiry-label">认证模式</label>
+              <select class="expiry-input expiry-select" id="smtpAuthMode">
+                <option value="password">SMTP 密码</option>
+                <option value="microsoft_oauth2">Microsoft OAuth2</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="expiry-form-grid expiry-form-grid-3">
+            <div class="expiry-form-group">
+              <label class="expiry-label">SMTP Host</label>
+              <input class="expiry-input" id="smtpHost" type="text" placeholder="smtp.example.com">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">端口</label>
+              <input class="expiry-input" id="smtpPort" type="number" placeholder="587">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">安全方式</label>
+              <select class="expiry-input expiry-select" id="smtpSecurity">
+                <option value="starttls">STARTTLS</option>
+                <option value="ssl">SSL</option>
+                <option value="none">无</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="expiry-form-grid expiry-form-grid-2">
+            <div class="expiry-form-group">
+              <label class="expiry-label">SMTP Username</label>
+              <input class="expiry-input" id="smtpUsername" type="text" placeholder="发件账号">
+            </div>
+            <div class="expiry-form-group" id="smtpPasswordGroup">
+              <label class="expiry-label">SMTP Password</label>
+              <input class="expiry-input" id="smtpPassword" type="password" placeholder="留空则保留当前密码">
+            </div>
+          </div>
+
+          <div class="expiry-form-grid expiry-form-grid-2 hidden" id="oauth2Panel">
+            <div class="expiry-form-group">
+              <label class="expiry-label">Tenant ID</label>
+              <input class="expiry-input" id="oauthTenantId" type="text" placeholder="微软租户 ID（common / organizations 或 GUID）">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">Client ID</label>
+              <input class="expiry-input" id="oauthClientId" type="text" placeholder="Azure App Client ID">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">Client Secret</label>
+              <input class="expiry-input" id="oauthClientSecret" type="password" placeholder="留空则保留已保存值">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">Refresh Token</label>
+              <textarea class="expiry-input expiry-textarea" id="oauthRefreshToken" placeholder="粘贴 Microsoft OAuth2 刷新令牌（留空则保留已保存值）"></textarea>
+            </div>
+          </div>
+
+          <div class="expiry-form-grid expiry-form-grid-2">
+            <div class="expiry-form-group">
+              <label class="expiry-label">发件邮箱</label>
+              <input class="expiry-input" id="fromEmail" type="email" placeholder="noreply@example.com">
+            </div>
+            <div class="expiry-form-group">
+              <label class="expiry-label">发件人名称</label>
+              <input class="expiry-input" id="fromName" type="text" placeholder="续费雷达">
+            </div>
+          </div>
+
+          <div class="expiry-toggle-row">
+            <label class="expiry-label" for="smtpEnabled">启用邮件提醒</label>
+            <input id="smtpEnabled" type="checkbox">
+          </div>
+          <div class="expiry-muted-line" id="oauthStatusLine"></div>
+          <div class="expiry-muted-line" id="smtpStatusLine"></div>
+          <div class="expiry-modal-actions">
+            <button class="expiry-btn expiry-btn-primary" id="saveEmailBtn">保存邮件配置</button>
+            <button class="expiry-btn expiry-btn-ghost" id="testEmailBtn">发送测试邮件</button>
+          </div>
+        </div>
+
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Password</span>
+              <h2 class="expiry-panel-title">修改密码</h2>
+            </div>
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">原密码</label>
+            <input class="expiry-input" id="oldPassword" type="password">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">新密码</label>
+            <input class="expiry-input" id="newPassword" type="password">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">确认新密码</label>
+            <input class="expiry-input" id="confirmPassword" type="password">
+          </div>
+          <button class="expiry-btn expiry-btn-primary" id="changePasswordBtn">更新密码</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/expiry/assets/js/common.js"></script>
+  <script src="/expiry/assets/js/settings.js"></script>
+</body>
+</html>

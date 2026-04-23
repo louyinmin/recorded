@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="format-detection" content="telephone=no">
+  <title>续费雷达 - 账号管理</title>
+  <link rel="stylesheet" href="/expiry/assets/css/expiry.css">
+</head>
+<body class="expiry-body">
+  <div class="expiry-gridlines"></div>
+  <div class="expiry-app-shell">
+    <aside class="expiry-sidebar">
+      <div class="expiry-brand-block">
+        <div class="expiry-brand-mark">ER</div>
+        <div>
+          <div class="expiry-brand-name">续费雷达</div>
+          <div class="expiry-brand-subtitle">Admin Access Console</div>
+        </div>
+      </div>
+      <nav class="expiry-nav">
+        <a class="expiry-nav-link" href="/expiry/dashboard.html">仪表盘</a>
+        <a class="expiry-nav-link" href="/expiry/settings.html">设置中心</a>
+        <a class="expiry-nav-link active" href="/expiry/admin-users.html">账号管理</a>
+      </nav>
+    </aside>
+
+    <main class="expiry-main">
+      <header class="expiry-topbar">
+        <div>
+          <div class="expiry-kicker">Administrator Zone</div>
+          <h1>账号管理</h1>
+        </div>
+        <div class="expiry-topbar-actions">
+          <div class="expiry-user-pill" id="currentUser"></div>
+          <button class="expiry-btn expiry-btn-light" id="logoutBtn">退出</button>
+        </div>
+      </header>
+
+      <section class="expiry-board-grid">
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Create User</span>
+              <h2 class="expiry-panel-title">创建账号</h2>
+            </div>
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">账号</label>
+            <input class="expiry-input" id="newUsername" type="text">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">邮箱</label>
+            <input class="expiry-input" id="newEmail" type="email">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">初始密码</label>
+            <input class="expiry-input" id="newPassword" type="text" placeholder="至少 6 位">
+          </div>
+          <div class="expiry-form-group">
+            <label class="expiry-label">角色</label>
+            <select class="expiry-input expiry-select" id="newRole">
+              <option value="user">普通用户</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+          <button class="expiry-btn expiry-btn-primary" id="createUserBtn">创建账号</button>
+        </div>
+
+        <div class="expiry-panel expiry-panel-wide">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">User Registry</span>
+              <h2 class="expiry-panel-title">账号列表</h2>
+            </div>
+          </div>
+          <div class="expiry-admin-grid" id="userList"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="expiry-modal hidden" id="editUserModal">
+    <div class="expiry-modal-backdrop" data-close="editUserModal"></div>
+    <div class="expiry-modal-card">
+      <div class="expiry-panel-head">
+        <div>
+          <span class="expiry-section-tag">User Edit</span>
+          <h2 class="expiry-panel-title">编辑账号</h2>
+        </div>
+        <button class="expiry-icon-btn" data-close="editUserModal">×</button>
+      </div>
+
+      <div class="expiry-form-group">
+        <label class="expiry-label">邮箱</label>
+        <input class="expiry-input" id="editUserEmail" type="email">
+      </div>
+      <div class="expiry-form-group">
+        <label class="expiry-label">角色</label>
+        <select class="expiry-input expiry-select" id="editUserRole">
+          <option value="user">普通用户</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+      <div class="expiry-modal-actions">
+        <button class="expiry-btn expiry-btn-light" data-close="editUserModal">取消</button>
+        <button class="expiry-btn expiry-btn-primary" id="saveUserBtn">保存变更</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/expiry/assets/js/common.js"></script>
+  <script src="/expiry/assets/js/admin-users.js"></script>
+</body>
+</html>

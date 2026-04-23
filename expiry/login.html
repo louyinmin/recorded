@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="format-detection" content="telephone=no">
+  <title>续费雷达 - 登录</title>
+  <link rel="stylesheet" href="/expiry/assets/css/expiry.css">
+</head>
+<body class="expiry-body expiry-login-body">
+  <div class="expiry-gridlines"></div>
+  <div class="expiry-login-shell">
+    <section class="expiry-login-panel">
+      <div class="expiry-kicker">Subscription Intelligence Console</div>
+      <h1 class="expiry-hero-title">续费雷达</h1>
+      <p class="expiry-hero-copy">把 GPT 会员、机场、视频会员、云服务和域名的到期、支出、提醒统一收拢在一块精密面板里。</p>
+      <div class="expiry-feature-strip">
+        <span>独立账号</span>
+        <span>邮件提醒</span>
+        <span>年度统计</span>
+      </div>
+    </section>
+
+    <section class="expiry-login-card">
+      <div class="expiry-card-glow"></div>
+      <div class="expiry-panel-head">
+        <span class="expiry-section-tag">Login</span>
+        <span class="expiry-status-dot">Secure</span>
+      </div>
+      <h2 class="expiry-panel-title">进入控制台</h2>
+      <p class="expiry-panel-copy">使用独立账号登录，不会影响原有旅行记账系统。</p>
+
+      <div class="expiry-form-group">
+        <label class="expiry-label" for="username">账号</label>
+        <input class="expiry-input" id="username" type="text" placeholder="请输入账号">
+      </div>
+      <div class="expiry-form-group">
+        <label class="expiry-label" for="password">密码</label>
+        <input class="expiry-input" id="password" type="password" placeholder="请输入密码">
+      </div>
+      <div class="expiry-error" id="loginError"></div>
+      <button class="expiry-btn expiry-btn-primary expiry-btn-block" id="loginBtn">登录续费雷达</button>
+      <a class="expiry-btn expiry-btn-ghost expiry-btn-block expiry-back-home" href="/">返回首页</a>
+      <div class="expiry-login-footnote">v1 支持多账号独立数据、站内提醒与自配 SMTP 邮件提醒。</div>
+    </section>
+  </div>
+
+  <script src="/expiry/assets/js/common.js"></script>
+  <script src="/expiry/assets/js/login.js"></script>
+</body>
+</html>

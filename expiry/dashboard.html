@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="format-detection" content="telephone=no">
+  <title>续费雷达 - 仪表盘</title>
+  <link rel="stylesheet" href="/expiry/assets/css/expiry.css">
+</head>
+<body class="expiry-body">
+  <div class="expiry-gridlines"></div>
+  <div class="expiry-app-shell">
+    <aside class="expiry-sidebar">
+      <div class="expiry-brand-block">
+        <div class="expiry-brand-mark">ER</div>
+        <div>
+          <div class="expiry-brand-name">续费雷达</div>
+          <div class="expiry-brand-subtitle">Precision Renewal Console</div>
+        </div>
+      </div>
+
+      <nav class="expiry-nav">
+        <a class="expiry-nav-link active" href="/expiry/dashboard.html">仪表盘</a>
+        <a class="expiry-nav-link" href="/expiry/settings.html">设置中心</a>
+        <a class="expiry-nav-link" href="/trips.html">旅行记账</a>
+        <a class="expiry-nav-link hidden" id="adminLink" href="/expiry/admin-users.html">账号管理</a>
+      </nav>
+
+      <div class="expiry-sidebar-card">
+        <div class="expiry-section-tag">Alert Matrix</div>
+        <h3>提醒机制</h3>
+        <p>默认在 30 / 7 / 1 天前触发，支持站内提醒与个人 SMTP 邮件提醒。</p>
+      </div>
+
+      <div class="expiry-sidebar-card">
+        <div class="expiry-section-tag">Isolation</div>
+        <h3>独立系统</h3>
+        <p>账号、会话、数据和界面均与旅行记账隔离，但共用同一台服务器与部署体系。</p>
+      </div>
+    </aside>
+
+    <main class="expiry-main">
+      <header class="expiry-topbar">
+        <div>
+          <div class="expiry-kicker">Operations View</div>
+          <h1>到期管理仪表盘</h1>
+        </div>
+        <div class="expiry-topbar-actions">
+          <div class="expiry-user-pill" id="currentUser"></div>
+          <button class="expiry-btn expiry-btn-ghost" id="openResourceBtn">新增资源</button>
+          <button class="expiry-btn expiry-btn-light" id="logoutBtn">退出</button>
+        </div>
+      </header>
+
+      <section class="expiry-banner hidden" id="passwordBanner">
+        <div>
+          <strong>首次登录提醒</strong>
+          <p>当前账号仍在使用初始化密码，建议立刻前往设置中心修改。</p>
+        </div>
+        <a class="expiry-btn expiry-btn-primary" href="/expiry/settings.html">去修改密码</a>
+      </section>
+
+      <section class="expiry-summary-grid" id="summaryGrid"></section>
+
+      <section class="expiry-board-grid">
+        <div class="expiry-panel expiry-panel-wide expiry-chart-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Year Flow</span>
+              <h2 class="expiry-panel-title">当前年份支出分布</h2>
+            </div>
+            <div class="expiry-year-control" id="yearControl">
+              <button class="expiry-year-btn" id="yearPickerBtn" type="button" aria-label="选择统计年份">
+                <span class="expiry-panel-meta" id="statsYearLabel"></span>
+                <span class="expiry-year-caret">▾</span>
+              </button>
+              <div class="expiry-year-menu hidden" id="yearPickerMenu"></div>
+            </div>
+          </div>
+          <div class="expiry-chart-scroll-wrap" id="barChartWrap">
+            <div class="expiry-bar-chart" id="barChart"></div>
+          </div>
+          <div class="expiry-chart-hint">左右滑动可查看 1-12 月完整支出</div>
+        </div>
+
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Category Split</span>
+              <h2 class="expiry-panel-title">分类占比</h2>
+            </div>
+          </div>
+          <div class="expiry-breakdown-list" id="categoryBreakdown"></div>
+        </div>
+      </section>
+
+      <section class="expiry-board-grid">
+        <div class="expiry-panel expiry-panel-wide">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Resource Matrix</span>
+              <h2 class="expiry-panel-title">资源清单</h2>
+            </div>
+          </div>
+
+          <div class="expiry-filter-grid">
+            <input class="expiry-input" id="searchInput" type="search" placeholder="搜索名称、服务商、分类">
+            <select class="expiry-input expiry-select" id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="active">仍在使用</option>
+              <option value="upcoming">即将到期</option>
+              <option value="expired">已过期</option>
+              <option value="stopped">已停用</option>
+            </select>
+            <select class="expiry-input expiry-select" id="cycleFilter">
+              <option value="">全部周期</option>
+              <option value="monthly">月付</option>
+              <option value="yearly">年付</option>
+              <option value="none">一次性</option>
+            </select>
+            <select class="expiry-input expiry-select" id="categoryFilter">
+              <option value="">全部分类</option>
+            </select>
+          </div>
+
+          <div class="expiry-resource-grid" id="resourceGrid"></div>
+        </div>
+
+        <div class="expiry-panel">
+          <div class="expiry-panel-head">
+            <div>
+              <span class="expiry-section-tag">Inbox</span>
+              <h2 class="expiry-panel-title">提醒中心</h2>
+            </div>
+          </div>
+          <div class="expiry-notification-list" id="notificationList"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="expiry-modal hidden" id="resourceModal">
+    <div class="expiry-modal-backdrop" data-close="resourceModal"></div>
+    <div class="expiry-modal-card">
+      <div class="expiry-panel-head">
+        <div>
+          <span class="expiry-section-tag" id="resourceModalTag">Create</span>
+          <h2 class="expiry-panel-title" id="resourceModalTitle">新增资源</h2>
+        </div>
+        <button class="expiry-icon-btn" data-close="resourceModal">×</button>
+      </div>
+
+      <div class="expiry-form-grid expiry-form-grid-2">
+        <div class="expiry-form-group">
+          <label class="expiry-label">资源名称</label>
+          <input class="expiry-input" id="resourceName" type="text" placeholder="例如 GPT Plus">
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">服务商</label>
+          <input class="expiry-input" id="resourceProvider" type="text" placeholder="例如 OpenAI">
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">分类</label>
+          <input class="expiry-input" id="resourceCategory" type="text" placeholder="AI / 机场 / 视频 / 云服务">
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">金额（元）</label>
+          <input class="expiry-input" id="resourceAmount" type="number" min="0" step="0.01" placeholder="99">
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">资源类型</label>
+          <select class="expiry-input expiry-select" id="resourceType">
+            <option value="subscription">订阅资源</option>
+            <option value="one_time">一次性项目</option>
+          </select>
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">计费周期</label>
+          <select class="expiry-input expiry-select" id="resourceCycle">
+            <option value="monthly">月付</option>
+            <option value="yearly">年付</option>
+            <option value="none">一次性</option>
+          </select>
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">开始日期</label>
+          <input class="expiry-input expiry-date-input" id="resourceStartDate" type="date">
+        </div>
+        <div class="expiry-form-group">
+          <label class="expiry-label">下次到期日</label>
+          <input class="expiry-input expiry-date-input" id="resourceDueDate" type="date">
+        </div>
+      </div>
+
+      <div class="expiry-form-grid expiry-form-grid-2">
+        <div class="expiry-toggle-row">
+          <label class="expiry-label" for="resourceAutoRenew">自动续费</label>
+          <input id="resourceAutoRenew" type="checkbox">
+        </div>
+        <div class="expiry-toggle-row">
+          <label class="expiry-label" for="resourceStopped">标记停用</label>
+          <input id="resourceStopped" type="checkbox">
+        </div>
+      </div>
+
+      <div class="expiry-form-group">
+        <label class="expiry-label">提醒阈值</label>
+        <input class="expiry-input" id="resourceNotifyOffsets" type="text" placeholder="例如 30,7,1">
+      </div>
+      <div class="expiry-form-group">
+        <label class="expiry-label">备注</label>
+        <textarea class="expiry-input expiry-textarea" id="resourceNote" placeholder="记录付款方式、共享说明或续费策略"></textarea>
+      </div>
+      <div class="expiry-error" id="resourceError"></div>
+
+      <div class="expiry-modal-actions">
+        <button class="expiry-btn expiry-btn-light" data-close="resourceModal">取消</button>
+        <button class="expiry-btn expiry-btn-primary" id="saveResourceBtn">保存资源</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/expiry/assets/js/common.js"></script>
+  <script src="/expiry/assets/js/dashboard.js"></script>
+</body>
+</html>

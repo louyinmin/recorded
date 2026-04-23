@@ -9,21 +9,24 @@ import functools
 from flask import Flask, request, jsonify, g, send_from_directory, Response
 from urllib.parse import quote
 import io
+from expiry_backend import init_expiry_module
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.environ.get('RECORDED_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__, static_folder=None)
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.db')
+DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
 
 # 固定账号
 FIXED_USER = 'lou'
 FIXED_PASS = '123'
 
 # 密码文件路径（用于保存修改后的密码）
-PASSWORD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.password')
+PASSWORD_FILE = os.path.join(BASE_DIR, '.password')
 
 # 简单 token 存储（内存中，重启后失效，用户重新登录即可）
 valid_tokens = set()
+
+init_expiry_module(app, BASE_DIR, DB_PATH)
 
 def get_password():
     """获取当前密码（优先从文件读取）"""
@@ -537,7 +540,13 @@ def serve_static(filename):
 
 @app.route('/')
 def serve_index():
-    return send_from_directory(BASE_DIR, 'login.html')
+    return send_from_directory(BASE_DIR, 'home.html')
+
+
+@app.route('/expiry')
+@app.route('/expiry/')
+def serve_expiry_index():
+    return send_from_directory(os.path.join(BASE_DIR, 'expiry'), 'login.html')
 
 # ===== 启动 =====
 
