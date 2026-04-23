@@ -1,10 +1,13 @@
-# 旅游记账系统 - 安装与运行指南
+# Recorded 双模块系统 - 安装与运行指南
 
 ## 项目简介
 
-这是一个旅游记账 H5 页面系统，适配微信浏览器及移动端打开。  
-采用 **Flask + SQLite** 后端，数据存储在服务器端，多人可通过浏览器共同操作同一份数据。  
-前端由 **Nginx** 托管静态文件，并反向代理 API 请求到 Flask。
+这是一个基于 **Flask + SQLite + Nginx** 的双模块系统：
+
+- **旅游记账**：记录旅行支出
+- **续费雷达**：管理订阅、会员和到期提醒
+
+两个模块共享服务器资源与部署体系，但账号、页面、API 和业务数据完全隔离。
 
 ## 环境要求
 
@@ -20,15 +23,20 @@
 ```
 recorded/
 ├── app.py                  # Flask 后端（API 服务）
+├── expiry_backend/         # 到期管理后端模块
+├── expiry/                 # 到期管理前端页面与静态资源
 ├── requirements.txt        # Python 依赖
 ├── nginx.conf              # Nginx 配置模板
 ├── run_server.sh           # 一键部署脚本
+├── run_expiry_reminder.sh  # 到期提醒脚本
+├── reset_expiry_admin_password.sh  # 重置续费雷达管理员密码
 ├── data.db                 # SQLite 数据库（运行后自动生成）
 ├── login.html              # 登录页
 ├── trips.html              # 旅行列表页
 ├── trip.html               # 单次旅行记账页
 ├── INSTALL.md              # 本文档
 ├── recorded.md             # 需求说明（原始文档）
+├── expiry.md               # 续费雷达说明
 └── assets/
     ├── css/
     │   └── style.css       # 全局样式
@@ -58,21 +66,25 @@ sudo ./run_server.sh
 脚本会自动完成以下操作：
 1. 安装 Python3、pip、venv、Nginx
 2. 创建 Python 虚拟环境并安装 Flask
-3. 初始化 SQLite 数据库
-4. 配置 Nginx（静态文件 + 反向代理）
-5. 启动 Flask 后端（后台运行）
-6. 重启 Nginx
+3. 初始化旅游记账与续费雷达的数据表
+4. 创建续费雷达管理员账号与应用密钥
+5. 配置 Nginx（静态文件 + 反向代理）
+6. 安装续费提醒定时任务
+7. 启动 Flask 后端并重启 Nginx
 
 ### 3. 访问系统
 
 部署完成后，在浏览器中访问：
 
-```
+```text
 http://服务器IP/login.html
+http://服务器IP/expiry/login.html
 ```
 
-- 登录账号：`lou`
-- 登录密码：`123`
+- 旅行记账账号：`lou`
+- 旅行记账密码：`123`
+- 续费雷达管理员：`lou`
+- 续费雷达初始密码：首次部署时在终端打印一次
 
 ## 手动部署
 
@@ -98,6 +110,11 @@ python3 -m venv venv
 ```bash
 cd /home/user/recorded
 ./venv/bin/python3 -c "from app import init_db; init_db()"
+./venv/bin/python3 - <<'PY'
+from expiry_backend.service import ensure_initial_admin
+info = ensure_initial_admin('/home/user/recorded/data.db', '/home/user/recorded', username='lou')
+print(info)
+PY
 nohup ./venv/bin/python3 app.py > flask.log 2>&1 &
 ```
 
@@ -116,10 +133,22 @@ sudo systemctl restart nginx
 sudo systemctl enable nginx
 ```
 
-### 5. 访问
+### 5. 配置续费提醒任务
 
+创建文件 `/etc/cron.d/recorded-expiry-reminder`：
+
+```bash
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+CRON_TZ=Asia/Shanghai
+0 9 * * * root cd /home/user/recorded && RECORDED_BASE_DIR=/home/user/recorded RECORDED_DB_PATH=/home/user/recorded/data.db /home/user/recorded/run_expiry_reminder.sh >> /home/user/recorded/expiry_reminder.log 2>&1
 ```
+
+### 6. 访问
+
+```text
 http://服务器IP/login.html
+http://服务器IP/expiry/login.html
 ```
 
 ## 常见问题
@@ -150,7 +179,8 @@ nohup ./venv/bin/python3 app.py > flask.log 2>&1 &
 
 ### Q: 数据保存在哪里？
 
-数据保存在服务器端的 `data.db` 文件（SQLite 数据库）中。所有用户共享同一份数据。
+数据保存在服务器端的 `data.db` 文件（SQLite 数据库）中。  
+两个模块共用这个文件，但使用不同的数据表。
 
 ### Q: 如何备份数据？
 
@@ -162,4 +192,23 @@ cp /home/user/recorded/data.db /home/user/recorded/data.db.backup
 
 ```bash
 tail -f /home/user/recorded/flask.log
+```
+
+### Q: 如何查看续费提醒日志？
+
+```bash
+tail -f /home/user/recorded/expiry_reminder.log
+```
+
+### Q: 初始化已执行过，如何只重置续费雷达管理员密码？
+
+```bash
+cd /home/user/recorded
+chmod +x reset_expiry_admin_password.sh
+
+# 自动生成随机临时密码（默认强制首次登录改密）
+./reset_expiry_admin_password.sh
+
+# 或者手动指定密码
+./reset_expiry_admin_password.sh --password 'Init@2026'
 ```

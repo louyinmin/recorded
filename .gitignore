@@ -42,6 +42,7 @@ env/
 
 # 密码文件
 .password
+.expiry_secret
 
 # IDE
 .idea/

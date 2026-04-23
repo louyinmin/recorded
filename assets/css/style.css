@@ -102,7 +102,7 @@ a { color: var(--primary); text-decoration: none; }
   display: inline-flex; align-items: center; justify-content: center;
   padding: 10px 20px; border: none; border-radius: var(--radius-sm);
   font-size: 0.95rem; font-weight: 500; cursor: pointer;
-  transition: all 0.2s; gap: 6px;
+  transition: all 0.2s; gap: 6px; text-decoration: none;
 }
 .btn-block { width: 100%; }
 .btn-primary { background: var(--primary); color: #fff; }

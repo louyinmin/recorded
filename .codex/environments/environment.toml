@@ -8,7 +8,4 @@ script = ""
 [[actions]]
 name = "运行"
 icon = "run"
-command = '''
-cd /Users/mark/codex/recorded
-.venv/bin/python3 app.py
-'''
+command = "/Users/mark/codex/recorded/.venv/bin/python3 app.py"
