@@ -35,7 +35,9 @@
       place-items: center;
       padding: 24px;
       position: relative;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     body::before {
@@ -171,6 +173,11 @@
     }
 
     @media (max-width: 820px) {
+      body {
+        align-items: start;
+        padding: 20px;
+      }
+
       .entry-shell {
         padding: 22px;
         border-radius: 18px;

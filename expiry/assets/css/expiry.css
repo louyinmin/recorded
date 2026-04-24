@@ -51,7 +51,9 @@ body.expiry-body {
 }
 
 .expiry-login-body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .expiry-login-shell {
@@ -840,9 +842,16 @@ body.expiry-body {
 }
 
 @media (max-width: 860px) {
+  html,
+  body.expiry-login-body {
+    min-height: 100%;
+  }
+
   .expiry-login-shell {
     grid-template-columns: 1fr;
     padding: 28px 20px;
+    min-height: auto;
+    align-items: start;
   }
 
   .expiry-main,
