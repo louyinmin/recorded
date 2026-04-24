@@ -199,7 +199,7 @@ CREATE TABLE categories (
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/login` | POST | 用户登录，获取 Token |
-| `/api/password` | POST | 修改密码 |
+| `/api/password` | POST | 兼容保留，固定返回 403（请到续费雷达修改密码） |
 
 ### 6.2 旅行管理
 
@@ -238,9 +238,9 @@ CREATE TABLE categories (
 
 ### 7.1 认证机制
 
-- **固定账号**: 默认用户名 `lou`，密码 `123`
-- **Token 认证**: 登录后返回随机 Token，后续请求通过 `Authorization: Bearer <token>` 传递
-- **内存存储**: Token 存储在内存中，服务重启后失效
+- **统一账号**: 旅行记账与续费雷达共用 `expiry_users` 账号体系
+- **Token 认证**: 登录后返回会话 Token，后续请求通过 `Authorization: Bearer <token>` 传递
+- **会话存储**: Token 存储在 `expiry_sessions` 表中，旅行记账与续费雷达共用会话体系
 
 ### 7.2 安全措施
 
@@ -348,8 +348,7 @@ recorded/
 
 ## 12. 默认访问信息
 
-- **默认账号**: lou
-- **默认密码**: 123
+- **管理员初始化**: 首次部署创建 `lou` 作为续费雷达管理员
 - **部署后访问**: 脚本会输出现场访问地址
 
 ---

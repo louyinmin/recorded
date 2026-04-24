@@ -103,15 +103,13 @@ SERVER_IP="$(hostname -I | awk '{print $1}')"
 echo "旅行记账: http://$SERVER_IP/login.html"
 echo "续费雷达: http://$SERVER_IP/expiry/login.html"
 echo ""
-echo "旅行记账账号: lou"
-echo "旅行记账密码: 123"
-echo ""
 echo "续费雷达管理员: $EXPIRY_ADMIN_USER"
 if [ "$EXPIRY_ADMIN_STATUS" = "created" ]; then
     echo "续费雷达初始密码: $EXPIRY_ADMIN_PASSWORD"
 else
     echo "续费雷达初始密码: 已存在管理员账号，本次未重置"
 fi
+echo "旅行记账登录: 使用续费雷达账号体系"
 echo ""
 echo "Flask 日志: $APP_DIR/flask.log"
 echo "提醒日志: $APP_DIR/expiry_reminder.log"

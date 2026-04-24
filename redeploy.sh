@@ -95,8 +95,7 @@ else
 fi
 
 echo ""
-echo "登录账号: lou"
-echo "登录密码: 123 (如已修改则使用新密码)"
+echo "登录说明: 旅行记账与续费雷达共用续费雷达账号体系"
 echo ""
 echo "Flask 日志: tail -f $APP_DIR/flask.log"
 echo "提醒日志: tail -f $APP_DIR/expiry_reminder.log"

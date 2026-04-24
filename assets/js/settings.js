@@ -3,10 +3,6 @@
 
   // DOM 引用
   var backBtn = document.getElementById('backBtn');
-  var oldPasswordEl = document.getElementById('oldPassword');
-  var newPasswordEl = document.getElementById('newPassword');
-  var confirmPasswordEl = document.getElementById('confirmPassword');
-  var changePasswordBtn = document.getElementById('changePasswordBtn');
   var newPayerNameEl = document.getElementById('newPayerName');
   var addPayerBtn = document.getElementById('addPayerBtn');
   var payerListEl = document.getElementById('payerList');
@@ -161,36 +157,6 @@
       });
     }
   }
-
-  // ===== 修改密码 =====
-  changePasswordBtn.addEventListener('click', function() {
-    var oldPwd = oldPasswordEl.value;
-    var newPwd = newPasswordEl.value;
-    var confirmPwd = confirmPasswordEl.value;
-    if (!oldPwd || !newPwd || !confirmPwd) {
-      showToast('请填写完整');
-      return;
-    }
-    if (newPwd !== confirmPwd) {
-      showToast('两次输入的新密码不一致');
-      return;
-    }
-    if (newPwd.length < 3) {
-      showToast('新密码至少3位');
-      return;
-    }
-    changePasswordBtn.disabled = true;
-    api.changePassword(oldPwd, newPwd).then(function() {
-      showToast('密码修改成功');
-      oldPasswordEl.value = '';
-      newPasswordEl.value = '';
-      confirmPasswordEl.value = '';
-      changePasswordBtn.disabled = false;
-    }).catch(function(err) {
-      showToast('修改失败: ' + err.message);
-      changePasswordBtn.disabled = false;
-    });
-  });
 
   // ===== 添加支付人 =====
   addPayerBtn.addEventListener('click', function() {

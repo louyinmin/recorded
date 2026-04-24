@@ -31,8 +31,12 @@ function checkAuth() {
   }
 }
 function logout() {
-  clearToken();
-  window.location.href = 'login.html';
+  api.logout().catch(function() {
+    return null;
+  }).then(function() {
+    clearToken();
+    window.location.href = 'login.html';
+  });
 }
 
 // ===== API 封装 =====
@@ -68,6 +72,13 @@ var api = {
         return data;
       });
     });
+  },
+
+  logout: function() {
+    return fetch('/api/logout', {
+      method: 'POST',
+      headers: api._headers()
+    }).then(api._handleResponse);
   },
 
   // 旅行
@@ -147,13 +158,6 @@ var api = {
   deleteCategory: function(name) {
     return fetch('/api/categories/' + encodeURIComponent(name), {
       method: 'DELETE', headers: api._headers()
-    }).then(api._handleResponse);
-  },
-
-  // 修改密码
-  changePassword: function(oldPassword, newPassword) {
-    return fetch('/api/password', {
-      method: 'POST', headers: api._headers(), body: JSON.stringify({ oldPassword: oldPassword, newPassword: newPassword })
     }).then(api._handleResponse);
   },
 

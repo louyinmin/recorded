@@ -10,38 +10,19 @@ from flask import Flask, request, jsonify, g, send_from_directory, Response
 from urllib.parse import quote
 import io
 from expiry_backend import init_expiry_module
+from expiry_backend.service import (
+    create_session,
+    get_token_from_request,
+    resolve_session,
+    verify_password,
+)
 
 BASE_DIR = os.environ.get('RECORDED_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__, static_folder=None)
 
 DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
 
-# 固定账号
-FIXED_USER = 'lou'
-FIXED_PASS = '123'
-
-# 密码文件路径（用于保存修改后的密码）
-PASSWORD_FILE = os.path.join(BASE_DIR, '.password')
-
-# 简单 token 存储（内存中，重启后失效，用户重新登录即可）
-valid_tokens = set()
-
 init_expiry_module(app, BASE_DIR, DB_PATH)
-
-def get_password():
-    """获取当前密码（优先从文件读取）"""
-    if os.path.exists(PASSWORD_FILE):
-        try:
-            with open(PASSWORD_FILE, 'r') as f:
-                return f.read().strip()
-        except:
-            pass
-    return FIXED_PASS
-
-def set_password(new_password):
-    """保存新密码到文件"""
-    with open(PASSWORD_FILE, 'w') as f:
-        f.write(new_password)
 
 DEFAULT_CATEGORIES = ['交通工具（飞机/动车/自驾）', '住宿', '餐费', '打车']
 
@@ -64,11 +45,13 @@ def close_db(exc):
 def init_db():
     """初始化数据库表和默认数据"""
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA foreign_keys=ON')
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS trips (
             id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL DEFAULT '',
             name TEXT NOT NULL,
             start_date TEXT,
             end_date TEXT,
@@ -77,6 +60,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS records (
             id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL DEFAULT '',
             trip_id TEXT NOT NULL,
             category TEXT NOT NULL,
             amount REAL NOT NULL,
@@ -87,16 +71,18 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS payers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL
+            user_id TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL,
+            UNIQUE (user_id, name)
         );
         CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL
+            user_id TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL,
+            UNIQUE (user_id, name)
         );
     ''')
-    # 插入默认类别（忽略已存在的）
-    for cat in DEFAULT_CATEGORIES:
-        conn.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (cat,))
+    migrate_travel_schema(conn)
     conn.commit()
     conn.close()
 
@@ -105,9 +91,11 @@ def init_db():
 def require_auth(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        token = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not token or token not in valid_tokens:
+        user = resolve_session(get_db(), get_token_from_request())
+        if not user:
             return jsonify({'error': '未登录或登录已过期'}), 401
+        g.travel_user = user
+        ensure_travel_user_setup(get_db(), user['id'])
         return f(*args, **kwargs)
     return wrapper
 
@@ -124,35 +112,169 @@ def row_to_dict(row):
 def rows_to_list(rows):
     return [dict(r) for r in rows]
 
+
+def get_default_travel_owner_id(conn):
+    row = conn.execute(
+        """
+        SELECT id FROM expiry_users
+        WHERE username='lou'
+        ORDER BY created_at ASC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row:
+        return row['id']
+    row = conn.execute(
+        '''
+        SELECT id FROM expiry_users
+        ORDER BY created_at ASC
+        LIMIT 1
+        '''
+    ).fetchone()
+    return row['id'] if row else ''
+
+
+def has_column(conn, table_name, column_name):
+    rows = conn.execute("PRAGMA table_info({})".format(table_name)).fetchall()
+    return any(row['name'] == column_name for row in rows)
+
+
+def table_sql(conn, table_name):
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return (row['sql'] or '') if row else ''
+
+
+def rebuild_named_table(conn, table_name, default_owner_id):
+    temp_name = '{}_new'.format(table_name)
+    conn.execute('DROP TABLE IF EXISTS {}'.format(temp_name))
+    conn.execute(
+        '''
+        CREATE TABLE {} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL,
+            UNIQUE (user_id, name)
+        )
+        '''.format(temp_name)
+    )
+    user_expr = "COALESCE(NULLIF(user_id, ''), ?)" if has_column(conn, table_name, 'user_id') else '?'
+    conn.execute(
+        '''
+        INSERT OR IGNORE INTO {temp} (user_id, name)
+        SELECT DISTINCT {user_expr}, name
+        FROM {table}
+        ORDER BY id
+        '''.format(temp=temp_name, user_expr=user_expr, table=table_name),
+        (default_owner_id,),
+    )
+    conn.execute('DROP TABLE {}'.format(table_name))
+    conn.execute('ALTER TABLE {} RENAME TO {}'.format(temp_name, table_name))
+
+
+def migrate_travel_schema(conn):
+    default_owner_id = get_default_travel_owner_id(conn)
+
+    if not has_column(conn, 'trips', 'user_id'):
+        conn.execute("ALTER TABLE trips ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+    if default_owner_id:
+        conn.execute(
+            "UPDATE trips SET user_id=? WHERE user_id IS NULL OR user_id=''",
+            (default_owner_id,),
+        )
+
+    if not has_column(conn, 'records', 'user_id'):
+        conn.execute("ALTER TABLE records ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        '''
+        UPDATE records
+        SET user_id=COALESCE(
+            NULLIF(user_id, ''),
+            (SELECT trips.user_id FROM trips WHERE trips.id = records.trip_id),
+            ?
+        )
+        ''',
+        (default_owner_id,),
+    )
+
+    if 'UNIQUE (user_id, name)' not in table_sql(conn, 'payers'):
+        rebuild_named_table(conn, 'payers', default_owner_id)
+    elif default_owner_id:
+        conn.execute(
+            "UPDATE payers SET user_id=? WHERE user_id IS NULL OR user_id=''",
+            (default_owner_id,),
+        )
+
+    if 'UNIQUE (user_id, name)' not in table_sql(conn, 'categories'):
+        rebuild_named_table(conn, 'categories', default_owner_id)
+    elif default_owner_id:
+        conn.execute(
+            "UPDATE categories SET user_id=? WHERE user_id IS NULL OR user_id=''",
+            (default_owner_id,),
+        )
+
+
+def ensure_travel_user_setup(conn, user_id):
+    for cat in DEFAULT_CATEGORIES:
+        conn.execute(
+            'INSERT OR IGNORE INTO categories (user_id, name) VALUES (?, ?)',
+            (user_id, cat),
+        )
+    conn.commit()
+
 # ===== API：登录 =====
 
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json(silent=True) or {}
-    username = data.get('username', '')
-    password = data.get('password', '')
-    if username == FIXED_USER and password == get_password():
-        token = uuid.uuid4().hex
-        valid_tokens.add(token)
-        return jsonify({'token': token})
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', ''))
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT * FROM expiry_users
+        WHERE username=? AND status='active'
+        """,
+        (username,),
+    ).fetchone()
+    if row and verify_password(password, row['password_hash']):
+        token, expires_at = create_session(db, row['id'])
+        db.execute(
+            'UPDATE expiry_users SET last_login_at=datetime("now") WHERE id=?',
+            (row['id'],),
+        )
+        ensure_travel_user_setup(db, row['id'])
+        db.commit()
+        return jsonify({
+            'token': token,
+            'expires_at': expires_at,
+            'user': {
+                'id': row['id'],
+                'username': row['username'],
+                'role': row['role'],
+            },
+        })
     return jsonify({'error': '账号或密码错误'}), 401
 
-# ===== API：修改密码 =====
+
+@app.route('/api/logout', methods=['POST'])
+@require_auth
+def logout():
+    db = get_db()
+    token = get_token_from_request()
+    db.execute('DELETE FROM expiry_sessions WHERE token=?', (token,))
+    db.commit()
+    return jsonify({'ok': True})
+
+# ===== API：账号管理 =====
 
 @app.route('/api/password', methods=['POST'])
 @require_auth
 def change_password():
-    data = request.get_json(silent=True) or {}
-    old_password = data.get('oldPassword', '')
-    new_password = data.get('newPassword', '')
-    if not old_password or not new_password:
-        return jsonify({'error': '请填写完整'}), 400
-    if len(new_password) < 3:
-        return jsonify({'error': '新密码至少3位'}), 400
-    if old_password != get_password():
-        return jsonify({'error': '原密码错误'}), 400
-    set_password(new_password)
-    return jsonify({'ok': True})
+    # Account and password management is centralized in expiry radar.
+    return jsonify({'error': '请前往续费雷达设置页修改密码'}), 403
 
 # ===== API：旅行 =====
 
@@ -161,19 +283,21 @@ def change_password():
 def get_trips():
     db = get_db()
     trips = rows_to_list(db.execute(
-        'SELECT * FROM trips ORDER BY created_at DESC'
+        'SELECT * FROM trips WHERE user_id=? ORDER BY created_at DESC',
+        (g.travel_user['id'],)
     ).fetchall())
     # 为每个旅行附加汇总信息
     for t in trips:
         row = db.execute(
-            'SELECT COUNT(*) as cnt, COALESCE(SUM(amount),0) as total FROM records WHERE trip_id=?',
-            (t['id'],)
+            'SELECT COUNT(*) as cnt, COALESCE(SUM(amount),0) as total FROM records WHERE trip_id=? AND user_id=?',
+            (t['id'], g.travel_user['id'])
         ).fetchone()
         t['record_count'] = row['cnt']
         t['total_amount'] = row['total']
         # 参与人
         payers = db.execute(
-            'SELECT DISTINCT payer FROM records WHERE trip_id=?', (t['id'],)
+            'SELECT DISTINCT payer FROM records WHERE trip_id=? AND user_id=?',
+            (t['id'], g.travel_user['id'])
         ).fetchall()
         t['payers'] = [p['payer'] for p in payers]
     return jsonify(trips)
@@ -188,8 +312,8 @@ def create_trip():
     trip_id = gen_id()
     db = get_db()
     db.execute(
-        'INSERT INTO trips (id, name, start_date, end_date, note, created_at) VALUES (?,?,?,?,?,datetime("now"))',
-        (trip_id, name, data.get('startDate', ''), data.get('endDate', ''), data.get('note', ''))
+        'INSERT INTO trips (id, user_id, name, start_date, end_date, note, created_at) VALUES (?,?,?,?,?,?,datetime("now"))',
+        (trip_id, g.travel_user['id'], name, data.get('startDate', ''), data.get('endDate', ''), data.get('note', ''))
     )
     db.commit()
     return jsonify({'id': trip_id, 'name': name}), 201
@@ -198,11 +322,15 @@ def create_trip():
 @require_auth
 def get_trip(trip_id):
     db = get_db()
-    trip = row_to_dict(db.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone())
+    trip = row_to_dict(db.execute(
+        'SELECT * FROM trips WHERE id=? AND user_id=?',
+        (trip_id, g.travel_user['id'])
+    ).fetchone())
     if not trip:
         return jsonify({'error': '旅行不存在'}), 404
     records = rows_to_list(db.execute(
-        'SELECT * FROM records WHERE trip_id=? ORDER BY date DESC', (trip_id,)
+        'SELECT * FROM records WHERE trip_id=? AND user_id=? ORDER BY date DESC',
+        (trip_id, g.travel_user['id'])
     ).fetchall())
     trip['records'] = records
     # 汇总
@@ -220,7 +348,10 @@ def get_trip(trip_id):
 @require_auth
 def update_trip(trip_id):
     db = get_db()
-    existing = db.execute('SELECT id FROM trips WHERE id=?', (trip_id,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM trips WHERE id=? AND user_id=?',
+        (trip_id, g.travel_user['id'])
+    ).fetchone()
     if not existing:
         return jsonify({'error': '旅行不存在'}), 404
     data = request.get_json(silent=True) or {}
@@ -228,8 +359,8 @@ def update_trip(trip_id):
     if not name:
         return jsonify({'error': '旅行名称不能为空'}), 400
     db.execute(
-        'UPDATE trips SET name=?, start_date=?, end_date=?, note=? WHERE id=?',
-        (name, data.get('startDate', ''), data.get('endDate', ''), data.get('note', ''), trip_id)
+        'UPDATE trips SET name=?, start_date=?, end_date=?, note=? WHERE id=? AND user_id=?',
+        (name, data.get('startDate', ''), data.get('endDate', ''), data.get('note', ''), trip_id, g.travel_user['id'])
     )
     db.commit()
     return jsonify({'ok': True})
@@ -238,8 +369,8 @@ def update_trip(trip_id):
 @require_auth
 def delete_trip(trip_id):
     db = get_db()
-    db.execute('DELETE FROM records WHERE trip_id=?', (trip_id,))
-    db.execute('DELETE FROM trips WHERE id=?', (trip_id,))
+    db.execute('DELETE FROM records WHERE trip_id=? AND user_id=?', (trip_id, g.travel_user['id']))
+    db.execute('DELETE FROM trips WHERE id=? AND user_id=?', (trip_id, g.travel_user['id']))
     db.commit()
     return jsonify({'ok': True})
 
@@ -249,7 +380,10 @@ def delete_trip(trip_id):
 @require_auth
 def create_record(trip_id):
     db = get_db()
-    trip = db.execute('SELECT id FROM trips WHERE id=?', (trip_id,)).fetchone()
+    trip = db.execute(
+        'SELECT id FROM trips WHERE id=? AND user_id=?',
+        (trip_id, g.travel_user['id'])
+    ).fetchone()
     if not trip:
         return jsonify({'error': '旅行不存在'}), 404
     data = request.get_json(silent=True) or {}
@@ -266,12 +400,12 @@ def create_record(trip_id):
         return jsonify({'error': '金额必须为正数'}), 400
     rec_id = gen_id()
     db.execute(
-        'INSERT INTO records (id, trip_id, category, amount, payer, date, note) VALUES (?,?,?,?,?,?,?)',
-        (rec_id, trip_id, category, amount, payer, data.get('date', ''), data.get('note', ''))
+        'INSERT INTO records (id, user_id, trip_id, category, amount, payer, date, note) VALUES (?,?,?,?,?,?,?,?)',
+        (rec_id, g.travel_user['id'], trip_id, category, amount, payer, data.get('date', ''), data.get('note', ''))
     )
     # 自动记录支付人和类别
-    db.execute('INSERT OR IGNORE INTO payers (name) VALUES (?)', (payer,))
-    db.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (category,))
+    db.execute('INSERT OR IGNORE INTO payers (user_id, name) VALUES (?, ?)', (g.travel_user['id'], payer))
+    db.execute('INSERT OR IGNORE INTO categories (user_id, name) VALUES (?, ?)', (g.travel_user['id'], category))
     db.commit()
     return jsonify({'id': rec_id}), 201
 
@@ -279,7 +413,10 @@ def create_record(trip_id):
 @require_auth
 def update_record(rec_id):
     db = get_db()
-    existing = db.execute('SELECT id FROM records WHERE id=?', (rec_id,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM records WHERE id=? AND user_id=?',
+        (rec_id, g.travel_user['id'])
+    ).fetchone()
     if not existing:
         return jsonify({'error': '记录不存在'}), 404
     data = request.get_json(silent=True) or {}
@@ -295,11 +432,11 @@ def update_record(rec_id):
     except (ValueError, TypeError):
         return jsonify({'error': '金额必须为正数'}), 400
     db.execute(
-        'UPDATE records SET category=?, amount=?, payer=?, date=?, note=? WHERE id=?',
-        (category, amount, payer, data.get('date', ''), data.get('note', ''), rec_id)
+        'UPDATE records SET category=?, amount=?, payer=?, date=?, note=? WHERE id=? AND user_id=?',
+        (category, amount, payer, data.get('date', ''), data.get('note', ''), rec_id, g.travel_user['id'])
     )
-    db.execute('INSERT OR IGNORE INTO payers (name) VALUES (?)', (payer,))
-    db.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (category,))
+    db.execute('INSERT OR IGNORE INTO payers (user_id, name) VALUES (?, ?)', (g.travel_user['id'], payer))
+    db.execute('INSERT OR IGNORE INTO categories (user_id, name) VALUES (?, ?)', (g.travel_user['id'], category))
     db.commit()
     return jsonify({'ok': True})
 
@@ -307,7 +444,7 @@ def update_record(rec_id):
 @require_auth
 def delete_record(rec_id):
     db = get_db()
-    db.execute('DELETE FROM records WHERE id=?', (rec_id,))
+    db.execute('DELETE FROM records WHERE id=? AND user_id=?', (rec_id, g.travel_user['id']))
     db.commit()
     return jsonify({'ok': True})
 
@@ -320,10 +457,11 @@ def get_payers():
     rows = db.execute('''
         SELECT p.name, COUNT(r.id) AS used_count
         FROM payers p
-        LEFT JOIN records r ON r.payer = p.name
-        GROUP BY p.name
+        LEFT JOIN records r ON r.payer = p.name AND r.user_id = p.user_id
+        WHERE p.user_id=?
+        GROUP BY p.user_id, p.name
         ORDER BY p.id
-    ''').fetchall()
+    ''', (g.travel_user['id'],)).fetchall()
     return jsonify([
         {
             'name': r['name'],
@@ -341,7 +479,7 @@ def create_payer():
     if not name:
         return jsonify({'error': '姓名不能为空'}), 400
     db = get_db()
-    db.execute('INSERT OR IGNORE INTO payers (name) VALUES (?)', (name,))
+    db.execute('INSERT OR IGNORE INTO payers (user_id, name) VALUES (?, ?)', (g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True}), 201
 
@@ -353,16 +491,22 @@ def update_payer(name):
     if not new_name:
         return jsonify({'error': '姓名不能为空'}), 400
     db = get_db()
-    existing = db.execute('SELECT id FROM payers WHERE name=?', (name,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM payers WHERE user_id=? AND name=?',
+        (g.travel_user['id'], name)
+    ).fetchone()
     if not existing:
         return jsonify({'error': '支付人不存在'}), 404
     # 检查新名称是否已存在
-    duplicate = db.execute('SELECT id FROM payers WHERE name=? AND name!=?', (new_name, name)).fetchone()
+    duplicate = db.execute(
+        'SELECT id FROM payers WHERE user_id=? AND name=? AND name!=?',
+        (g.travel_user['id'], new_name, name)
+    ).fetchone()
     if duplicate:
         return jsonify({'error': '该姓名已存在'}), 400
-    db.execute('UPDATE payers SET name=? WHERE name=?', (new_name, name))
+    db.execute('UPDATE payers SET name=? WHERE user_id=? AND name=?', (new_name, g.travel_user['id'], name))
     # 同步更新记录中的支付人
-    db.execute('UPDATE records SET payer=? WHERE payer=?', (new_name, name))
+    db.execute('UPDATE records SET payer=? WHERE user_id=? AND payer=?', (new_name, g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True})
 
@@ -370,13 +514,19 @@ def update_payer(name):
 @require_auth
 def delete_payer(name):
     db = get_db()
-    existing = db.execute('SELECT id FROM payers WHERE name=?', (name,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM payers WHERE user_id=? AND name=?',
+        (g.travel_user['id'], name)
+    ).fetchone()
     if not existing:
         return jsonify({'error': '支付人不存在'}), 404
-    used_count = db.execute('SELECT COUNT(*) AS c FROM records WHERE payer=?', (name,)).fetchone()['c']
+    used_count = db.execute(
+        'SELECT COUNT(*) AS c FROM records WHERE user_id=? AND payer=?',
+        (g.travel_user['id'], name)
+    ).fetchone()['c']
     if used_count > 0:
         return jsonify({'error': '该支付人正在被账单使用，无法删除'}), 400
-    db.execute('DELETE FROM payers WHERE name=?', (name,))
+    db.execute('DELETE FROM payers WHERE user_id=? AND name=?', (g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True})
 
@@ -389,10 +539,11 @@ def get_categories():
     rows = db.execute('''
         SELECT c.name, COUNT(r.id) AS used_count
         FROM categories c
-        LEFT JOIN records r ON r.category = c.name
-        GROUP BY c.name
+        LEFT JOIN records r ON r.category = c.name AND r.user_id = c.user_id
+        WHERE c.user_id=?
+        GROUP BY c.user_id, c.name
         ORDER BY c.id
-    ''').fetchall()
+    ''', (g.travel_user['id'],)).fetchall()
     return jsonify([
         {
             'name': r['name'],
@@ -410,7 +561,7 @@ def create_category():
     if not name:
         return jsonify({'error': '类别名称不能为空'}), 400
     db = get_db()
-    db.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (name,))
+    db.execute('INSERT OR IGNORE INTO categories (user_id, name) VALUES (?, ?)', (g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True}), 201
 
@@ -422,16 +573,22 @@ def update_category(name):
     if not new_name:
         return jsonify({'error': '类别名称不能为空'}), 400
     db = get_db()
-    existing = db.execute('SELECT id FROM categories WHERE name=?', (name,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM categories WHERE user_id=? AND name=?',
+        (g.travel_user['id'], name)
+    ).fetchone()
     if not existing:
         return jsonify({'error': '类别不存在'}), 404
     # 检查新名称是否已存在
-    duplicate = db.execute('SELECT id FROM categories WHERE name=? AND name!=?', (new_name, name)).fetchone()
+    duplicate = db.execute(
+        'SELECT id FROM categories WHERE user_id=? AND name=? AND name!=?',
+        (g.travel_user['id'], new_name, name)
+    ).fetchone()
     if duplicate:
         return jsonify({'error': '该类别已存在'}), 400
-    db.execute('UPDATE categories SET name=? WHERE name=?', (new_name, name))
+    db.execute('UPDATE categories SET name=? WHERE user_id=? AND name=?', (new_name, g.travel_user['id'], name))
     # 同步更新记录中的类别
-    db.execute('UPDATE records SET category=? WHERE category=?', (new_name, name))
+    db.execute('UPDATE records SET category=? WHERE user_id=? AND category=?', (new_name, g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True})
 
@@ -439,13 +596,19 @@ def update_category(name):
 @require_auth
 def delete_category(name):
     db = get_db()
-    existing = db.execute('SELECT id FROM categories WHERE name=?', (name,)).fetchone()
+    existing = db.execute(
+        'SELECT id FROM categories WHERE user_id=? AND name=?',
+        (g.travel_user['id'], name)
+    ).fetchone()
     if not existing:
         return jsonify({'error': '类别不存在'}), 404
-    used_count = db.execute('SELECT COUNT(*) AS c FROM records WHERE category=?', (name,)).fetchone()['c']
+    used_count = db.execute(
+        'SELECT COUNT(*) AS c FROM records WHERE user_id=? AND category=?',
+        (g.travel_user['id'], name)
+    ).fetchone()['c']
     if used_count > 0:
         return jsonify({'error': '该类别正在被账单使用，无法删除'}), 400
-    db.execute('DELETE FROM categories WHERE name=?', (name,))
+    db.execute('DELETE FROM categories WHERE user_id=? AND name=?', (g.travel_user['id'], name))
     db.commit()
     return jsonify({'ok': True})
 
@@ -455,18 +618,23 @@ def delete_category(name):
 def export_trip_excel(trip_id):
     # 支持URL参数传递token（用于下载）
     token = request.args.get('token', '')
-    if not token or token not in valid_tokens:
-        return jsonify({'error': '未登录或登录已过期'}), 401
-    
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    user = resolve_session(conn, token)
+    if not token or not user:
+        conn.close()
+        return jsonify({'error': '未登录或登录已过期'}), 401
     try:
-        trip = conn.execute('SELECT * FROM trips WHERE id=?', (trip_id,)).fetchone()
+        trip = conn.execute(
+            'SELECT * FROM trips WHERE id=? AND user_id=?',
+            (trip_id, user['id'])
+        ).fetchone()
         if not trip:
             return jsonify({'error': '旅行不存在'}), 404
         trip = dict(trip)
         records = [dict(r) for r in conn.execute(
-            'SELECT * FROM records WHERE trip_id=? ORDER BY date DESC', (trip_id,)
+            'SELECT * FROM records WHERE trip_id=? AND user_id=? ORDER BY date DESC',
+            (trip_id, user['id'])
         ).fetchall()]
     finally:
         conn.close()
