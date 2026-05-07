@@ -8,15 +8,19 @@ var expiryApp = (function() {
 
   function setToken(token) {
     localStorage.setItem(STORAGE_KEY, token || '');
+    localStorage.setItem('travel_token', token || '');
   }
 
   function clearToken() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('travel_token');
+    localStorage.removeItem('travel_user');
   }
 
   function setUser(user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user || {}));
+    localStorage.setItem('travel_user', JSON.stringify(user || {}));
   }
 
   function getUser() {

@@ -13,14 +13,46 @@ function getCategoryStyle(name) {
 }
 
 // ===== Token 管理 =====
+var TRAVEL_TOKEN_KEY = 'travel_token';
+var TRAVEL_USER_KEY = 'travel_user';
+var EXPIRY_TOKEN_KEY = 'expiry_token';
+var EXPIRY_USER_KEY = 'expiry_user';
+
+function parseStoredUser(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch (err) {
+    return {};
+  }
+}
+
+function setTravelUser(user) {
+  localStorage.setItem(TRAVEL_USER_KEY, JSON.stringify(user || {}));
+}
+
+function syncTravelSessionFromExpiry() {
+  var expiryToken = localStorage.getItem(EXPIRY_TOKEN_KEY) || '';
+  var expiryUser = parseStoredUser(EXPIRY_USER_KEY);
+  var travelUser = parseStoredUser(TRAVEL_USER_KEY);
+  if (!expiryToken || !expiryUser.id) return;
+  if (!travelUser.id || travelUser.id !== expiryUser.id) {
+    localStorage.setItem(TRAVEL_TOKEN_KEY, expiryToken);
+    setTravelUser(expiryUser);
+  }
+}
+
 function getToken() {
-  return localStorage.getItem('travel_token') || '';
+  syncTravelSessionFromExpiry();
+  return localStorage.getItem(TRAVEL_TOKEN_KEY) || '';
 }
 function setToken(token) {
-  localStorage.setItem('travel_token', token);
+  localStorage.setItem(TRAVEL_TOKEN_KEY, token);
 }
 function clearToken() {
-  localStorage.removeItem('travel_token');
+  localStorage.removeItem(TRAVEL_TOKEN_KEY);
+  localStorage.removeItem(TRAVEL_USER_KEY);
+  localStorage.removeItem(EXPIRY_TOKEN_KEY);
+  localStorage.removeItem(EXPIRY_USER_KEY);
 }
 function isLoggedIn() {
   return !!getToken();
@@ -79,6 +111,10 @@ var api = {
       method: 'POST',
       headers: api._headers()
     }).then(api._handleResponse);
+  },
+
+  me: function() {
+    return fetch('/api/me', { headers: api._headers() }).then(api._handleResponse);
   },
 
   // 旅行

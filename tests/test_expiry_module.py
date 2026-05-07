@@ -35,6 +35,14 @@ class ExpiryModuleTestCase(unittest.TestCase):
     def auth_headers(self, token):
         return {'Authorization': 'Bearer ' + token}
 
+    def travel_login(self, username, password):
+        response = self.client.post('/api/login', json={
+            'username': username,
+            'password': password,
+        })
+        self.assertEqual(response.status_code, 200)
+        return response.get_json()['token']
+
     def test_admin_can_create_and_manage_resources(self):
         token = self.login(self.admin_username, self.admin_password)
         response = self.client.post('/api/expiry/resources', headers=self.auth_headers(token), json={
@@ -139,14 +147,56 @@ class ExpiryModuleTestCase(unittest.TestCase):
         user_payload = user_email_settings.get_json()
         self.assertTrue(user_payload['managed_by_admin'])
         self.assertEqual(user_payload['sender_owner'], 'lou')
-        self.assertEqual(user_payload['smtp_host'], 'smtp.example.com')
-        self.assertEqual(user_payload['from_email'], 'lou@example.com')
+        self.assertNotIn('smtp_host', user_payload)
+        self.assertNotIn('smtp_username', user_payload)
+        self.assertNotIn('from_email', user_payload)
 
         forbidden_save = self.client.put('/api/expiry/settings/email', headers=self.auth_headers(user_token), json={
             'smtp_host': 'smtp.user.com',
             'enabled': True,
         })
         self.assertEqual(forbidden_save.status_code, 403)
+
+    def test_travel_data_is_isolated_by_account(self):
+        admin_token = self.login(self.admin_username, self.admin_password)
+        created = self.client.post('/api/expiry/admin/users', headers=self.auth_headers(admin_token), json={
+            'username': 'alice',
+            'password': 'alice123',
+            'email': 'alice@example.com',
+            'role': 'user',
+        })
+        self.assertEqual(created.status_code, 201)
+
+        admin_travel_token = self.travel_login(self.admin_username, self.admin_password)
+        admin_trip = self.client.post('/api/trips', headers=self.auth_headers(admin_travel_token), json={
+            'name': 'Admin Trip',
+            'startDate': '2026-05-01',
+            'endDate': '2026-05-03',
+            'note': 'admin only',
+        })
+        self.assertEqual(admin_trip.status_code, 201)
+        admin_trip_id = admin_trip.get_json()['id']
+
+        user_travel_token = self.travel_login('alice', 'alice123')
+        user_trips = self.client.get('/api/trips', headers=self.auth_headers(user_travel_token))
+        self.assertEqual(user_trips.status_code, 200)
+        self.assertEqual(user_trips.get_json(), [])
+
+        user_admin_trip = self.client.get(
+            '/api/trips/{}'.format(admin_trip_id),
+            headers=self.auth_headers(user_travel_token),
+        )
+        self.assertEqual(user_admin_trip.status_code, 404)
+
+        user_trip = self.client.post('/api/trips', headers=self.auth_headers(user_travel_token), json={
+            'name': 'Alice Trip',
+            'startDate': '2026-06-01',
+        })
+        self.assertEqual(user_trip.status_code, 201)
+
+        admin_trips = self.client.get('/api/trips', headers=self.auth_headers(admin_travel_token))
+        self.assertEqual(admin_trips.status_code, 200)
+        self.assertEqual([trip['name'] for trip in admin_trips.get_json()], ['Admin Trip'])
 
     def test_email_settings_support_oauth_mode(self):
         token = self.login(self.admin_username, self.admin_password)

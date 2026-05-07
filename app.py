@@ -268,6 +268,18 @@ def logout():
     db.commit()
     return jsonify({'ok': True})
 
+
+@app.route('/api/me', methods=['GET'])
+@require_auth
+def travel_me():
+    user = dict(g.travel_user)
+    return jsonify({
+        'id': user['id'],
+        'username': user['username'],
+        'role': user['role'],
+        'email': user.get('email', ''),
+    })
+
 # ===== API：账号管理 =====
 
 @app.route('/api/password', methods=['POST'])

@@ -23,6 +23,9 @@
     loginBtn.textContent = '登录中...';
     api.login(user, pass).then(function(data) {
       setToken(data.token);
+      setTravelUser(data.user);
+      localStorage.setItem('expiry_token', data.token || '');
+      localStorage.setItem('expiry_user', JSON.stringify(data.user || {}));
       window.location.href = 'trips.html';
     }).catch(function(err) {
       loginError.textContent = err.message || '账号或密码错误';

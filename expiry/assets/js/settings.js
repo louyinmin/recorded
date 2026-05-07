@@ -12,6 +12,10 @@
     if (user.role === 'admin') {
       document.getElementById('adminLink').classList.remove('hidden');
     }
+    var emailPanel = document.getElementById('emailSettingsPanel');
+    if (emailPanel) {
+      emailPanel.classList.toggle('hidden', user.role !== 'admin');
+    }
   }
 
   function renderAuthMode(mode) {
@@ -96,13 +100,13 @@
   function loadSettings() {
     return Promise.all([
       expiryApp.api.getProfile(),
-      expiryApp.api.getReminderSettings(),
-      expiryApp.api.getEmailSettings()
+      expiryApp.api.getReminderSettings()
     ]).then(function(result) {
       fillUser(result[0]);
       document.getElementById('defaultOffsets').value = result[1].default_notify_offsets || '30,7,1';
       document.getElementById('timezone').value = result[1].timezone || 'Asia/Shanghai';
-      fillEmailSettings(result[2]);
+      if (result[0].role !== 'admin') return null;
+      return expiryApp.api.getEmailSettings().then(fillEmailSettings);
     });
   }
 

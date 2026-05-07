@@ -333,8 +333,15 @@ def email_settings():
     conn = get_expiry_db()
     current_user = dict(g.expiry_user)
     _, sender_user = get_sender_settings_for_user(conn, current_user)
+    if current_user.get('role') != ROLE_ADMIN:
+        return jsonify({
+            'managed_by_admin': True,
+            'sender_owner': sender_user.get('username', ''),
+            'sender_owner_display': '管理员 {}'.format(sender_user.get('username', '')),
+            'recipient_email': current_user.get('email', '') or '',
+        })
     payload = get_email_settings(conn, sender_user['id'])
-    payload['managed_by_admin'] = current_user.get('role') != ROLE_ADMIN
+    payload['managed_by_admin'] = False
     payload['sender_owner'] = sender_user.get('username', '')
     payload['sender_owner_display'] = '管理员 {}'.format(sender_user.get('username', ''))
     payload['recipient_email'] = current_user.get('email', '') or ''
