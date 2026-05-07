@@ -102,6 +102,51 @@ class ExpiryModuleTestCase(unittest.TestCase):
 
         forbidden = self.client.get('/api/expiry/admin/users', headers=self.auth_headers(user_token))
         self.assertEqual(forbidden.status_code, 403)
+        forbidden_create = self.client.post('/api/expiry/admin/users', headers=self.auth_headers(user_token), json={
+            'username': 'bob',
+            'password': 'bob123456',
+            'email': 'bob@example.com',
+            'role': 'user',
+        })
+        self.assertEqual(forbidden_create.status_code, 403)
+
+    def test_normal_user_uses_admin_sender_settings_and_cannot_edit_sender(self):
+        admin_token = self.login(self.admin_username, self.admin_password)
+        created = self.client.post('/api/expiry/admin/users', headers=self.auth_headers(admin_token), json={
+            'username': 'alice',
+            'password': 'alice123',
+            'email': 'alice@example.com',
+            'role': 'user',
+        })
+        self.assertEqual(created.status_code, 201)
+
+        admin_email_saved = self.client.put('/api/expiry/settings/email', headers=self.auth_headers(admin_token), json={
+            'auth_mode': 'password',
+            'smtp_host': 'smtp.example.com',
+            'smtp_port': 587,
+            'smtp_username': 'lou@example.com',
+            'smtp_password': 'demo-pass',
+            'smtp_security': 'starttls',
+            'from_email': 'lou@example.com',
+            'from_name': 'Lou Sender',
+            'enabled': True,
+        })
+        self.assertEqual(admin_email_saved.status_code, 200)
+
+        user_token = self.login('alice', 'alice123')
+        user_email_settings = self.client.get('/api/expiry/settings/email', headers=self.auth_headers(user_token))
+        self.assertEqual(user_email_settings.status_code, 200)
+        user_payload = user_email_settings.get_json()
+        self.assertTrue(user_payload['managed_by_admin'])
+        self.assertEqual(user_payload['sender_owner'], 'lou')
+        self.assertEqual(user_payload['smtp_host'], 'smtp.example.com')
+        self.assertEqual(user_payload['from_email'], 'lou@example.com')
+
+        forbidden_save = self.client.put('/api/expiry/settings/email', headers=self.auth_headers(user_token), json={
+            'smtp_host': 'smtp.user.com',
+            'enabled': True,
+        })
+        self.assertEqual(forbidden_save.status_code, 403)
 
     def test_email_settings_support_oauth_mode(self):
         token = self.login(self.admin_username, self.admin_password)

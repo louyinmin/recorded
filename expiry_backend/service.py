@@ -21,6 +21,7 @@ DEFAULT_NOTIFY_OFFSETS = '30,7,1'
 SESSION_DAYS = 30
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'
+DEFAULT_SENDER_ADMIN_USERNAME = 'lou'
 STATUS_ACTIVE = 'active'
 STATUS_DISABLED = 'disabled'
 RESOURCE_ACTIVE = 'active'
@@ -72,6 +73,38 @@ def close_expiry_db(exc=None):
 
 def row_to_dict(row):
     return dict(row) if row is not None else None
+
+
+def get_user_by_username(conn, username):
+    row = conn.execute(
+        'SELECT * FROM expiry_users WHERE username=?',
+        (str(username or '').strip(),),
+    ).fetchone()
+    return row_to_dict(row)
+
+
+def get_sender_settings_for_user(conn, user):
+    """Resolve effective sender settings.
+
+    Admin users send with their own config; normal users reuse admin lou config.
+    """
+    role = str((user or {}).get('role', '')).strip()
+    if role == ROLE_ADMIN:
+        sender_user = dict(user or {})
+    else:
+        sender_user = get_user_by_username(conn, DEFAULT_SENDER_ADMIN_USERNAME)
+        if not sender_user or sender_user.get('role') != ROLE_ADMIN:
+            raise ValueError('管理员 lou 不存在，无法使用统一发件配置')
+        if sender_user.get('status') != STATUS_ACTIVE:
+            raise ValueError('管理员 lou 已停用，无法使用统一发件配置')
+    ensure_user_settings(conn, sender_user['id'])
+    settings = row_to_dict(
+        conn.execute(
+            'SELECT * FROM expiry_email_settings WHERE user_id=?',
+            (sender_user['id'],),
+        ).fetchone()
+    ) or {}
+    return settings, sender_user
 
 
 def init_expiry_db(db_path, base_dir):

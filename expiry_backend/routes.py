@@ -21,6 +21,7 @@ from .service import (
     get_expiry_db,
     get_resource,
     get_resources,
+    get_sender_settings_for_user,
     get_user_settings,
     hash_password,
     list_notifications,
@@ -330,12 +331,21 @@ def update_profile():
 @require_expiry_auth
 def email_settings():
     conn = get_expiry_db()
-    return jsonify(get_email_settings(conn, g.expiry_user['id']))
+    current_user = dict(g.expiry_user)
+    _, sender_user = get_sender_settings_for_user(conn, current_user)
+    payload = get_email_settings(conn, sender_user['id'])
+    payload['managed_by_admin'] = current_user.get('role') != ROLE_ADMIN
+    payload['sender_owner'] = sender_user.get('username', '')
+    payload['sender_owner_display'] = '管理员 {}'.format(sender_user.get('username', ''))
+    payload['recipient_email'] = current_user.get('email', '') or ''
+    return jsonify(payload)
 
 
 @expiry_bp.route('/settings/email', methods=['PUT'])
 @require_expiry_auth
 def save_email_settings():
+    if g.expiry_user.get('role') != ROLE_ADMIN:
+        return jsonify({'error': '普通用户不能修改发件配置，请联系管理员 lou'}), 403
     conn = get_expiry_db()
     try:
         update_email_settings(
@@ -353,20 +363,19 @@ def save_email_settings():
 @require_expiry_auth
 def test_email():
     conn = get_expiry_db()
+    current_user = dict(g.expiry_user)
     user = conn.execute(
         'SELECT email FROM expiry_users WHERE id=?',
-        (g.expiry_user['id'],),
+        (current_user['id'],),
     ).fetchone()
     recipient = (user['email'] if user else '') or ''
     recipient = recipient.strip()
     if not recipient:
         return jsonify({'error': '请先在账号资料中填写接收邮箱'}), 400
-    email_settings = row_to_dict(
-        conn.execute(
-            'SELECT * FROM expiry_email_settings WHERE user_id=?',
-            (g.expiry_user['id'],),
-        ).fetchone()
-    ) or {}
+    try:
+        email_settings, sender_user = get_sender_settings_for_user(conn, current_user)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
     if not email_settings.get('enabled'):
         return jsonify({'error': '请先启用邮件提醒'}), 400
     try:
@@ -382,7 +391,7 @@ def test_email():
         )
     except Exception as exc:
         return jsonify({'error': '测试发送失败: {}'.format(exc)}), 400
-    return jsonify({'ok': True, 'recipient': recipient})
+    return jsonify({'ok': True, 'recipient': recipient, 'sender_owner': sender_user.get('username', '')})
 
 
 @expiry_bp.route('/settings/reminders', methods=['GET'])

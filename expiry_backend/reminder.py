@@ -12,6 +12,7 @@ from .service import (
     connect_db,
     create_notification,
     get_email_delivery_auth,
+    get_sender_settings_for_user,
     get_user_settings,
     local_today,
     notification_message,
@@ -63,7 +64,7 @@ def run_daily_scan(db_path, base_dir):
     summary = {'site_created': 0, 'email_sent': 0, 'email_failed': 0, 'advanced_resources': 0}
     try:
         users = conn.execute(
-            "SELECT id, email FROM expiry_users WHERE status=?",
+            "SELECT id, username, role, status, email FROM expiry_users WHERE status=?",
             (STATUS_ACTIVE,),
         ).fetchall()
         for user in users:
@@ -82,14 +83,15 @@ def run_daily_scan(db_path, base_dir):
                 ''',
                 (user['id'],),
             ).fetchall()
-            email_settings = row_to_dict(
-                conn.execute(
-                    'SELECT * FROM expiry_email_settings WHERE user_id=?',
-                    (user['id'],),
-                ).fetchone()
-            ) or {}
+            email_settings = {}
+            try:
+                email_settings, _ = get_sender_settings_for_user(conn, row_to_dict(user) or {})
+            except ValueError as exc:
+                email_settings = {}
+                auth_error = str(exc)
+            else:
+                auth_error = ''
             auth_payload = None
-            auth_error = ''
             if email_settings.get('enabled') and user['email']:
                 try:
                     auth_payload = get_email_delivery_auth(conn, email_settings, base_dir)

@@ -1,5 +1,6 @@
 (function() {
   var currentUser = null;
+  var emailManagedByAdmin = false;
   var EMAIL_AUTH_PASSWORD = 'password';
   var EMAIL_AUTH_MICROSOFT_OAUTH2 = 'microsoft_oauth2';
 
@@ -44,7 +45,36 @@
     smtpStatusLine.textContent = emailSettings.smtp_password_configured ? '当前已保存 SMTP 密码，留空不会覆盖。' : '当前尚未保存 SMTP 密码。';
   }
 
+  function setEmailSectionEditable(canEdit, senderOwnerDisplay) {
+    var fieldIds = [
+      'smtpAuthMode',
+      'smtpHost',
+      'smtpPort',
+      'smtpUsername',
+      'smtpPassword',
+      'smtpSecurity',
+      'fromEmail',
+      'fromName',
+      'smtpEnabled',
+      'oauthTenantId',
+      'oauthClientId',
+      'oauthClientSecret',
+      'oauthRefreshToken'
+    ];
+    fieldIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !canEdit;
+    });
+    document.getElementById('saveEmailBtn').disabled = !canEdit;
+    var line = document.getElementById('smtpStatusLine');
+    if (!canEdit) {
+      line.textContent = '普通用户发件配置由' + (senderOwnerDisplay || '管理员 lou') + '统一管理；你只需维护接收邮箱。';
+    }
+  }
+
   function fillEmailSettings(data) {
+    emailManagedByAdmin = !!data.managed_by_admin;
     var authMode = data.auth_mode || EMAIL_AUTH_PASSWORD;
     document.getElementById('smtpHost').value = data.smtp_host || '';
     document.getElementById('smtpPort').value = data.smtp_port || 587;
@@ -60,6 +90,7 @@
     document.getElementById('oauthRefreshToken').value = '';
     renderAuthMode(authMode);
     renderEmailStatus(data);
+    setEmailSectionEditable(!emailManagedByAdmin, data.sender_owner_display);
   }
 
   function loadSettings() {
@@ -99,6 +130,10 @@
   });
 
   document.getElementById('saveEmailBtn').addEventListener('click', function() {
+    if (emailManagedByAdmin) {
+      expiryApp.showToast('普通用户不能修改发件配置，请联系管理员 lou');
+      return;
+    }
     expiryApp.api.saveEmailSettings({
       auth_mode: document.getElementById('smtpAuthMode').value,
       smtp_host: document.getElementById('smtpHost').value.trim(),
@@ -136,6 +171,7 @@
   });
 
   document.getElementById('smtpAuthMode').addEventListener('change', function() {
+    if (emailManagedByAdmin) return;
     renderAuthMode(this.value);
   });
 
