@@ -33,6 +33,6 @@ git config --global user.name "louyinmin"
 git clone https://github.com/louyinmin/recorded.git
 
 # 后续更新
-cd recorded
-git pull
+cd /home/admin/recorded
+git -c http.version=HTTP/1.1 pull --ff-only origin main
 ./redeploy.sh
