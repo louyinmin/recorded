@@ -16,6 +16,8 @@
       --travel-b: #1f57cf;
       --expiry-a: #15a7b8;
       --expiry-b: #06788d;
+      --life-a: #0f9f9d;
+      --life-b: #0b6f73;
     }
 
     * {
@@ -93,7 +95,7 @@
 
     .entry-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 18px;
       margin-top: 24px;
     }
@@ -145,6 +147,10 @@
       background: linear-gradient(120deg, var(--expiry-a), var(--expiry-b));
     }
 
+    .entry-pill.life {
+      background: linear-gradient(120deg, var(--life-a), var(--life-b));
+    }
+
     .entry-btn {
       margin-top: auto;
       text-decoration: none;
@@ -164,6 +170,10 @@
 
     .entry-btn.expiry {
       background: linear-gradient(120deg, var(--expiry-a), var(--expiry-b));
+    }
+
+    .entry-btn.life {
+      background: linear-gradient(120deg, var(--life-a), var(--life-b));
     }
 
     .entry-foot {
@@ -218,6 +228,13 @@
         <h2 class="entry-title">续费雷达</h2>
         <p class="entry-copy">管理各类会员与服务到期日，查看月度/年度预计支出并接收提醒。</p>
         <a class="entry-btn expiry" href="/expiry/login.html">进入续费雷达</a>
+      </article>
+
+      <article class="entry-card">
+        <span class="entry-pill life">Life Atlas</span>
+        <h2 class="entry-title">生活航迹</h2>
+        <p class="entry-copy">记录日常、情绪、关系与重要决定，把生活片段沉淀成可复盘的人生时间轴。</p>
+        <a class="entry-btn life" href="/life.html">进入生活航迹</a>
       </article>
     </section>
 
