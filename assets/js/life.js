@@ -11,8 +11,10 @@
   var MOCK_RELATIONSHIP_STORAGE_KEY = 'life_mock_relationships_v1';
   var WISH_STORAGE_KEY = 'life_wishes_v1';
   var MOCK_WISH_STORAGE_KEY = 'life_mock_wishes_v1';
-  var MONTHLY_STORAGE_KEY = 'life_monthly_v1';
-  var MOCK_MONTHLY_STORAGE_KEY = 'life_mock_monthly_v1';
+  var PROJECT_STORAGE_KEY = 'life_projects_v1';
+  var MOCK_PROJECT_STORAGE_KEY = 'life_mock_projects_v1';
+  var HEALTH_STORAGE_KEY = 'life_health_records_v1';
+  var MOCK_HEALTH_STORAGE_KEY = 'life_mock_health_records_v1';
   var state = {
     view: 'timeline',
     query: '',
@@ -45,10 +47,6 @@
     wishCategory: '全部',
     wishSort: '按剩余天数排序',
     wishFormMode: null,
-    monthlyYear: 2026,
-    monthlyMonth: 4,
-    monthlyLetterMode: false,
-    monthlyQuoteMode: false,
     selectedMomentId: 'm1',
     selectedAxisId: 'a7',
     selectedDecisionId: 'd1',
@@ -86,17 +84,18 @@
   var seedMoments = [
     {
       id: 'm1',
-      type: '健康',
+      type: '情绪',
       icon: '☀',
-      time: '08:30',
+      time: '09:30',
       date: '今天 05-13',
-      title: '今天发生了什么',
-      copy: '晨跑 5 公里，状态不错，空气很清新。',
-      location: '上海 · 浦东滨江',
+      title: '今日心情：晴朗 78/100',
+      copy: '早上起来阳光很好，心情也跟着明亮起来。',
+      location: '情绪天气站',
       people: [],
       mood: '晴朗',
       photos: ['photo-river'],
-      tags: ['健康', '运动', '晨跑']
+      tags: ['情绪', '睡眠 7.2h', '压力 35/100'],
+      linkedMoodDate: '2026-05-13'
     },
     {
       id: 'm2',
@@ -105,8 +104,8 @@
       time: '10:45',
       date: '今天 05-13',
       title: '是否接受新工作的 Offer？',
-      copy: '职业发展机会更大，团队匹配度高，薪资涨幅合理。',
-      location: '上海',
+      copy: '我的选择：接受新 Offer；信心 70/100，计划 2026-10-20 复盘。',
+      location: '决策档案馆',
       people: ['HR', '张敏'],
       mood: '期待',
       photos: [],
@@ -119,13 +118,14 @@
       icon: '♟',
       time: '14:20',
       date: '今天 05-13',
-      title: '和张敏的互动减少了',
-      copy: '最近 30 天联系 1 次，上月是 6 次，关系距离感上升。',
-      location: '微信',
+      title: '关系温度：张敏',
+      copy: '最近联系：昨天 · 微信；亲密度 88/100，下次联系 4 天后。',
+      location: '关系温度',
       people: ['张敏'],
       mood: '平静',
       photos: [],
-      tags: ['关系', '提醒']
+      tags: ['关系', '朋友', '提醒'],
+      linkedRelationship: 'r3'
     },
     {
       id: 'm4',
@@ -133,9 +133,9 @@
       icon: '❄',
       time: '16:40',
       date: '今天 05-13',
-      title: '想买的相机（预算 ¥8,999）',
-      copy: '冷却中 21 天，初始心动：85/100。',
-      location: '线上商城',
+      title: '愿望冷却：相机 Sony A7C II',
+      copy: '剩余 12 天，当前想要程度 72%，价格 ¥12,999。',
+      location: '愿望冷却箱',
       people: [],
       mood: '兴奋',
       photos: ['photo-camera'],
@@ -154,7 +154,8 @@
       people: ['妈妈', '爸爸'],
       mood: '愉快',
       photos: ['photo-garden', 'photo-river', 'photo-night'],
-      tags: ['旅行', '家人', '本月值得记住']
+      tags: ['旅行', '家人', '本月值得记住'],
+      linkedView: 'monthly'
     },
     {
       id: 'm6',
@@ -162,13 +163,14 @@
       icon: '✓',
       time: '09:30',
       date: '昨天 05-12',
-      title: '项目进展',
-      copy: '完成产品原型设计，与团队评审通过。',
-      location: '腾讯会议',
+      title: '项目与目标：个人网站改版',
+      copy: '进度 60%，下一步：完成首页视觉稿。',
+      location: '项目与目标',
       people: ['May', 'Emily', '陈昊'],
       mood: '充实',
       photos: ['photo-office'],
-      tags: ['项目', '工作']
+      tags: ['项目', '工作'],
+      linkedView: 'projects'
     },
     {
       id: 'm7',
@@ -176,13 +178,14 @@
       icon: '☾',
       time: '22:10',
       date: '昨天 05-12',
-      title: '睡前记录',
-      copy: '看完《纳瓦尔宝典》，很多启发。明天继续阅读。',
-      location: '家',
+      title: '健康轨迹：睡眠 7.2 小时',
+      copy: '最近 3 天稳定，情绪评分更高；今晚继续保持睡前阅读。',
+      location: '健康与身体',
       people: [],
       mood: '平静',
       photos: ['photo-book'],
-      tags: ['阅读', '睡眠', '健康']
+      tags: ['阅读', '睡眠', '健康'],
+      linkedView: 'health'
     }
   ];
 
@@ -296,16 +299,16 @@
   ];
 
   var mockMoments = [
-    { id: 'm8', type: '记忆', icon: '◌', time: '21:40', date: '05-11', title: '和老朋友重逢', copy: '两年没见的大学室友，从下午聊到深夜，发现彼此都变得更松弛了。', location: '上海 · 衡山路', people: ['张敏', '李想'], mood: '温暖', photos: ['photo-cafe', 'photo-night'], tags: ['记忆', '朋友', '本月值得记住'] },
-    { id: 'm9', type: '健康', icon: '♡', time: '07:10', date: '05-10', title: '年度体检完成', copy: '指标整体正常，医生建议继续保持运动，减少久坐。', location: '上海体检中心', people: [], mood: '安心', photos: ['photo-office'], tags: ['健康', '身体信号'] },
-    { id: 'm10', type: '项目', icon: '▤', time: '16:00', date: '05-09', title: '个人网站首页评审', copy: '主视觉方向确定，下一步补齐作品集详情页和联系表单。', location: '远程会议', people: ['May', '陈昊'], mood: '充实', photos: ['photo-office', 'photo-book'], tags: ['项目', '作品集', '工作'] },
-    { id: 'm11', type: '愿望', icon: '♢', time: '22:20', date: '05-08', title: '想报名陶艺课', copy: '看到了周末陶艺体验课，想给自己留一段不用屏幕的时间。', location: '上海 · 静安', people: [], mood: '期待', photos: ['photo-book'], tags: ['愿望', '生活', '冷却中'] },
-    { id: 'm12', type: '关系', icon: '♟', time: '18:30', date: '05-07', title: '给爸爸打电话', copy: '聊了家里的花和最近的天气，他提醒我别总是熬夜。', location: '电话', people: ['爸爸'], mood: '平静', photos: [], tags: ['关系', '家人'] },
+    { id: 'm8', type: '记忆', icon: '◌', time: '21:40', date: '05-11', title: '和老朋友重逢', copy: '两年没见的大学室友，从下午聊到深夜，发现彼此都变得更松弛了。', location: '本月值得记住', people: ['张敏', '李想'], mood: '温暖', photos: ['photo-cafe', 'photo-night'], tags: ['记忆', '朋友', '本月值得记住'], linkedView: 'monthly' },
+    { id: 'm9', type: '健康', icon: '♡', time: '07:10', date: '05-10', title: '健康与身体：年度体检完成', copy: '指标整体正常，医生建议继续保持运动，减少久坐。', location: '健康与身体', people: [], mood: '安心', photos: ['photo-office'], tags: ['健康', '身体信号'], linkedView: 'health' },
+    { id: 'm10', type: '项目', icon: '▤', time: '16:00', date: '05-09', title: '项目与目标：个人网站首页评审', copy: '主视觉方向确定，下一步补齐作品集详情页和联系表单。', location: '项目与目标', people: ['May', '陈昊'], mood: '充实', photos: ['photo-office', 'photo-book'], tags: ['项目', '作品集', '工作'], linkedView: 'projects' },
+    { id: 'm11', type: '愿望', icon: '♢', time: '22:20', date: '05-08', title: '愿望冷却：Apple Watch Series 9', copy: '剩余 1 天，当前想要程度 40%，用于健康和运动数据记录。', location: '愿望冷却箱', people: [], mood: '期待', photos: ['photo-book'], tags: ['愿望', '数码', '冷却中'], linkedWish: 'w6' },
+    { id: 'm12', type: '关系', icon: '♟', time: '18:30', date: '05-07', title: '关系温度：爸爸', copy: '最近联系：3 天前 · 电话；亲密度 78/100，下次联系 12 天后。', location: '关系温度', people: ['爸爸'], mood: '平静', photos: [], tags: ['关系', '家人'], linkedRelationship: 'r2' },
     { id: 'm13', type: '决策', icon: '♎', time: '11:00', date: '05-06', title: '是否继续租现在的房子？', copy: '通勤便利，但房租上涨明显，需要对比搬家成本。', location: '上海 · 徐汇', people: [], mood: '纠结', photos: ['photo-office'], tags: ['决策', '居住', '冷却中'], linkedDecision: 'd4' },
-    { id: 'm14', type: '旅行', icon: '✈', time: '14:30', date: '05-04', title: '杭州西湖散步', copy: '阴天的湖边很安静，走了很长一段路，心情慢慢沉下来。', location: '杭州 · 西湖', people: ['Emma'], mood: '平静', photos: ['photo-garden', 'photo-river'], tags: ['旅行', '朋友'] },
-    { id: 'm15', type: '记忆', icon: '☾', time: '23:10', date: '05-03', title: '睡前读完一本书', copy: '读完《被讨厌的勇气》，关于课题分离的部分很有启发。', location: '家', people: [], mood: '安静', photos: ['photo-book'], tags: ['记忆', '学习', '阅读'] },
-    { id: 'm16', type: '项目', icon: '✓', time: '10:40', date: '04-28', title: '作品集摄影筛选', copy: '从 400 张照片里选出了 36 张候选，风格开始统一。', location: '家', people: ['阿木'], mood: '专注', photos: ['photo-camera', 'photo-mountain'], tags: ['项目', '作品', '摄影'] },
-    { id: 'm17', type: '健康', icon: '☁', time: '20:20', date: '04-26', title: '连续两天睡眠不足', copy: '晚上脑子停不下来，第二天明显注意力下降。', location: '家', people: [], mood: '疲惫', photos: [], tags: ['健康', '睡眠不足', '情绪天气'] }
+    { id: 'm14', type: '旅行', icon: '✈', time: '14:30', date: '05-04', title: '本月值得记住：杭州西湖散步', copy: '阴天的湖边很安静，走了很长一段路，心情慢慢沉下来。', location: '本月值得记住', people: ['Emma'], mood: '平静', photos: ['photo-garden', 'photo-river'], tags: ['旅行', '朋友'], linkedView: 'monthly' },
+    { id: 'm15', type: '记忆', icon: '☾', time: '23:10', date: '05-03', title: '资源库：睡前读完一本书', copy: '读完《被讨厌的勇气》，关于课题分离的部分很有启发。', location: '资源库', people: [], mood: '安静', photos: ['photo-book'], tags: ['记忆', '学习', '阅读'], linkedView: 'resources' },
+    { id: 'm16', type: '项目', icon: '✓', time: '10:40', date: '04-28', title: '项目与目标：作品集摄影筛选', copy: '从 400 张照片里选出了 36 张候选，风格开始统一。', location: '项目与目标', people: ['阿木'], mood: '专注', photos: ['photo-camera', 'photo-mountain'], tags: ['项目', '作品', '摄影'], linkedView: 'projects' },
+    { id: 'm17', type: '健康', icon: '☁', time: '20:20', date: '04-26', title: '情绪天气：连续两天睡眠不足', copy: '晚上脑子停不下来，第二天明显注意力下降。', location: '情绪天气站', people: [], mood: '疲惫', photos: [], tags: ['健康', '睡眠不足', '情绪天气'], linkedView: 'mood' }
   ];
 
   var mockDecisions = [
@@ -414,6 +417,7 @@
     '关系': 'red',
     '决策': 'amber',
     '愿望': 'blue',
+    '情绪': 'amber',
     '记忆': 'green'
   };
 
@@ -458,12 +462,16 @@
     settings: '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M4 12h2"/><path d="M18 12h2"/><path d="m6.3 6.3 1.4 1.4"/><path d="m16.3 16.3 1.4 1.4"/><path d="M12 4v2"/><path d="M12 18v2"/><path d="m17.7 6.3-1.4 1.4"/><path d="m7.7 16.3-1.4 1.4"/>',
     trash: '<path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5"/><path d="M14 11v5"/>',
     search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.1 0l1.4-1.4a5 5 0 0 0-7.1-7.1L10.5 5"/><path d="M14 11a5 5 0 0 0-7.1 0l-1.4 1.4a5 5 0 0 0 7.1 7.1l.9-.9"/>',
+    image: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m7 17 3.5-4 2.5 3 2-2.2 2.5 3.2"/>',
+    mic: '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/><path d="M8 21h8"/>',
+    file: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/>',
     location: '<path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
     people: '<path d="M16.5 19v-1c0-2-1.8-3.5-4-3.5h-1c-2.2 0-4 1.5-4 3.5v1"/><circle cx="12" cy="8" r="3"/><path d="M4.5 18c.2-1.8 1.2-3 2.8-3.6"/><path d="M19.5 18c-.2-1.8-1.2-3-2.8-3.6"/>',
     memory: '<path d="M7 4h10a1 1 0 0 1 1 1v16l-6-3-6 3V5a1 1 0 0 1 1-1Z"/><path d="M9 9h6"/><path d="M9 13h4"/>',
     travel: '<path d="M3 13 21 5l-6 16-3.5-6.5L3 13Z"/><path d="m21 5-9.5 9.5"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/>',
-    calm: '<path d="M19 15.5A7.5 7.5 0 0 1 8.5 5 7.5 7.5 0 1 0 19 15.5Z"/>',
+    calm: '<path d="M4 10c1.7 1.5 3.3 1.5 5 0s3.3-1.5 5 0 3.3 1.5 5 0"/><path d="M4 15c1.7 1.5 3.3 1.5 5 0s3.3-1.5 5 0 3.3 1.5 5 0"/>',
     smile: '<circle cx="12" cy="12" r="8"/><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M8.8 14.5c1.8 1.8 4.6 1.8 6.4 0"/>',
     star: '<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>',
     anxious: '<circle cx="12" cy="12" r="8"/><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M9 16c1.8-1.2 4.2-1.2 6 0"/>',
@@ -618,27 +626,24 @@
     localStorage.setItem(wishStorageKey(), JSON.stringify(store));
   }
 
-  function monthlyStorageKey() {
-    return mockMode ? MOCK_MONTHLY_STORAGE_KEY : MONTHLY_STORAGE_KEY;
+  function projectStorageKey() {
+    return mockMode ? MOCK_PROJECT_STORAGE_KEY : PROJECT_STORAGE_KEY;
   }
 
-  function getMonthlyStore() {
+  function healthStorageKey() {
+    return mockMode ? MOCK_HEALTH_STORAGE_KEY : HEALTH_STORAGE_KEY;
+  }
+
+  function getSimpleStore(key) {
     try {
-      var raw = JSON.parse(localStorage.getItem(monthlyStorageKey()) || '{}');
-      return {
-        bookmarked: raw.bookmarked || {},
-        reports: raw.reports || {},
-        archived: raw.archived || {},
-        letters: raw.letters || {},
-        quotes: raw.quotes || {}
-      };
+      return JSON.parse(localStorage.getItem(key) || '[]');
     } catch (err) {
-      return { bookmarked: {}, reports: {}, archived: {}, letters: {}, quotes: {} };
+      return [];
     }
   }
 
-  function saveMonthlyStore(store) {
-    localStorage.setItem(monthlyStorageKey(), JSON.stringify(store));
+  function saveSimpleStore(key, items) {
+    localStorage.setItem(key, JSON.stringify(items));
   }
 
   function decisionMetaKey() {
@@ -835,11 +840,11 @@
   }
 
   function allProjects() {
-    return withMockData(projects, mockProjects);
+    return getSimpleStore(projectStorageKey()).concat(withMockData(projects, mockProjects));
   }
 
   function allHealth() {
-    return withMockData(health, mockHealth);
+    return getSimpleStore(healthStorageKey()).concat(withMockData(health, mockHealth));
   }
 
   function allResources() {
@@ -885,6 +890,51 @@
     return '<div class="life-progress"><span style="--value:' + value + '%; --color:' + (color || 'var(--life-accent)') + '"></span></div>';
   }
 
+  function findById(items, id) {
+    return (items || []).filter(function(item) {
+      return item.id === id;
+    })[0] || null;
+  }
+
+  function targetFromMoment(moment) {
+    if (!moment) return { type: '', id: '' };
+    if (moment.linkedDecision) return { type: 'decision', id: moment.linkedDecision };
+    if (moment.linkedRelationship) return { type: 'relationship', id: moment.linkedRelationship };
+    if (moment.linkedWish) return { type: 'wish', id: moment.linkedWish };
+    if (moment.linkedMoodDate) return { type: 'mood', id: moment.linkedMoodDate };
+    if (moment.linkedView) return { type: 'view', id: moment.linkedView };
+    if (Array.isArray(moment.linkedModules)) {
+      var moduleMap = {
+        '情绪天气站': 'mood',
+        '健康轨迹': 'health',
+        '健康与身体': 'health',
+        '关系温度': 'relationships',
+        '愿望冷却箱': 'wishes',
+        '决策档案馆': 'decisions',
+        '项目与目标': 'projects',
+        '资源库': 'resources',
+        '本月值得记住': 'monthly',
+        '复盘与回顾': 'review'
+      };
+      var matched = moment.linkedModules.map(function(name) { return moduleMap[name]; }).filter(Boolean)[0];
+      if (matched) return { type: 'view', id: matched };
+    }
+    if (moment.type === '决策' || moment.type === '决定') return { type: 'view', id: 'decisions' };
+    if (moment.type === '关系') return { type: 'view', id: 'relationships' };
+    if (moment.type === '愿望') return { type: 'view', id: 'wishes' };
+    if (moment.type === '情绪') return { type: 'view', id: 'mood' };
+    if (moment.type === '项目') return { type: 'view', id: 'projects' };
+    if (moment.type === '健康') return { type: 'view', id: 'health' };
+    return { type: 'view', id: 'monthly' };
+  }
+
+  function momentTargetAttrs(moment) {
+    var target = targetFromMoment(moment);
+    return ' data-moment-id="' + escapeHtml(moment.id) + '"' +
+      (target.type ? ' data-moment-target="' + escapeHtml(target.type) + '"' : '') +
+      (target.id ? ' data-target-id="' + escapeHtml(target.id) + '"' : '');
+  }
+
   function showToast(message) {
     els.toast.textContent = message;
     els.toast.classList.add('show');
@@ -900,8 +950,61 @@
     render();
   }
 
+  function openMomentTarget(momentId, targetType, targetId) {
+    state.selectedMomentId = momentId;
+    var moment = findById(allMoments(), momentId);
+    var target = targetType ? { type: targetType, id: targetId } : targetFromMoment(moment);
+    if (target.type === 'decision') {
+      var decision = findById(decisionArchiveItems(), target.id);
+      state.selectedDecisionId = target.id;
+      if (decision) state.decisionFilter = decisionBucket(decision);
+      state.decisionFormMode = null;
+      state.view = 'decisions';
+      render();
+      return;
+    }
+    if (target.type === 'relationship') {
+      var relationship = findById(allRelationships(), target.id);
+      state.selectedRelationshipId = target.id;
+      if (relationship) state.relationshipFilter = relationship.group;
+      state.relationshipFormMode = null;
+      state.relationshipEditingId = '';
+      state.relationshipInlineEditor = '';
+      state.view = 'relationships';
+      render();
+      return;
+    }
+    if (target.type === 'wish') {
+      var wish = findById(allWishes(), target.id);
+      state.selectedWishId = target.id;
+      state.wishCategory = '全部';
+      if (wish) state.wishFilter = wish.status;
+      state.wishFormMode = null;
+      state.view = 'wishes';
+      render();
+      return;
+    }
+    if (target.type === 'mood') {
+      var parsed = parseMoodDate(target.id);
+      state.moodYear = parsed.year;
+      state.moodMonth = parsed.month;
+      state.selectedMoodDay = parsed.day;
+      state.moodTab = 'overview';
+      state.moodFormMode = null;
+      state.moodEditingId = '';
+      state.view = 'mood';
+      render();
+      return;
+    }
+    if (target.type === 'view' && target.id) {
+      setView(target.id);
+      return;
+    }
+    renderTimeline();
+  }
+
   function updateChrome() {
-    els.title.textContent = (state.view === 'life-axis' || state.view === 'decisions' || state.view === 'mood' || state.view === 'monthly') ? '生活航迹' : (viewTitles[state.view] || '生活航迹');
+    els.title.textContent = (state.view === 'life-axis' || state.view === 'decisions' || state.view === 'mood' || state.view === 'add') ? '生活航迹' : (viewTitles[state.view] || '生活航迹');
     document.body.setAttribute('data-life-view', state.view);
     Array.prototype.forEach.call(document.querySelectorAll('.life-nav-item'), function(btn) {
       btn.classList.toggle('active', btn.getAttribute('data-view') === state.view);
@@ -947,7 +1050,7 @@
       '<div class="life-moment-date">' + dayBlock + '</div>' +
       '<div class="life-moment-time"><span>' + escapeHtml(moment.time) + '</span></div>' +
       '<div class="life-moment-dot">' + iconHtml(iconForType(moment.type)) + '</div>' +
-      '<div class="life-card clickable ' + (state.selectedMomentId === moment.id ? 'active' : '') + '" data-moment-id="' + moment.id + '">' +
+      '<div class="life-card clickable ' + (state.selectedMomentId === moment.id ? 'active' : '') + '"' + momentTargetAttrs(moment) + '>' +
         '<div class="life-row-head"><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p></div>' +
         '<span class="life-badge ' + (colors[moment.type] || 'gray') + '">' + escapeHtml(moment.type) + '</span></div>' +
         photosHtml(moment.photos) +
@@ -989,50 +1092,56 @@
     if (moment.id === 'm5') return renderMemoryHomeCard(moment);
     if (moment.id === 'm6') return renderProjectHomeCard(moment);
     if (moment.id === 'm7') return renderSleepHomeCard(moment);
-    return '<div class="life-home-card life-card clickable" data-moment-id="' + moment.id + '"><div class="life-row-head"><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p></div><span class="life-badge ' + (colors[moment.type] || 'gray') + '">' + escapeHtml(moment.type) + '</span></div>' + photosHtml(moment.photos) + '<div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div>';
+    return '<div class="life-home-card life-card clickable"' + momentTargetAttrs(moment) + '><div class="life-row-head"><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p></div><span class="life-badge ' + (colors[moment.type] || 'gray') + '">' + escapeHtml(moment.type) + '</span></div>' + photosHtml(moment.photos) + '<div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div>';
   }
 
   function renderMorningCard(moment) {
-    return '<div class="life-home-card life-card life-weather-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-morning-main"><div class="life-home-type-icon amber">' + iconHtml('sun') + '</div><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p><div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(['健康','运动']) + '</div></div><span class="life-photo photo-river life-main-photo"></span></div>' +
+    var record = moodRecordForMonth(13, 2026, 4) || selectedMoodRecord() || { weather: '晴朗', score: 78, sleep: 7.2, pressure: 35, energy: 80, feeling: '平静' };
+    return '<div class="life-home-card life-card life-weather-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-morning-main"><div class="life-home-type-icon amber">' + iconHtml(moodIcons[record.weather] || 'sun') + '</div><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p><div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div><span class="life-photo photo-river life-main-photo"></span></div>' +
       '<div class="life-mood-row"><span class="life-muted">最近情绪</span><div class="life-mood-now">' + iconHtml('sun') + '<strong>晴朗</strong><span>78/100</span></div><span class="life-energy-note">精力充沛，适合推进重要的事。</span></div>' +
-      '<div class="life-weather-metrics"><span>情绪天气</span><span>睡眠 <strong>7.2h</strong> 良好</span><span>压力 <strong>35/100</strong> 较低</span><span>精力 <strong>80/100</strong> 充沛</span><span>感受 <strong>平静</strong></span></div>' +
+      '<div class="life-weather-metrics"><span>情绪天气</span><span>睡眠 <strong>' + escapeHtml(record.sleep) + 'h</strong> 良好</span><span>压力 <strong>' + escapeHtml(record.pressure) + '/100</strong> 较低</span><span>精力 <strong>' + escapeHtml(record.energy) + '/100</strong> 充沛</span><span>感受 <strong>' + escapeHtml(record.feeling) + '</strong></span></div>' +
     '</div>';
   }
 
   function renderDecisionHomeCard(moment) {
-    return '<div class="life-home-card life-card life-decision-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-card-label amber">重要决定</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge amber">待复盘</span> <span class="life-card-date">记录于 2026-05-13</span></h3><p class="life-card-copy">我的选择：<strong>接受</strong><span class="life-gap"></span>置信度：70%</p><p class="life-card-copy">原因：职业发展机会更大，团队匹配度高，薪资涨幅合理。</p><button class="life-link-btn" type="button" data-action="view-decisions">查看详情 →</button></div><div class="life-review-box"><span>下次复盘日</span><strong>2026-06-13</strong><span>还有 31 天</span></div>' +
+    var decision = findById(decisionArchiveItems(), moment.linkedDecision) || {};
+    return '<div class="life-home-card life-card life-decision-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-card-label amber">重要决定</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge amber">' + escapeHtml(decision.status || '待复盘') + '</span> <span class="life-card-date">记录于 ' + escapeHtml(decision.date || '2026-04-20') + '</span></h3><p class="life-card-copy">我的选择：<strong>' + escapeHtml(decision.choice || '接受新 Offer') + '</strong><span class="life-gap"></span>信心：' + escapeHtml(decision.confidence || 70) + '/100</p><p class="life-card-copy">' + escapeHtml((decision.reason || [moment.copy])[0]) + '</p><button class="life-link-btn" type="button">查看详情 →</button></div><div class="life-review-box"><span>下次复盘日</span><strong>' + escapeHtml(decision.reviewDate || '2026-10-20') + '</strong><span>决策档案馆</span></div>' +
     '</div>';
   }
 
   function renderRelationshipHomeCard(moment) {
-    return '<div class="life-home-card life-card life-relationship-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-card-label red">关系变远</div><div class="life-home-card-main"><h3 class="life-card-title">和 <strong>张敏</strong> 的互动减少了</h3><p class="life-card-copy">最近 30 天联系 1 次（上月 6 次）</p></div><div class="life-relation-change"><span>互动变化</span><strong>6次</strong><i></i><strong>1次</strong></div><div class="life-avatar-pair"><span>张</span><span>敏</span></div><div class="life-distance-badge">距离感 +5</div>' +
+    var relationship = findById(allRelationships(), moment.linkedRelationship) || { name: '张敏', score: 88, last: '昨天', channel: '微信', next: '4 天后' };
+    return '<div class="life-home-card life-card life-relationship-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-card-label red">关系提醒</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">最近联系：' + escapeHtml(relationship.last) + ' · ' + escapeHtml(relationship.channel) + '；亲密度 ' + escapeHtml(relationship.score) + '/100</p></div><div class="life-relation-change"><span>下次联系</span><strong>' + escapeHtml(relationship.next) + '</strong><i></i><strong>' + escapeHtml(relationship.group || '朋友') + '</strong></div><div class="life-avatar-pair"><span>' + escapeHtml(relationship.name.slice(0, 1)) + '</span><span>' + escapeHtml(relationship.name.slice(-1)) + '</span></div><div class="life-distance-badge">去关系温度</div>' +
     '</div>';
   }
 
   function renderWishHomeCard(moment) {
-    return '<div class="life-home-card life-card life-wish-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-card-label blue">愿望冷却中</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">冷却中 21 天</p><p class="life-card-copy">初始心动：85/100</p></div><div class="life-cool-box"><span>冷却目标</span><strong>60 天</strong><span>还剩 39 天</span></div>' +
+    var wish = findById(allWishes(), moment.linkedWish) || { status: '愿望冷却中', days: 12, desire: 72, due: '2026-05-25' };
+    return '<div class="life-home-card life-card life-wish-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-card-label blue">' + escapeHtml(wish.status) + '</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">剩余 ' + escapeHtml(wish.days) + ' 天</p><p class="life-card-copy">当前想要程度：' + escapeHtml(wish.desire) + '/100</p></div><div class="life-cool-box"><span>冷却至</span><strong>' + escapeHtml(wish.due) + '</strong><span>愿望冷却箱</span></div>' +
     '</div>';
   }
 
   function renderMemoryHomeCard(moment) {
-    return '<div class="life-home-card life-card life-memory-card clickable" data-moment-id="' + moment.id + '">' +
+    return '<div class="life-home-card life-card life-memory-card clickable"' + momentTargetAttrs(moment) + '>' +
       '<div class="life-card-label blue">本月值得记住</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p><div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span></div></div><div class="life-memory-photos"><span class="life-photo photo-garden"></span><span class="life-photo photo-river"></span><span class="life-photo photo-mountain"></span><span class="life-photo photo-night"></span></div><div class="life-memory-actions"><span>❤ 12</span><span>♡ 3</span></div>' +
     '</div>';
   }
 
   function renderProjectHomeCard(moment) {
-    return '<div class="life-home-card life-card life-compact-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-home-type-icon green">' + iconHtml('project') + '</div><div class="life-home-card-main"><h3 class="life-card-title">项目进展</h3><p class="life-card-copy">完成了产品原型设计，与团队评审通过。 <span class="life-badge amber">项目</span></p></div><div class="life-team-note"><span>团队协作</span><strong>8/10</strong><span class="life-avatar-row"><i></i><i></i><i></i><i></i> +2</span></div>' +
+    var project = allProjects()[0] || { name: '项目进展', progress: 60, next: '完成首页视觉稿', people: '团队协作 8/10' };
+    return '<div class="life-home-card life-card life-compact-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-home-type-icon green">' + iconHtml('project') + '</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title || project.name) + '</h3><p class="life-card-copy">下一步：' + escapeHtml(project.next) + ' <span class="life-badge amber">项目</span></p></div><div class="life-team-note"><span>' + escapeHtml(project.people) + '</span><strong>' + escapeHtml(project.progress) + '%</strong><span class="life-avatar-row"><i></i><i></i><i></i><i></i> +2</span></div>' +
     '</div>';
   }
 
   function renderSleepHomeCard(moment) {
-    return '<div class="life-home-card life-card life-compact-card clickable" data-moment-id="' + moment.id + '">' +
-      '<div class="life-home-type-icon purple">' + iconHtml('calm') + '</div><div class="life-home-card-main"><h3 class="life-card-title">睡前记录</h3><p class="life-card-copy">看完《纳瓦尔宝典》，很多启发。明天继续阅读。 <span class="life-badge green">阅读</span></p></div><div class="life-sleep-note"><span>今日感恩</span><p>感谢家人的支持，感谢自己坚持运动。</p></div><span class="life-photo photo-book life-small-photo"></span>' +
+    var sleep = allHealth()[0] || { name: '睡眠', value: '7.2 小时', note: moment.copy };
+    return '<div class="life-home-card life-card life-compact-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-home-type-icon purple">' + iconHtml('calm') + '</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title || sleep.name) + '</h3><p class="life-card-copy">' + escapeHtml(sleep.note) + ' <span class="life-badge green">健康</span></p></div><div class="life-sleep-note"><span>' + escapeHtml(sleep.name) + '</span><p>' + escapeHtml(sleep.value) + '</p></div><span class="life-photo photo-book life-small-photo"></span>' +
     '</div>';
   }
 
@@ -2749,366 +2858,428 @@
     persistWishUpdate(Object.assign({}, current, { completedPlan: completed }), '计划进度已更新');
   }
 
-  function monthlyKey() {
-    return state.monthlyYear + '-' + String(state.monthlyMonth + 1).padStart(2, '0');
-  }
-
-  function monthlyTitle() {
-    return state.monthlyYear + ' 年 ' + (state.monthlyMonth + 1) + ' 月';
-  }
-
-  function monthlyDateText(day) {
-    return String(state.monthlyMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-  }
-
-  function getMonthlyMeta() {
-    var store = getMonthlyStore();
-    var key = monthlyKey();
-    return {
-      bookmarked: store.bookmarked[key] !== false,
-      report: store.reports[key] || null,
-      archived: !!store.archived[key],
-      quote: store.quotes[key] || '在探索与连接中，我更靠近自己想要的生活。',
-      letter: store.letters[key] || {
-        title: '写给 3 个月后的自己',
-        date: '2026-05-13 写下',
-        body: '希望那时的你，还记得今天想要的生活是什么样子。也希望你依然在勇敢地选择自己。'
-      }
-    };
-  }
-
-  function monthlySet(key, value, message) {
-    var store = getMonthlyStore();
-    var month = monthlyKey();
-    if (key === 'bookmarked') store.bookmarked[month] = value;
-    if (key === 'report') store.reports[month] = value;
-    if (key === 'archived') store.archived[month] = value;
-    if (key === 'letter') store.letters[month] = value;
-    if (key === 'quote') store.quotes[month] = value;
-    saveMonthlyStore(store);
-    if (message) showToast(message);
-    renderMonthly();
-  }
-
-  function shiftMonthly(delta) {
-    state.monthlyMonth += delta;
-    if (state.monthlyMonth < 0) {
-      state.monthlyMonth = 11;
-      state.monthlyYear -= 1;
-    }
-    if (state.monthlyMonth > 11) {
-      state.monthlyMonth = 0;
-      state.monthlyYear += 1;
-    }
-    state.monthlyLetterMode = false;
-    state.monthlyQuoteMode = false;
-    renderMonthly();
-  }
-
-  function monthlyMomentDay(item) {
-    var match = String(item.date || '').match(/(\d{2})-(\d{2})/);
-    if (!match) return 1;
-    return Number(match[2] || 1);
-  }
-
-  function monthlyMediaImageHtml(item) {
-    if (item.image) return '<span class="life-photo life-uploaded-photo"><img src="' + escapeHtml(item.image) + '" alt=""></span>';
-    return '<span class="life-photo ' + escapeHtml(item.photo || 'photo-book') + '"></span>';
-  }
-
-  function monthlyMediaCandidates() {
-    var candidates = [];
-    allMoments().filter(function(item) {
-      return item.photos && item.photos.length && String(item.date || '').indexOf(String(state.monthlyMonth + 1).padStart(2, '0') + '-') >= 0;
-    }).forEach(function(item, idx) {
-      candidates.push({
-        id: 'moment-' + item.id,
-        day: monthlyMomentDay(item),
-        title: item.title,
-        copy: item.copy,
-        tag: (item.tags || [item.type])[0] || item.type,
-        source: '时间河流',
-        view: 'timeline',
-        likes: 12 + idx,
-        photo: item.photos[0]
-      });
-    });
-    allRelationships().forEach(function(person) {
-      [
-        ['memories', '共同记忆', 'memory'],
-        ['gifts', '送的礼物', 'gift'],
-        ['places', '一起去过的地方', 'place']
-      ].forEach(function(config) {
-        normalizeRelationshipMedia(person[config[0]]).forEach(function(media, idx) {
-          candidates.push({
-            id: 'relationship-' + person.id + '-' + config[0] + '-' + idx,
-            day: [3, 5, 8, 10, 13][idx % 5],
-            title: media.text || person.name + '的' + config[1],
-            copy: person.name + ' · ' + (person.notes || ['重要关系图片记录'])[0],
-            tag: config[1],
-            source: '关系温度',
-            view: 'relationships',
-            likes: person.score ? Math.max(8, Math.round(person.score / 8)) : 10,
-            image: media.image || '',
-            photo: relationshipMediaClasses(config[2], idx)
-          });
-        });
-      });
-    });
-    allWishes().filter(function(item) {
-      return item.photo;
-    }).forEach(function(item, idx) {
-      candidates.push({
-        id: 'wish-' + item.id,
-        day: Number((String(item.due || '').split('-')[2] || 13)),
-        title: item.name,
-        copy: item.reason,
-        tag: item.status,
-        source: '愿望冷却箱',
-        view: 'wishes',
-        likes: Math.max(8, Math.round(item.desire / 6)),
-        photo: wishPhoto(item)
-      });
-    });
-    return candidates;
-  }
-
-  function monthlyHighlights() {
-    var picked = [];
-    var used = {};
-    function pickFrom(sourceName, fallbackIndex) {
-      var item = monthlyMediaCandidates().filter(function(candidate) {
-        return candidate.source === sourceName && !used[candidate.id];
-      })[fallbackIndex || 0];
-      if (item) {
-        used[item.id] = true;
-        picked.push(item);
-      }
-    }
-    pickFrom('时间河流', 0);
-    pickFrom('关系温度', 0);
-    pickFrom('愿望冷却箱', 0);
-    pickFrom('时间河流', 1);
-    monthlyMediaCandidates().forEach(function(item) {
-      if (picked.length < 4 && !used[item.id]) {
-        used[item.id] = true;
-        picked.push(item);
-      }
-    });
-    return picked.slice(0, 4);
-  }
-
-  function monthlyMoodScores() {
-    return allMoodRecords().filter(function(item) {
-      return Number(item.year) === Number(state.monthlyYear) && Number(item.month) === Number(state.monthlyMonth);
-    }).map(function(item) { return item.score; });
-  }
-
-  function monthlyMoodSvg(scores) {
-    var values = scores.length ? scores : [64, 70, 58, 76, 68, 72, 66, 80, 74, 62, 78, 70];
-    var width = 520;
-    var height = 150;
-    var points = values.map(function(score, idx) {
-      var x = 20 + idx * ((width - 40) / Math.max(values.length - 1, 1));
-      var y = height - 24 - ((score - 35) / 60) * (height - 44);
-      return { x: Math.round(x), y: Math.round(Math.max(18, Math.min(height - 20, y))), score: score };
-    });
-    return '<svg class="life-monthly-mood-svg" viewBox="0 0 ' + width + ' ' + height + '" aria-label="本月情绪曲线">' +
-      '<defs><linearGradient id="monthlyMoodBg" x1="0" x2="1"><stop offset="0" stop-color="#fdf7e6"/><stop offset="0.48" stop-color="#fff2f2"/><stop offset="1" stop-color="#eef8ee"/></linearGradient></defs>' +
-      '<rect width="' + width + '" height="' + height + '" rx="10" fill="url(#monthlyMoodBg)"/>' +
-      '<path d="' + points.map(function(point, idx) { return (idx ? 'L' : 'M') + point.x + ' ' + point.y; }).join(' ') + '" fill="none" stroke="#0b8f8d" stroke-width="2.2"/>' +
-      points.map(function(point) { return '<circle cx="' + point.x + '" cy="' + point.y + '" r="4" fill="#fff" stroke="#0b8f8d" stroke-width="2"/>'; }).join('') +
-      '<g fill="#667b78" font-size="11"><text x="18" y="136">05-01</text><text x="180" y="136">05-10</text><text x="342" y="136">05-20</text><text x="462" y="136">05-31</text></g></svg>';
-  }
-
-  function renderMonthlyHighlightCard(item, idx) {
-    return '<article class="life-monthly-highlight ' + (idx === 0 ? 'featured' : '') + '" data-view="' + escapeHtml(item.view || 'timeline') + '">' + monthlyMediaImageHtml(item) + '<div><small>' + monthlyDateText(item.day) + ' · 来自' + escapeHtml(item.source || '时间河流') + '</small><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.copy) + '</p><footer><span class="life-badge ' + (idx === 0 ? 'amber' : idx === 1 ? 'green' : idx === 2 ? 'red' : 'blue') + '">' + escapeHtml(item.tag) + '</span><span>❤ ' + item.likes + '</span></footer></div></article>';
-  }
-
-  function renderMonthlyDecisionRows() {
-    return allDecisions().slice(0, 4).map(function(item, idx) {
-      return '<div class="life-monthly-line"><span class="life-side-icon ' + (idx % 2 ? 'green' : 'amber') + '">' + iconHtml('decision') + '</span><span>' + monthlyDateText([5, 10, 12, 13][idx]) + '</span><strong>' + escapeHtml(item.title) + '</strong><span class="life-badge ' + decisionTone(item) + '">' + escapeHtml(decisionStatus(item)) + '</span><em>选择：' + escapeHtml(item.choice) + '　|　信心：' + item.confidence + '%</em></div>';
-    }).join('');
-  }
-
-  function renderMonthlyPeople() {
-    return allRelationships().slice(0, 4).map(function(item, idx) {
-      var note = (item.notes || [])[0] || '有一段温暖的交流。';
-      return '<article class="life-monthly-person"><header><span class="life-monthly-person-face">' + relationshipAvatarHtml(item, 'sm') + '</span><div><strong>' + escapeHtml(item.name) + '</strong><small>见面 ' + (idx === 0 ? 2 : 1) + ' 次</small></div></header><p>' + escapeHtml(note) + '</p></article>';
-    }).join('');
-  }
-
-  function renderMonthlyPlaces() {
-    return [
-      ['苏州 · 拙政园', 'photo-garden'],
-      ['上海 · 外滩', 'photo-river'],
-      ['杭州 · 西湖', 'photo-mountain'],
-      ['南京 · 先锋书店', 'photo-cafe'],
-      ['家附近的公园', 'photo-book']
-    ].map(function(item) {
-      return '<article class="life-monthly-place"><span class="life-photo ' + item[1] + '"></span><strong>' + item[0] + '</strong></article>';
-    }).join('');
-  }
-
-  function renderMonthlyWishResults() {
-    return allWishes().filter(function(item) {
-      return ['愿望冷却中', '可以决定', '已实现'].indexOf(item.status) >= 0;
-    }).slice(0, 3).map(function(item) {
-      return '<div class="life-monthly-wish"><span class="life-side-icon green">' + iconHtml('wish') + '</span><div class="life-monthly-wish-main"><div><strong>' + escapeHtml(item.name) + '</strong><span class="life-badge green">' + escapeHtml(item.status) + '</span>' + (item.days ? '<em>还有 ' + item.days + ' 天</em>' : '') + '</div><p>' + escapeHtml(item.reason) + '</p></div><span class="life-photo ' + wishPhoto(item) + '"></span></div>';
-    }).join('');
-  }
-
-  function renderMonthlyLearned() {
-    return ['睡眠比我想象中更影响情绪，早睡真的有用。', '把大目标拆成小任务，行动会更轻松。', '真诚地沟通，可以减少很多误解和内耗。', '给自己留出独处的时间，才能听见内心的声音。', '慢慢来，比匆忙赶路更重要。'].map(function(text, idx) {
-      return '<button type="button" class="life-monthly-learning-row" data-monthly-action="view-learnings"><span class="life-monthly-learn-icon">' + ['❤', '💡', '👤', '★', '☘'][idx] + '</span><strong>' + escapeHtml(text) + '</strong></button>';
-    }).join('');
-  }
-
   function renderMonthly() {
-    var meta = getMonthlyMeta();
-    var scores = monthlyMoodScores();
-    els.content.innerHTML = mockNotice() + '<section class="life-monthly-page"><header class="life-monthly-header"><div><h2>本月值得记住 <button type="button" class="life-monthly-bookmark ' + (meta.bookmarked ? 'active' : '') + '" data-monthly-action="bookmark">' + iconHtml('monthly') + '</button></h2></div><div class="life-monthly-month"><button type="button" data-monthly-action="prev-month">‹</button><strong>' + monthlyTitle() + '</strong><button type="button" data-monthly-action="next-month">›</button></div></header>' +
-      '<section class="life-monthly-highlights">' + monthlyHighlights().map(renderMonthlyHighlightCard).join('') + '</section>' +
-      '<section class="life-monthly-grid two"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>做过的决定</h3><span>4 个决定</span><button type="button" data-monthly-action="view-decisions">查看全部 →</button></div><div class="life-monthly-lines">' + renderMonthlyDecisionRows() + '</div></article><article class="life-monthly-card life-monthly-mood-card"><div class="life-monthly-card-head"><h3>情绪模式</h3><span>整体感受：<b>良好</b></span><button type="button" data-monthly-action="view-mood">查看情绪 →</button></div><p class="life-monthly-sub">本月情绪曲线</p><div class="life-monthly-mood-wrap"><div class="life-monthly-mood-scale"><span>晴朗</span><span>微笑</span><span>平静</span><span>低落</span></div>' + monthlyMoodSvg(scores) + '</div></article></section>' +
-      '<section class="life-monthly-grid two compact"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>见过的人</h3><span>' + allRelationships().length + ' 位</span></div><div class="life-monthly-people">' + renderMonthlyPeople() + '</div></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>去过的地方</h3><span>5 个地点</span><button type="button" data-monthly-action="view-map">查看地图 →</button></div><div class="life-monthly-places">' + renderMonthlyPlaces() + '</div></article></section>' +
-      '<section class="life-monthly-grid three"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>愿望结果</h3><span>3 个结果</span></div>' + renderMonthlyWishResults() + '<button class="life-link-btn" type="button" data-view="wishes">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>学到的事</h3><span>5 条</span></div><div class="life-monthly-learned">' + renderMonthlyLearned() + '</div><button class="life-link-btn" type="button" data-monthly-action="view-learnings">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>总结感受</h3></div><div class="life-monthly-summary"><p>这个月是充实又温柔的一个月。</p><p>工作上有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要：健康的身体、真诚的关系、持续成长，以及自由的时间。</p><p>下个月，希望继续保持这份节奏，也给自己更多的耐心和信任。</p></div></article></section></section>';
-    els.aside.innerHTML = renderMonthlyAside(meta);
+    var monthlyDecisions = allDecisions();
+    els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-panel-title">本月值得记住</h2><p class="life-panel-sub">2026 年 5 月</p></div><button class="life-secondary-btn">生成月报</button></div>' +
+      '<div class="life-wide-grid">' + ['黄浦江日落骑行','项目上线','和老朋友重逢'].map(function(title, idx) {
+        return '<article class="life-card"><span class="life-photo ' + ['photo-river','photo-office','photo-cafe'][idx] + '" style="width:100%;height:126px"></span><h3 class="life-card-title" style="margin-top:12px">' + title + '</h3><p class="life-card-copy">' + ['傍晚沿着江边骑行，风很大，但心里很轻。','团队一起熬了两个夜晚，今天终于上线了。','两年没见的大学室友，从下午聊到深夜。'][idx] + '</p></article>';
+      }).join('') + '</div></section>' +
+      '<section class="life-two-grid" style="margin-top:14px"><div class="life-panel"><h2 class="life-panel-title">做过的决定</h2><div class="life-list">' + monthlyDecisions.map(function(item) { return '<div class="life-row"><div class="life-row-head"><h3 class="life-row-title">' + item.title + '</h3><span class="life-badge">' + item.status + '</span></div><p class="life-card-copy">选择：' + item.choice + ' · 信心 ' + item.confidence + '%</p></div>'; }).join('') + '</div></div><div class="life-panel"><h2 class="life-panel-title">情绪模式</h2><div class="life-line-chart" style="height:150px">' + [42,76,88,50,70,44,66,82,58,88,72].map(function(v) { return '<span class="life-bar" style="height:' + v + '%"></span>'; }).join('') + '</div><p class="life-card-copy">整体感受：良好。规律作息与运动对情绪影响最大。</p></div></section>' +
+      '<section class="life-wide-grid" style="margin-top:14px"><div class="life-panel"><h2 class="life-panel-title">见过的人</h2>' + ['张敏','陈昊','李想','Emily'].map(function(name) { return '<div class="life-person" style="margin-top:12px"><span class="life-person-avatar">' + name.slice(0,1) + '</span><span>' + name + '</span></div>'; }).join('') + '</div><div class="life-panel"><h2 class="life-panel-title">过去的地方</h2><div class="life-media-row"><span class="life-photo photo-garden"></span><span class="life-photo photo-river"></span><span class="life-photo photo-cafe"></span></div><p class="life-card-copy">苏州 · 上海 · 杭州 · 南京</p></div><div class="life-panel"><h2 class="life-panel-title">总结感受</h2><p class="life-card-copy">这个月是充实又温柔的一个月。工作有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要。</p></div></section>';
+    els.aside.innerHTML = '<section class="life-detail-card"><h2 class="life-detail-title">本月一句话</h2><div class="life-quote">在探索与连接中，我更靠近自己想要的生活。</div></section><section class="life-detail-card"><h2 class="life-detail-title">写给未来的自己</h2><p class="life-card-copy">写给 3 个月后的自己：希望那时的你，还记得今天想要的生活是什么样子。</p><button class="life-secondary-btn">写一封信</button></section><section class="life-detail-card"><h2 class="life-detail-title">归档本月</h2><p class="life-card-copy">将本月回顾内容归档保存，便于未来跨时间对比。</p><button class="life-primary-btn" style="width:100%">归档</button></section>';
   }
 
-  function renderMonthlyAside(meta) {
-    var reportText = meta.report ? '已生成于 ' + meta.report.createdAt : '记录、统计、故事，一键生成';
-    var archiveText = meta.archived ? '本月内容已归档，后续可在复盘与回顾中查看。' : '将本月回顾内容归档保存，便于未来随时回顾与对比';
-    return '<section class="life-monthly-side-card quote"><div class="life-monthly-card-head"><h3>本月一句话</h3>' + (state.monthlyQuoteMode ? '<span>编辑中</span>' : '<button type="button" data-monthly-action="edit-quote">修改</button>') + '</div>' + (state.monthlyQuoteMode ? renderMonthlyQuoteForm(meta.quote) : '<div class="life-monthly-handwriting">' + escapeHtml(meta.quote) + '</div><span class="life-monthly-heart">♡</span><span class="life-photo photo-book"></span>') + '</section>' +
-      '<section class="life-monthly-side-card"><div class="life-monthly-card-head"><h3>写给未来的自己</h3><span>1 封信</span></div>' + (state.monthlyLetterMode ? renderMonthlyLetterForm(meta.letter) : '<article class="life-monthly-letter"><strong>' + escapeHtml(meta.letter.title) + '</strong><small>' + escapeHtml(meta.letter.date) + '</small><p>' + escapeHtml(meta.letter.body) + '</p><button type="button" data-monthly-action="write-letter">' + iconHtml('add') + ' 编辑信件</button></article>') + '</section>' +
-      '<section class="life-monthly-side-card report"><h3>生成月报</h3><p>自动生成本月生活月报</p><span>' + reportText + '</span><button class="life-secondary-btn" type="button" data-monthly-action="generate-report">' + iconHtml('star') + ' 生成月报</button></section>' +
-      '<section class="life-monthly-side-card archive"><h3>归档本月</h3><p>' + archiveText + '</p><button class="life-secondary-btn" type="button" data-monthly-action="archive-month">' + iconHtml('resource') + ' ' + (meta.archived ? '已归档' : '归档') + '</button><span class="life-photo photo-cafe"></span></section>';
+  function addTypeList() {
+    return ['记忆', '决定', '情绪', '关系', '愿望', '健康', '项目'];
   }
 
-  function renderMonthlyQuoteForm(quote) {
-    return '<form id="lifeMonthlyQuoteForm" class="life-monthly-quote-form"><label>一句话<textarea class="life-textarea" name="quote" maxlength="80">' + escapeHtml(quote) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-quote">取消</button><button class="life-primary-btn" type="submit">保存一句话</button></div></form>';
+  function currentAddType(form) {
+    var active = form && form.querySelector('[data-add-type].active');
+    return active ? active.getAttribute('data-add-type') : '记忆';
   }
 
-  function renderMonthlyLetterForm(letter) {
-    return '<form id="lifeMonthlyLetterForm" class="life-monthly-letter-form"><label>标题<input class="life-input" name="title" value="' + escapeHtml(letter.title) + '"></label><label>内容<textarea class="life-textarea" name="body">' + escapeHtml(letter.body) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-letter">取消</button><button class="life-primary-btn" type="submit">保存信件</button></div></form>';
+  function addValue(form, name, fallback) {
+    return form.elements[name] ? form.elements[name].value.trim() || fallback || '' : fallback || '';
   }
 
-  function saveMonthlyQuote(form) {
-    state.monthlyQuoteMode = false;
-    monthlySet('quote', form.elements.quote.value.trim() || '在探索与连接中，我更靠近自己想要的生活。', '本月一句话已保存');
+  function addDateParts(form) {
+    var date = addValue(form, 'date', '2026-05-13');
+    var time = addValue(form, 'time', '15:30');
+    return { date: date, time: time, day: Number(date.split('-')[2] || 13) };
   }
 
-  function saveMonthlyLetter(form) {
-    state.monthlyLetterMode = false;
-    monthlySet('letter', {
-      title: form.elements.title.value.trim() || '写给 3 个月后的自己',
-      date: '2026-05-13 写下',
-      body: form.elements.body.value.trim() || '希望那时的你，还记得今天想要的生活是什么样子。'
-    }, '信件已保存');
+  function addSelectedMood(form) {
+    var activeMood = form.querySelector('[data-add-mood].active');
+    return activeMood ? activeMood.getAttribute('data-add-mood') : '晴朗';
   }
 
-  function handleMonthlyAction(actionName) {
-    var meta = getMonthlyMeta();
-    if (actionName === 'prev-month') shiftMonthly(-1);
-    if (actionName === 'next-month') shiftMonthly(1);
-    if (actionName === 'bookmark') monthlySet('bookmarked', !meta.bookmarked, meta.bookmarked ? '已取消本月收藏' : '已收藏本月');
-    if (actionName === 'edit-quote') {
-      state.monthlyQuoteMode = true;
-      state.monthlyLetterMode = false;
-      renderMonthly();
-    }
-    if (actionName === 'cancel-quote') {
-      state.monthlyQuoteMode = false;
-      renderMonthly();
-    }
-    if (actionName === 'write-letter') {
-      state.monthlyQuoteMode = false;
-      state.monthlyLetterMode = true;
-      renderMonthly();
-    }
-    if (actionName === 'cancel-letter') {
-      state.monthlyLetterMode = false;
-      renderMonthly();
-    }
-    if (actionName === 'generate-report') monthlySet('report', { createdAt: '2026-05-13 09:30', records: allMoments().length, moodAverage: 64 }, '月报已生成');
-    if (actionName === 'archive-month') {
-      if (!meta.archived && !window.confirm('确认归档本月回顾吗？归档后仍可继续查看。')) return;
-      monthlySet('archived', true, '本月已归档');
-    }
-    if (actionName === 'view-decisions') setView('decisions');
-    if (actionName === 'view-map') showToast('地图视图已筛选本月地点');
-    if (actionName === 'view-mood') setView('mood');
-    if (actionName === 'view-learnings') setView('review');
+  function addTags(form) {
+    return addValue(form, 'tags', '').split(',').map(function(item) { return item.trim(); }).filter(Boolean);
+  }
+
+  function addPeople(form) {
+    return addValue(form, 'people', '').split(',').map(function(item) { return item.trim(); }).filter(Boolean);
+  }
+
+  function addSelectedAssociations() {
+    return Array.prototype.slice.call(document.querySelectorAll('[data-add-association].active')).map(function(btn) {
+      return btn.getAttribute('data-add-association');
+    });
+  }
+
+  function addTitleForType(type, form) {
+    if (type === '决定') return addValue(form, 'decisionTitle', '是否接受新的 Offer？');
+    if (type === '情绪') return addSelectedMood(form) + ' ' + addValue(form, 'moodScore', '78') + ' 分';
+    if (type === '关系') return '和 ' + addValue(form, 'relationshipName', addValue(form, 'people', '张敏')) + ' 的互动';
+    if (type === '愿望') return addValue(form, 'wishName', '相机 Sony A7C II');
+    if (type === '健康') return addValue(form, 'healthSignal', '身体状态记录');
+    if (type === '项目') return addValue(form, 'projectName', '个人网站改版');
+    return addValue(form, 'memoryTitle', '今天在江边散步');
+  }
+
+  function renderAddTypeButtons(extraClass) {
+    return '<div class="' + extraClass + '">' + addTypeList().map(function(type, idx) {
+      return '<button class="life-type-option ' + (idx === 0 ? 'active' : '') + '" type="button" data-add-type="' + type + '">' + addTypeIcon(type) + '<span>' + type + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function addTypeIcon(type) {
+    var map = {
+      '记忆': 'memory',
+      '决定': 'decision',
+      '情绪': 'mood',
+      '关系': 'relationship',
+      '愿望': 'wish',
+      '健康': 'health',
+      '项目': 'project'
+    };
+    var icon = map[type] || 'memory';
+    return '<span class="life-add-prototype-icon life-add-prototype-icon-' + icon + '" aria-hidden="true"><img src="assets/icons/life/' + icon + '.svg" alt=""></span>';
+  }
+
+  function renderAddCard(number, title, theme, body, extraClass, moduleType) {
+    return '<section class="life-add-map-card life-add-theme-' + theme + (extraClass ? ' ' + extraClass : '') + (moduleType ? '" data-add-module="' + moduleType : '') + '"><div class="life-add-map-card-head"><span class="life-add-map-number">' + number + '</span><h3>' + title + '</h3></div>' + body + '</section>';
+  }
+
+  function renderAddToolbar() {
+    return '<div class="life-add-editor-tools"><button type="button">B</button><button type="button">I</button><button type="button">U</button><button type="button">≡</button><button type="button">≣</button><button type="button">“”</button><button type="button">' + iconHtml('link') + '</button><button type="button">' + iconHtml('image') + '</button><button type="button">' + iconHtml('mood') + '</button><button type="button">' + iconHtml('mic') + '</button></div>';
+  }
+
+  function renderAddMoodPicker(compact) {
+    var moods = ['晴朗','平静','愉快','充实','焦虑','疲惫','低落','生气','其他'];
+    return '<div class="' + (compact ? 'life-add-mood-strip' : 'life-add-mood-grid') + '">' + moods.map(function(mood, idx) {
+      return '<button class="life-mood-option ' + (idx === 0 ? 'active' : '') + '" type="button" data-add-mood="' + mood + '">' + iconHtml(moodIcons[mood]) + '<span>' + mood + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function renderAddPhotoRail() {
+    return '<div class="life-add-photo-rail"><span class="life-photo photo-river"></span><span class="life-photo photo-cafe"></span><span class="life-photo photo-night"></span><span class="life-photo photo-book"></span><button class="life-add-upload-tile" type="button">+<span>添加更多</span></button></div>';
   }
 
   function renderAdd() {
-    els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-panel-title">添加一刻</h2><p class="life-panel-sub">记录此刻的生活片段，丰富你的时间河流</p></div></div><form class="life-form" id="lifeAddForm">' +
-      '<div class="life-type-grid">' + ['记忆','决定','情绪','关系','愿望','健康','项目'].map(function(type, idx) { return '<button class="life-type-option ' + (idx === 0 ? 'active' : '') + '" type="button" data-add-type="' + type + '">' + iconHtml(iconForType(type === '决定' ? '决策' : type)) + '<span>' + type + '</span></button>'; }).join('') + '</div>' +
-      '<label>今天发生了什么？<textarea class="life-textarea" name="body" maxlength="2000" placeholder="记录这一刻的想法、经历或感受...">今天在江边散步，阳光很好，江风很舒服。路过一家咖啡馆，坐下来写了会儿笔记，感觉很治愈。</textarea></label>' +
-      '<label>选择心情<div class="life-mood-grid">' + ['晴朗','平静','愉快','充实','焦虑','疲惫','低落','生气','其他'].map(function(mood, idx) { return '<button class="life-mood-option ' + (idx === 0 ? 'active' : '') + '" type="button" data-add-mood="' + mood + '">' + iconHtml(moodIcons[mood]) + '<span>' + mood + '</span></button>'; }).join('') + '</div></label>' +
-      '<div class="life-two-grid"><label>添加人物<input class="life-input" name="people" placeholder="选择或搜索人物..." value="张敏, Emma"></label><label>添加地点<input class="life-input" name="location" placeholder="选择或搜索地点..." value="上海 · 徐汇滨江"></label></div>' +
-      '<label>上传照片<div class="life-upload-grid"><span class="life-upload-box">拖拽上传</span><span class="life-photo photo-river" style="width:100%;height:76px"></span><span class="life-photo photo-cafe" style="width:100%;height:76px"></span><span class="life-photo photo-night" style="width:100%;height:76px"></span><span class="life-photo photo-book" style="width:100%;height:76px"></span><span class="life-upload-more">+ 添加更多</span></div></label>' +
-      '<div class="life-two-grid"><label>日期时间<input class="life-input" type="datetime-local" name="datetime" value="2026-05-13T15:30"></label><label>标签<input class="life-input" name="tags" value="日常, 散步, 咖啡馆, 笔记"></label></div>' +
-      '<div class="life-switch-row"><div><strong>关联到时间河流</strong><p class="life-panel-sub">保存后会在时间河流中显示</p></div><span class="life-switch"></span></div>' +
-      '<div class="life-row-head"><button class="life-secondary-btn" type="button" data-action="preview-add">预览</button><button class="life-primary-btn" type="submit">保存这一刻</button></div></form></section>';
-    els.aside.innerHTML = renderAddAside();
+    els.content.innerHTML = mockNotice() + '<section class="life-add-workbench-page"><div class="life-add-workbench-head"><h2>添加一刻</h2><p>记录此刻的生活片段，丰富你的时间河流</p></div><form class="life-add-workbench" id="lifeAddForm">' +
+      '<section class="life-add-editor-card">' + renderAddTypeButtons('life-add-primary-tabs') +
+      '<div class="life-add-section"><label class="life-add-body-label">今天发生了什么？<textarea class="life-textarea life-add-body" name="body" data-add-body-source maxlength="2000" placeholder="记录这一刻的想法、经历或感受...">下午在江边散步，阳光很好，江风很舒服。路过一家咖啡馆，坐下来写了会儿笔记，感觉很治愈。</textarea><span data-add-count>126/2000</span></label>' + renderAddToolbar() + '</div>' +
+      '<div class="life-add-section life-add-module-shell">' + renderAddWorkbenchPanels() + '</div>' +
+      '<div class="life-add-section"><div class="life-two-grid"><label>添加人物<input class="life-input" name="people" placeholder="选择或搜索人物..." value="张敏, Emma"></label><label>添加地点<input class="life-input" name="location" placeholder="选择或搜索地点..." value="上海 · 徐汇滨江"></label></div></div>' +
+      '<div class="life-add-section"><label>上传图片 / 附件' + renderAddPhotoRail() + '</label></div>' +
+      '<div class="life-add-section"><div class="life-two-grid"><div class="life-two-grid"><label>日期<input class="life-input" type="date" name="date" value="2026-05-13"></label><label>时间<input class="life-input" type="time" name="time" value="15:30"></label></div><label>标签<input class="life-input" name="tags" value="日常, 散步, 咖啡馆, 笔记"></label></div></div>' +
+      '<div class="life-add-footer-row"><label><input type="checkbox" name="linkTimeline" checked> 关联到时间河流</label><label><select class="life-select" name="privacy"><option>仅自己可见</option><option>可进入月度回顾</option></select></label><button class="life-secondary-btn" type="button" data-action="preview-add">预览</button><button class="life-primary-btn" type="submit">保存这一刻</button></div></section>' +
+      '<aside class="life-add-side-rail"><section class="life-detail-card life-add-preview-panel"><h2 class="life-detail-title">预览</h2><p class="life-panel-sub">在时间河流中的样子</p><div id="lifeAddPreview"></div></section><section class="life-detail-card life-association-card"><h2 class="life-detail-title">智能关联建议</h2><div class="life-association-list" id="lifeAssociationList"></div></section><section class="life-detail-card life-add-tip"><h2 class="life-detail-title">小贴士</h2><p class="life-card-copy">切换类型后，只填写当前模块需要的内容。保存后会同步写入时间河流和对应功能页。</p></section></aside>' +
+      '</form></section>';
+    els.aside.innerHTML = '';
+    setAddType('记忆');
     updateAddPreview();
+  }
+
+  function renderAddWorkbenchPanels() {
+    return '<section class="life-add-module-panel life-add-memory-panel" data-add-module="记忆"><label>选择心情' + renderAddMoodPicker(false) + '</label><input type="hidden" name="memoryTitle" value="今天在江边散步"></section>' +
+      '<section class="life-add-module-panel life-add-theme-orange is-hidden" data-add-module="决定"><div class="life-add-inline-title">' + addTypeIcon('决定') + '<strong>决策信息</strong><span>记录选择、信心和复盘计划</span></div><label>决定背景（可选）<input class="life-input" name="decisionTitle" value="是否接受新工作的 Offer？"></label>' + renderDecisionOptionEditor() + '<div class="life-two-grid"><label>我的倾向<select class="life-select" name="decisionChoice"><option>A. 接受 Offer</option><option>B. 暂不接受</option><option>C. 继续观望</option></select></label><label>复盘计划<input class="life-input" type="date" name="decisionReviewDate" value="2026-11-13"></label></div><label class="life-range-line">信心<input type="range" min="0" max="100" name="decisionConfidence" value="70"><b>70/100</b></label><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="情绪"><label>选择心情' + renderAddMoodPicker(false) + '</label><label class="life-range-line">强度<input type="range" min="0" max="100" name="moodScore" value="78"><b>78/100</b></label><div class="life-three-grid"><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label></div><div class="life-add-chip-group"><span>身体信号</span><button type="button">精力充沛</button><button type="button">肩颈酸痛</button><button type="button">睡眠不足</button><button type="button">专注良好</button></div></section>' +
+      '<section class="life-add-module-panel life-add-theme-purple is-hidden" data-add-module="关系"><div class="life-add-inline-title">' + addTypeIcon('关系') + '<strong>关系信息</strong><span>更新联系人互动、温度和下次提醒</span></div><div class="life-two-grid"><label>选择 / 搜索人物<input class="life-input" name="relationshipName" value="张敏（大学同学）"></label><label>上次联系<input class="life-input" name="relationshipLast" value="2026-05-10（微信）"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" value="聊到各自的工作近况和下次聚会时间。"></label><div class="life-two-grid"><label>下次联系提醒<input class="life-input" type="date" name="relationshipNextDate" value="2026-05-24"></label><label class="life-heart-line">关系温度<input type="range" min="0" max="100" name="relationshipScore" value="80"><span>4/5</span></label></div></section>' +
+      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="愿望"><div class="life-add-inline-title">' + addTypeIcon('愿望') + '<strong>愿望信息</strong><span>记录想要程度和冷却计划</span></div><div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" value="相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" value="¥12,999"></label></div><label class="life-range-line">当前想要程度<input type="range" min="0" max="100" name="wishDesire" value="65"><b>65%</b></label><div class="life-add-radio-box"><label><input type="radio" name="wishStatus" value="愿望冷却中" checked> 继续冷却</label><label><input type="radio" name="wishStatus" value="可以决定"> 可以决定了</label></div><label>替代方案<input class="life-input" name="wishAlternatives" value="先用手机练习；租借体验；观望新品"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-green is-hidden" data-add-module="健康"><div class="life-add-inline-title">' + addTypeIcon('健康') + '<strong>健康信息</strong><span>记录身体状态和后续提醒</span></div><div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="2026-05-15"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-blue is-hidden" data-add-module="项目"><div class="life-add-inline-title">' + addTypeIcon('项目') + '<strong>项目信息</strong><span>更新进度和下一步</span></div><div class="life-two-grid"><label>项目 / 任务<input class="life-input" name="projectName" value="个人网站改版"></label><label class="life-range-line">进度<input type="range" min="0" max="100" name="projectProgress" value="60"><b>60%</b></label></div><label>当前阻碍<input class="life-input" name="projectBlocker" value="设计稿还未最终确定"></label><label>下一步行动<input class="life-input" name="projectNext" value="完成首页视觉稿"></label><div class="life-file-chip">' + iconHtml('file') + ' 首页设计稿 v2.fig</div></section>';
+  }
+
+  function renderDecisionOptionEditor() {
+    var rows = [
+      ['接受 Offer', '发展空间大，薪酬更高', '工作强度高，通勤长', '70'],
+      ['暂不接受', '保持现状，生活稳定', '可能错过窗口', '40'],
+      ['继续观望', '时间更充裕', '不确定性增加', '55']
+    ];
+    return '<section class="life-decision-option-editor"><div class="life-section-title"><h3>选项对比</h3><button class="life-mini-btn" type="button" data-add-action="add-decision-option">+ 新增选项</button></div><div class="life-decision-option-head"><span></span><span>选项</span><span>优点</span><span>顾虑</span><span>评分</span><span></span></div><div class="life-decision-option-list">' + rows.map(function(row, idx) { return renderDecisionOptionRow(row, idx); }).join('') + '</div></section>';
+  }
+
+  function renderDecisionOptionRow(row, idx) {
+    var letter = String.fromCharCode(65 + idx);
+    return '<div class="life-decision-option-row" data-option-index="' + idx + '"><strong class="life-decision-option-letter">' + letter + '.</strong><label><span>选项</span><input class="life-input" name="decisionOptionName" value="' + escapeHtml(row[0]) + '"></label><label><span>优点</span><input class="life-input" name="decisionOptionPros" value="' + escapeHtml(row[1]) + '"></label><label><span>顾虑</span><input class="life-input" name="decisionOptionCons" value="' + escapeHtml(row[2]) + '"></label><label><span>评分</span><input class="life-input" type="number" min="0" max="100" name="decisionOptionScore" value="' + escapeHtml(row[3]) + '"></label><button class="life-mini-btn danger" type="button" data-add-action="remove-decision-option">删除</button></div>';
+  }
+
+  function syncAddDecisionOptions(form) {
+    var shell = form || document.getElementById('lifeAddForm');
+    if (!shell) return;
+    var rows = Array.prototype.slice.call(shell.querySelectorAll('.life-decision-option-row'));
+    var select = shell.elements.decisionChoice;
+    var previous = select ? select.value : '';
+    rows.forEach(function(row, idx) {
+      var letter = String.fromCharCode(65 + idx);
+      row.setAttribute('data-option-index', idx);
+      var letterNode = row.querySelector('.life-decision-option-letter');
+      if (letterNode) letterNode.textContent = letter + '.';
+    });
+    if (!select) return;
+    select.innerHTML = rows.map(function(row, idx) {
+      var letter = String.fromCharCode(65 + idx);
+      var name = row.querySelector('[name="decisionOptionName"]');
+      var label = letter + '. ' + (name && name.value.trim() ? name.value.trim() : '未命名选项');
+      return '<option value="' + escapeHtml(label) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+    if (previous && Array.prototype.some.call(select.options, function(option) { return option.value === previous; })) {
+      select.value = previous;
+    }
+  }
+
+  function addDecisionOptionRow(button) {
+    var form = button.closest('#lifeAddForm');
+    var list = form && form.querySelector('.life-decision-option-list');
+    if (!list) return;
+    var next = list.querySelectorAll('.life-decision-option-row').length;
+    list.insertAdjacentHTML('beforeend', renderDecisionOptionRow(['新选项', '填写优点', '填写顾虑', '50'], next));
+    syncAddDecisionOptions(form);
+    updateAddPreview();
+  }
+
+  function removeDecisionOptionRow(button) {
+    var form = button.closest('#lifeAddForm');
+    var list = form && form.querySelector('.life-decision-option-list');
+    if (!list) return;
+    var rows = list.querySelectorAll('.life-decision-option-row');
+    if (rows.length <= 1) {
+      showToast('至少保留一个选项');
+      return;
+    }
+    var row = button.closest('.life-decision-option-row');
+    if (row) row.remove();
+    syncAddDecisionOptions(form);
+    updateAddPreview();
+  }
+
+  function renderAddTypePanel(type, idx) {
+    var hidden = idx ? ' is-hidden' : '';
+    var body = {
+      '记忆': '<div class="life-two-grid"><label>记忆标题<input class="life-input" name="memoryTitle" value="今天在江边散步"></label><label>归档到<select class="life-select" name="memoryBucket"><option>时间河流（默认）</option><option>本月值得记住</option></select></label></div>',
+      '决定': '<div class="life-two-grid"><label>决定标题<input class="life-input" name="decisionTitle" value="是否接受新的 Offer？"></label><label>我的倾向<select class="life-select" name="decisionChoice"><option>接受 Offer</option><option>暂不接受</option><option>继续观望</option></select></label></div><div class="life-two-grid"><label>信心 <input class="life-input" type="number" min="0" max="100" name="decisionConfidence" value="70"></label><label>复盘日期<input class="life-input" type="date" name="decisionReviewDate" value="2026-11-13"></label></div><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label>',
+      '情绪': '<div class="life-three-grid"><label>心情评分<input class="life-input" type="number" min="0" max="100" name="moodScore" value="78"></label><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label></div><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label>',
+      '关系': '<div class="life-two-grid"><label>人物<input class="life-input" name="relationshipName" value="张敏"></label><label>关系温度<input class="life-input" type="number" min="0" max="100" name="relationshipScore" value="80"></label></div><div class="life-two-grid"><label>上次联系<input class="life-input" name="relationshipLast" value="今天"></label><label>下次提醒<input class="life-input" type="date" name="relationshipNextDate" value="2026-05-24"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" value="聊到各自的工作近况和下次聚会时间。"></label>',
+      '愿望': '<div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" value="相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" min="0" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" value="¥12,999"></label></div><div class="life-two-grid"><label>当前想要程度<input class="life-input" type="number" min="0" max="100" name="wishDesire" value="65"></label><label>状态<select class="life-select" name="wishStatus"><option>愿望冷却中</option><option>可以决定</option></select></label></div><label>替代方案<input class="life-input" name="wishAlternatives" value="先租手机练习；租借体验；观望新品"></label>',
+      '健康': '<div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="2026-05-15"></label>',
+      '项目': '<div class="life-two-grid"><label>项目 / 任务<input class="life-input" name="projectName" value="个人网站改版"></label><label>进度<input class="life-input" type="number" min="0" max="100" name="projectProgress" value="60"></label></div><label>当前阻碍<input class="life-input" name="projectBlocker" value="设计稿还未最终确定"></label><label>下一步行动<input class="life-input" name="projectNext" value="完成首页视觉稿"></label>'
+    }[type];
+    return '<section class="life-add-module-panel' + hidden + '" data-add-panel="' + type + '"><div class="life-section-title"><h3>' + type + '子组件</h3><span>保存时同步写入对应模块</span></div>' + body + '</section>';
   }
 
   function renderAddAside() {
     return '<section class="life-detail-card life-add-preview-panel"><h2 class="life-detail-title">预览</h2><p class="life-panel-sub">在时间河流中的样子</p><div id="lifeAddPreview" style="margin-top:14px"></div></section>' +
-      '<section class="life-detail-card life-association-card"><h2 class="life-detail-title">智能关联建议</h2><div class="life-association-list">' +
-      [
-        ['情绪天气站', '今日心情记录'],
-        ['关系温度', '与 Emma 的互动'],
-        ['决策档案馆', '咖啡馆选择记录']
-      ].map(function(item) {
-        return '<div class="life-association-row"><span>' + item[0] + '</span><strong>' + item[1] + '</strong><button class="life-mini-btn" type="button" data-action="link-suggestion">关联</button></div>';
-      }).join('') +
-      '</div></section><section class="life-detail-card"><h2 class="life-detail-title">小贴士</h2><p class="life-card-copy">关联后可以在时间轴、情绪天气站、关系温度等页面中快速找到这一刻。</p></section>';
+      '<section class="life-detail-card life-association-card"><h2 class="life-detail-title">智能关联建议</h2><div class="life-association-list" id="lifeAssociationList"></div></section>' +
+      '<section class="life-detail-card life-add-tip"><h2 class="life-detail-title">小贴士</h2><p class="life-card-copy">关联后可以在时间轴、情绪天气站、关系温度等页面中快速找到这一刻。</p></section>';
+  }
+
+  function updateAddTypePanels(type) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-add-module]'), function(panel) {
+      var isActive = panel.getAttribute('data-add-module') === type;
+      panel.classList.toggle('is-active', isActive);
+      panel.classList.toggle('is-hidden', !isActive);
+    });
+  }
+
+  function setAddType(type) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-add-type]'), function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-add-type') === type);
+    });
+    updateAddTypePanels(type);
+    if (type === '决定') syncAddDecisionOptions(document.getElementById('lifeAddForm'));
+    updateAddPreview();
+  }
+
+  function addAssociationSuggestions(type) {
+    var map = {
+      '记忆': [['情绪天气站', '今日心情记录'], ['关系温度', '与 Emma 的互动'], ['决策档案馆', '咖啡馆选择记录']],
+      '决定': [['时间河流', '生成一条决定记录'], ['愿望冷却箱', '关联相机愿望'], ['复盘与回顾', '创建复盘提醒']],
+      '情绪': [['情绪天气站', '写入今日心情'], ['健康轨迹', '关联睡眠和压力'], ['时间河流', '同步为生活片段']],
+      '关系': [['关系温度', '更新联系人档案'], ['本月值得记住', '收录共同记忆'], ['时间河流', '生成互动记录']],
+      '愿望': [['愿望冷却箱', '创建冷却愿望'], ['决策档案馆', '关联后续决定'], ['时间河流', '记录愿望来源']],
+      '健康': [['健康轨迹', '写入身体信号'], ['情绪天气站', '关联睡眠压力'], ['时间河流', '生成健康记录']],
+      '项目': [['项目与目标', '更新项目进展'], ['资源库', '归档附件'], ['时间河流', '生成项目记录']]
+    };
+    return map[type] || map['记忆'];
   }
 
   function updateAddPreview() {
     var preview = document.getElementById('lifeAddPreview');
     var form = document.getElementById('lifeAddForm');
     if (!preview || !form) return;
-    var body = form.elements.body.value.trim() || '记录这一刻的想法、经历或感受...';
-    var location = form.elements.location.value.trim() || '未选择地点';
-    var people = form.elements.people.value.trim();
-    var activeType = form.querySelector('[data-add-type].active');
-    var activeMood = form.querySelector('[data-add-mood].active');
-    preview.innerHTML = '<article class="life-add-preview-card"><div class="life-add-preview-head"><span>今日</span><strong>15:30</strong><i>' + iconHtml('sun') + '</i></div><div class="life-add-preview-main"><span class="life-badge">' + (activeType ? activeType.getAttribute('data-add-type') : '记忆') + '</span><h3>今天在江边散步</h3><p>' + escapeHtml(body) + '</p><div class="life-add-preview-photos"><span class="life-photo photo-river"></span><span class="life-photo photo-cafe"></span><span class="life-photo photo-night"></span></div><div class="life-add-preview-meta"><span>' + iconHtml('location') + escapeHtml(location) + '</span><span>' + iconHtml(moodIcons[activeMood ? activeMood.getAttribute('data-add-mood') : '晴朗']) + (activeMood ? activeMood.getAttribute('data-add-mood') : '晴朗') + '</span>' + (people ? '<span>' + iconHtml('people') + escapeHtml(people) + '</span>' : '') + '</div></div></article>';
+    var type = currentAddType(form);
+    var body = addValue(form, 'body', '记录这一刻的想法、经历或感受...');
+    var location = addValue(form, 'location', '未选择地点');
+    var people = addPeople(form);
+    var mood = addSelectedMood(form);
+    var dateParts = addDateParts(form);
+    var title = addTitleForType(type, form);
+    var countNode = form.querySelector('[data-add-count]');
+    var associationList = document.getElementById('lifeAssociationList');
+    if (countNode) countNode.textContent = body.length + ' / 2000';
+    if (associationList) {
+      associationList.innerHTML = addAssociationSuggestions(type).map(function(item, idx) {
+        return '<div class="life-association-row"><span>可能相关联到</span><strong>' + item[0] + ' - ' + item[1] + '</strong><button class="life-mini-btn ' + (idx === 0 ? 'active' : '') + '" type="button" data-add-association="' + item[0] + '">关联</button></div>';
+      }).join('');
+    }
+    preview.innerHTML = '<article class="life-add-preview-card"><div class="life-add-preview-head"><span>今日</span><strong>' + escapeHtml(dateParts.time) + '</strong><i>' + iconHtml(iconForType(type)) + '</i></div><div class="life-add-preview-main"><span class="life-badge">' + escapeHtml(type) + '</span><h3>' + escapeHtml(title) + '</h3><p>' + escapeHtml(body) + '</p><div class="life-add-preview-photos"><span class="life-photo photo-river"></span><span class="life-photo photo-cafe"></span><span class="life-photo photo-night"></span><span class="life-photo photo-book"></span></div><div class="life-add-preview-meta"><span>' + iconHtml('location') + escapeHtml(location) + '</span><span>' + iconHtml(moodIcons[mood]) + escapeHtml(mood) + '</span>' + (people.length ? '<span>' + iconHtml('people') + people.length + '</span>' : '') + '</div></div></article>';
   }
 
   function saveMomentFromForm(form) {
-    var body = form.elements.body.value.trim();
+    var body = addValue(form, 'body', '');
     if (!body) {
       showToast('请先写下这一刻发生了什么');
       return;
     }
-    var activeType = form.querySelector('[data-add-type].active');
-    var activeMood = form.querySelector('[data-add-mood].active');
-    var tags = form.elements.tags.value.split(',').map(function(item) { return item.trim(); }).filter(Boolean);
-    var people = form.elements.people.value.split(',').map(function(item) { return item.trim(); }).filter(Boolean);
+    var type = currentAddType(form);
+    var dateParts = addDateParts(form);
+    var tags = addTags(form);
+    var people = addPeople(form);
+    var mood = addSelectedMood(form);
     var stored = getStoredMoments();
-    stored.unshift({
+    var moment = {
       id: 'local-' + Date.now(),
-      type: activeType ? activeType.getAttribute('data-add-type') : '记忆',
+      type: type,
       icon: '☀',
-      time: '15:30',
-      date: '今天 05-13',
-      title: '今天在江边散步',
+      time: dateParts.time,
+      date: '今天 ' + dateParts.date.slice(5),
+      title: addTitleForType(type, form),
       copy: body,
-      location: form.elements.location.value.trim() || '未选择地点',
+      location: addValue(form, 'location', '未选择地点'),
       people: people,
-      mood: activeMood ? activeMood.getAttribute('data-add-mood') : '晴朗',
-      photos: ['photo-river', 'photo-cafe', 'photo-night'],
-      tags: tags.length ? tags : ['日常']
-    });
+      mood: mood,
+      photos: ['photo-river', 'photo-cafe', 'photo-night', 'photo-book'],
+      tags: (tags.length ? tags : ['日常']).concat([type]),
+      linkedModules: addSelectedAssociations()
+    };
+    stored.unshift(moment);
     saveStoredMoments(stored);
-    state.selectedMomentId = stored[0].id;
+    saveAddModuleRecord(type, form, moment, dateParts);
+    state.selectedMomentId = moment.id;
     state.view = 'timeline';
-    showToast('已保存到时间河流');
+    showToast('已保存，并同步到' + type + '模块');
     render();
+  }
+
+  function saveAddModuleRecord(type, form, moment, dateParts) {
+    if (type === '决定') saveAddDecision(form, moment, dateParts);
+    if (type === '情绪') saveAddMood(form, moment, dateParts);
+    if (type === '关系') saveAddRelationship(form, moment);
+    if (type === '愿望') saveAddWish(form, moment, dateParts);
+    if (type === '健康') saveAddHealth(form, moment);
+    if (type === '项目') saveAddProject(form, moment);
+  }
+
+  function saveAddDecision(form, moment, dateParts) {
+    var stored = getStoredDecisions();
+    stored.unshift({
+      id: 'd-local-' + Date.now(),
+      status: '待复盘',
+      title: addValue(form, 'decisionTitle', moment.title),
+      date: dateParts.date,
+      category: '生活决策',
+      choice: addValue(form, 'decisionChoice', '继续观察'),
+      confidence: Number(addValue(form, 'decisionConfidence', '70')),
+      background: moment.copy,
+      reason: splitLines(moment.copy, [moment.copy]),
+      risks: splitLines(addValue(form, 'decisionRisks', ''), []),
+      options: [
+        [addValue(form, 'decisionChoice', '接受'), '当前倾向', moment.location, '待评估', '信心 ' + addValue(form, 'decisionConfidence', '70') + '/100'],
+        ['暂缓', '继续观察', moment.location, '机会成本', '信息更充分']
+      ],
+      reviewDate: addValue(form, 'decisionReviewDate', '2026-11-13'),
+      result: '由“添加一刻”创建，等待后续复盘。'
+    });
+    saveStoredDecisions(stored);
+    state.selectedDecisionId = stored[0].id;
+  }
+
+  function saveAddMood(form, moment, dateParts) {
+    var store = getMoodStore();
+    var score = Number(addValue(form, 'moodScore', '78'));
+    store.added.unshift({
+      id: 'mood-local-' + Date.now(),
+      year: 2026,
+      month: 4,
+      day: dateParts.day,
+      date: dateParts.date,
+      time: dateParts.time,
+      score: score,
+      weather: addSelectedMood(form),
+      sleep: Number(addValue(form, 'moodSleep', '7.2')),
+      pressure: Number(addValue(form, 'moodPressure', '35')),
+      energy: Number(addValue(form, 'healthEnergy', String(Math.min(100, score + 2)))),
+      feeling: addSelectedMood(form),
+      note: moment.copy,
+      tags: splitLines(addValue(form, 'moodTriggers', '').replace(/,/g, '\n'), ['日常'])
+    });
+    saveMoodStore(store);
+  }
+
+  function saveAddRelationship(form, moment) {
+    var name = addValue(form, 'relationshipName', (moment.people[0] || '未命名联系人'));
+    var current = allRelationships().filter(function(item) { return item.name === name; })[0];
+    var note = addValue(form, 'relationshipNote', moment.copy);
+    var next = normalizeRelationship(Object.assign({}, current || {}, {
+      id: current ? current.id : 'r-local-' + Date.now(),
+      name: name,
+      role: current ? current.role : '重要的人',
+      group: current ? current.group : '朋友',
+      last: addValue(form, 'relationshipLast', '今天'),
+      channel: '微信',
+      score: Number(addValue(form, 'relationshipScore', '80')),
+      next: '待提醒',
+      nextDate: addValue(form, 'relationshipNextDate', '2026-05-24'),
+      notes: [note].concat(current && current.notes ? current.notes : []),
+      memories: current ? current.memories : [{ text: moment.title, image: '' }]
+    }));
+    var store = getRelationshipStore();
+    var seedExists = withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === next.id; });
+    if (seedExists) store.edits[next.id] = next;
+    else {
+      store.added = (store.added || []).filter(function(item) { return item.id !== next.id; });
+      store.added.unshift(next);
+    }
+    saveRelationshipStore(store);
+    state.selectedRelationshipId = next.id;
+  }
+
+  function saveAddWish(form, moment, dateParts) {
+    var store = getWishStore();
+    var days = Number(addValue(form, 'wishDays', '21'));
+    var item = normalizeWish({
+      id: 'w-local-' + Date.now(),
+      status: addValue(form, 'wishStatus', '愿望冷却中'),
+      category: '生活',
+      name: addValue(form, 'wishName', moment.title),
+      reason: moment.copy,
+      days: days,
+      due: addDateDays(dateParts.date, days),
+      desire: Number(addValue(form, 'wishDesire', '65')),
+      price: addValue(form, 'wishPrice', '待定'),
+      alternatives: splitLines(addValue(form, 'wishAlternatives', '').replace(/；/g, '\n'), []),
+      plan: ['冷却期结束前再确认真实需求'],
+      photo: 'photo-camera',
+      addedAt: dateParts.date,
+      coolStart: dateParts.date
+    });
+    store.added.unshift(item);
+    saveWishStore(store);
+    state.selectedWishId = item.id;
+  }
+
+  function saveAddHealth(form, moment) {
+    var stored = getSimpleStore(healthStorageKey());
+    stored.unshift({
+      name: addValue(form, 'healthSignal', '身体状态记录'),
+      value: addValue(form, 'healthSleep', '7.2 小时') + ' · 精力 ' + addValue(form, 'healthEnergy', '80') + '/100',
+      note: moment.copy + ' 运动：' + addValue(form, 'healthExercise', '散步 40 分钟') + '。提醒：' + addValue(form, 'healthReminder', '2026-05-15') + '。'
+    });
+    saveSimpleStore(healthStorageKey(), stored);
+  }
+
+  function saveAddProject(form, moment) {
+    var stored = getSimpleStore(projectStorageKey());
+    stored.unshift({
+      name: addValue(form, 'projectName', moment.title),
+      progress: Number(addValue(form, 'projectProgress', '60')),
+      status: addValue(form, 'projectBlocker', '暂无阻碍'),
+      next: addValue(form, 'projectNext', '继续推进'),
+      people: moment.people.length ? '协作：' + moment.people.join('、') : '个人项目'
+    });
+    saveSimpleStore(projectStorageKey(), stored);
   }
 
   function renderSimpleView(kind) {
@@ -3171,11 +3342,6 @@
       if (actionName === 'back-timeline') setView('timeline');
       if (actionName === 'preview-add') updateAddPreview();
       if (actionName === 'link-suggestion') showToast('已关联到当前记录草稿');
-      return;
-    }
-    var monthlyAction = event.target.closest('[data-monthly-action]');
-    if (monthlyAction) {
-      handleMonthlyAction(monthlyAction.getAttribute('data-monthly-action'));
       return;
     }
     var axisAction = event.target.closest('[data-axis-action]');
@@ -3386,8 +3552,11 @@
     }
     var moment = event.target.closest('[data-moment-id]');
     if (moment) {
-      state.selectedMomentId = moment.getAttribute('data-moment-id');
-      renderTimeline();
+      openMomentTarget(
+        moment.getAttribute('data-moment-id'),
+        moment.getAttribute('data-moment-target'),
+        moment.getAttribute('data-target-id')
+      );
       return;
     }
     var axisItem = event.target.closest('[data-axis-id]');
@@ -3491,11 +3660,22 @@
       toggleWishPlan(wishPlan);
       return;
     }
+    var addAction = event.target.closest('[data-add-action]');
+    if (addAction) {
+      var addActionName = addAction.getAttribute('data-add-action');
+      if (addActionName === 'add-decision-option') addDecisionOptionRow(addAction);
+      if (addActionName === 'remove-decision-option') removeDecisionOptionRow(addAction);
+      return;
+    }
     var typeBtn = event.target.closest('[data-add-type]');
     if (typeBtn) {
-      Array.prototype.forEach.call(document.querySelectorAll('[data-add-type]'), function(btn) { btn.classList.remove('active'); });
-      typeBtn.classList.add('active');
-      updateAddPreview();
+      setAddType(typeBtn.getAttribute('data-add-type'));
+      return;
+    }
+    var addAssociation = event.target.closest('[data-add-association]');
+    if (addAssociation) {
+      addAssociation.classList.toggle('active');
+      showToast(addAssociation.classList.contains('active') ? '已加入关联' : '已取消关联');
       return;
     }
     var moodBtn = event.target.closest('[data-add-mood]');
@@ -3545,6 +3725,14 @@
     if (event.target.matches('[data-relationship-media-image]')) {
       refreshRelationshipMediaRowPreview(event.target.closest('[data-relationship-media-row]'));
       return;
+    }
+    if (event.target.matches('[data-add-body-source]')) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-add-body-source]'), function(node) {
+        if (node !== event.target) node.value = event.target.value;
+      });
+    }
+    if (event.target.closest('.life-decision-option-editor')) {
+      syncAddDecisionOptions(event.target.closest('#lifeAddForm'));
     }
     if (event.target.closest('#lifeAddForm')) updateAddPreview();
   });
@@ -3612,18 +3800,6 @@
     if (relationshipInlineForm) {
       event.preventDefault();
       saveRelationshipInlineForm(relationshipInlineForm);
-      return;
-    }
-    var monthlyLetterForm = event.target.closest('#lifeMonthlyLetterForm');
-    if (monthlyLetterForm) {
-      event.preventDefault();
-      saveMonthlyLetter(monthlyLetterForm);
-      return;
-    }
-    var monthlyQuoteForm = event.target.closest('#lifeMonthlyQuoteForm');
-    if (monthlyQuoteForm) {
-      event.preventDefault();
-      saveMonthlyQuote(monthlyQuoteForm);
       return;
     }
     var wishForm = event.target.closest('#lifeWishForm');
