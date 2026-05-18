@@ -59,7 +59,7 @@ function isLoggedIn() {
 }
 function checkAuth() {
   if (!isLoggedIn()) {
-    window.location.href = 'login.html';
+    window.location.href = 'travel-login.html';
   }
 }
 function logout() {
@@ -67,7 +67,7 @@ function logout() {
     return null;
   }).then(function() {
     clearToken();
-    window.location.href = 'login.html';
+    window.location.href = 'travel-login.html';
   });
 }
 
@@ -83,7 +83,7 @@ var api = {
   _handleResponse: function(resp) {
     if (resp.status === 401) {
       clearToken();
-      window.location.href = 'login.html';
+      window.location.href = 'travel-login.html';
       return Promise.reject(new Error('未登录'));
     }
     return resp.json().then(function(data) {

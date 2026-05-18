@@ -53,6 +53,7 @@
     monthlyMonth: 4,
     monthlyLetterMode: false,
     monthlyQuoteMode: false,
+    accountAdminCreateOpen: false,
     selectedMomentId: 'm1',
     selectedAxisId: 'a7',
     selectedDecisionId: 'd1',
@@ -70,6 +71,22 @@
   };
 
   var mockMode = new URLSearchParams(window.location.search).get('mock') === '1';
+
+  function lifeAccount() {
+    return window.LifeAccount || null;
+  }
+
+  function accountSession() {
+    return lifeAccount() ? lifeAccount().getSession() : null;
+  }
+
+  function accountAvatarKey(account) {
+    return String((account && account.avatar) || 'Q1').toLowerCase();
+  }
+
+  function accountRoleText(account) {
+    return account && account.role === 'admin' ? '管理员' : '普通用户';
+  }
 
   var viewTitles = {
     timeline: '生活航迹',
@@ -1046,6 +1063,24 @@
     if (addBtn) addBtn.textContent = state.view === 'life-axis' ? '+ 添加里程碑' : (state.view === 'decisions' ? '+ 添加决定' : (state.view === 'mood' ? '+ 记录情绪' : (state.view === 'wishes' ? '+ 添加愿望' : '+ 添加一刻')));
     if (els.search) {
       els.search.placeholder = state.view === 'life-axis' ? '搜索地点、事件、人物、决定...' : (state.view === 'wishes' ? '搜索愿望、原因、标签...' : (state.view === 'decisions' || state.view === 'mood' ? '搜索记录、地点、人物...' : '搜索记录、地点、人物、决策...'));
+    }
+    var session = accountSession();
+    var accountBtn = document.querySelector('[data-account-action="profile"]');
+    if (accountBtn) accountBtn.textContent = session ? session.name : '登录';
+    var profile = document.querySelector('.life-profile');
+    if (profile) {
+      var nameNode = profile.querySelector('strong');
+      var copyNode = profile.querySelector('span');
+      var avatarNode = profile.querySelector('.life-avatar');
+      if (nameNode) nameNode.textContent = session ? session.name : '未登录';
+      if (copyNode) copyNode.textContent = session ? '记录生活，理解自己' : '登录后同步个人档案';
+      if (avatarNode && session) {
+        avatarNode.classList.add('account-avatar');
+        avatarNode.innerHTML = relationshipAvatarHtml({ avatar: accountAvatarKey(session) }, '');
+      } else if (avatarNode) {
+        avatarNode.classList.remove('account-avatar');
+        avatarNode.innerHTML = 'L';
+      }
     }
     hydrateStaticIcons(document);
   }
@@ -3591,6 +3626,157 @@
     saveSimpleStore(projectStorageKey(), stored);
   }
 
+  function accountStatusPanel() {
+    var session = accountSession();
+    if (!session) {
+      return '<section class="life-account-empty"><div><h3>登录后启用个人档案</h3><p>生活航迹账号与旅游记账、续费雷达完全独立。登录后可管理资料、密码、安全状态和账号生命周期。</p></div><button class="life-primary-btn" type="button" data-account-action="login">去登录</button></section>';
+    }
+    var lifecycleCount = (session.lifecycle || []).length;
+    var lastLifecycle = (session.lifecycle || [])[lifecycleCount - 1];
+    return '<section class="life-account-card"><div class="life-account-head">' +
+      relationshipAvatarHtml({ avatar: accountAvatarKey(session) }, 'large') +
+      '<div><span>当前账号 · ' + accountRoleText(session) + '</span><h3>' + escapeHtml(session.name) + '</h3><p>' + escapeHtml(session.email) + '</p></div><em>active</em></div>' +
+      '<form id="lifeAccountForm" class="life-account-form"><div class="life-two-grid"><label>昵称<input class="life-input" name="name" value="' + escapeHtml(session.name) + '"></label><label>邮箱<input class="life-input" name="email" value="' + escapeHtml(session.email) + '"></label></div>' +
+      '<div class="life-avatar-picker">' + ['Q1','Q2','Q3','Q4','Q5','Q6'].map(function(item) {
+        var key = item.toLowerCase();
+        return '<label class="' + (accountAvatarKey(session) === key ? 'active' : '') + '"><input type="radio" name="avatar" value="' + item + '" ' + (accountAvatarKey(session) === key ? 'checked' : '') + '>' + relationshipAvatarHtml({ avatar: key }, '') + '<em>' + item + '</em></label>';
+      }).join('') + '</div>' +
+      '<label class="life-account-toggle"><input type="checkbox" name="reminder" ' + (session.preferences && session.preferences.reminder ? 'checked' : '') + '> 开启重要复盘提醒</label>' +
+      '<div class="life-account-actions"><button class="life-secondary-btn" type="button" data-account-action="logout">退出登录</button><button class="life-primary-btn" type="submit">保存资料</button></div></form>' +
+      '<div class="life-account-log-summary"><span>操作日志</span><strong>' + lifecycleCount + ' 条</strong><small>最近：' + escapeHtml(lastLifecycle ? lastLifecycle.date : '暂无') + '</small></div></section>' + accountAdminPanel(session);
+  }
+
+  function accountAdminPanel(session) {
+    if (!lifeAccount() || !session || session.role !== 'admin') return '';
+    var accounts = lifeAccount().listAccounts();
+    var userCount = accounts.filter(function(account) { return account.role !== 'admin'; }).length;
+    var adminCount = accounts.filter(function(account) { return account.role === 'admin'; }).length;
+    var createForm = state.accountAdminCreateOpen ? '<form id="lifeAccountAdminCreateForm" class="life-account-admin-create">' +
+      '<label>昵称<input class="life-input" name="name" placeholder="例如 Alex" required></label>' +
+      '<label>邮箱<input class="life-input" type="email" name="email" placeholder="user@example.com" required></label>' +
+      '<label>初始密码<input class="life-input" type="password" name="password" placeholder="至少 6 位" required></label>' +
+      '<label>角色<select class="life-input" name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label>' +
+      '<div class="life-account-admin-actions"><button class="life-secondary-btn" type="button" data-account-action="admin-create-cancel">取消</button><button class="life-primary-btn" type="submit">创建账号</button></div>' +
+      '</form>' : '';
+    return '<section id="lifeAccountAdminPanel" class="life-account-card life-account-admin-panel"><div class="life-account-admin-head"><div><span>管理员入口</span><h3>账号管理</h3><p>创建普通用户或管理员，删除不再使用的账号。当前账号不能在这里删除。</p></div><button class="life-primary-btn" type="button" data-account-action="admin-create-toggle">' + (state.accountAdminCreateOpen ? '收起创建' : '+ 创建账号') + '</button></div>' +
+      '<div class="life-account-admin-kpis"><div><span>全部账号</span><strong>' + accounts.length + '</strong></div><div><span>管理员</span><strong>' + adminCount + '</strong></div><div><span>普通用户</span><strong>' + userCount + '</strong></div></div>' +
+      createForm +
+      '<div class="life-account-admin-list">' + accounts.map(function(account) {
+        var self = account.id === session.accountId;
+        return '<article class="life-account-admin-row"><div>' + relationshipAvatarHtml({ avatar: accountAvatarKey(account) }, '') + '<span><strong>' + escapeHtml(account.name) + '</strong><small>' + escapeHtml(account.email) + ' · ' + accountRoleText(account) + ' · ' + escapeHtml(account.status || 'active') + '</small></span></div><button type="button" data-account-action="admin-delete" data-account-id="' + escapeHtml(account.id) + '" ' + (self ? 'disabled' : '') + '>' + (self ? '当前账号' : '删除') + '</button></article>';
+      }).join('') + '</div></section>';
+  }
+
+  function accountSecurityPanel() {
+    var session = accountSession();
+    if (!session) return '<section class="life-detail-card"><h2 class="life-detail-title">账号生命周期</h2><p class="life-card-copy">注册、登录、资料维护、重置密码、停用和删除均由生活航迹独立管理。</p></section>';
+    var adminEntry = session.role === 'admin' ? '<section class="life-detail-card life-account-side life-account-admin-entry"><h2 class="life-detail-title">账号管理</h2><p class="life-card-copy">你当前是管理员，可创建普通用户或管理员账号，也可删除其他账号。</p><a class="life-primary-btn" href="#lifeAccountAdminPanel">打开账号管理</a></section>' : '';
+    return adminEntry + '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">账号安全</h2><form id="lifeAccountPasswordForm" class="life-account-password-form"><label>当前密码<input class="life-input" type="password" name="currentPassword" placeholder="当前密码"></label><label>新密码<input class="life-input" type="password" name="nextPassword" placeholder="至少 6 位"></label><button class="life-primary-btn" type="submit">修改密码</button></form></section>' +
+      '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">生命周期操作</h2><p class="life-card-copy">停用会退出登录；删除会从本机可登录账号中移除。</p><div class="life-account-danger"><button type="button" data-account-action="deactivate">停用账号</button><button type="button" data-account-action="delete">删除账号</button></div></section>';
+  }
+
+  function saveAccountProfile(form) {
+    if (!lifeAccount()) return;
+    var selected = form.querySelector('input[name="avatar"]:checked');
+    try {
+      lifeAccount().updateProfile({
+        name: form.elements.name.value,
+        email: form.elements.email.value,
+        avatar: selected ? selected.value : 'Q1',
+        preferences: { reminder: !!form.elements.reminder.checked }
+      });
+      showToast('账号资料已保存');
+      render();
+    } catch (err) {
+      showToast(err.message || '保存失败');
+    }
+  }
+
+  function saveAccountPassword(form) {
+    if (!lifeAccount()) return;
+    try {
+      lifeAccount().changePassword(form.elements.currentPassword.value, form.elements.nextPassword.value);
+      showToast('密码已修改');
+      render();
+    } catch (err) {
+      showToast(err.message || '修改失败');
+    }
+  }
+
+  function saveAdminAccount(form) {
+    if (!lifeAccount()) return;
+    try {
+      lifeAccount().adminCreateAccount({
+        name: form.elements.name.value,
+        email: form.elements.email.value,
+        password: form.elements.password.value,
+        role: form.elements.role.value,
+        adminCode: 'LIFE-ADMIN',
+        avatar: form.elements.role.value === 'admin' ? 'Q1' : 'Q2'
+      });
+      state.accountAdminCreateOpen = false;
+      showToast('账号已创建');
+      render();
+    } catch (err) {
+      showToast(err.message || '创建失败');
+    }
+  }
+
+  function handleAccountAction(action, actionBtn) {
+    if (action === 'profile') {
+      if (!accountSession()) window.location.href = 'login.html';
+      else setView('profile');
+      return;
+    }
+    if (action === 'login') {
+      window.location.href = 'login.html';
+      return;
+    }
+    if (!lifeAccount()) return;
+    if (action === 'logout') {
+      lifeAccount().signOut();
+      showToast('已退出登录');
+      render();
+      return;
+    }
+    if (action === 'admin-create-toggle') {
+      state.accountAdminCreateOpen = !state.accountAdminCreateOpen;
+      render();
+      return;
+    }
+    if (action === 'admin-create-cancel') {
+      state.accountAdminCreateOpen = false;
+      render();
+      return;
+    }
+    if (action === 'admin-delete') {
+      var target = actionBtn && actionBtn.getAttribute('data-account-id');
+      if (!target) return;
+      if (!window.confirm('确认删除这个账号？删除后该账号无法再登录。')) return;
+      try {
+        lifeAccount().adminDeleteAccount(target);
+        showToast('账号已删除');
+        render();
+      } catch (err) {
+        showToast(err.message || '删除失败');
+      }
+      return;
+    }
+    if (action === 'deactivate') {
+      if (!window.confirm('确认停用当前账号？停用后会退出登录。')) return;
+      lifeAccount().deactivateAccount();
+      showToast('账号已停用');
+      render();
+      return;
+    }
+    if (action === 'delete') {
+      if (!window.confirm('确认删除当前账号？此操作会退出登录，并从可登录账号中移除。')) return;
+      lifeAccount().deleteAccount();
+      showToast('账号已删除');
+      render();
+    }
+  }
+
   function renderSimpleView(kind) {
     var simpleProjects = allProjects();
     var simpleHealth = allHealth();
@@ -3601,10 +3787,10 @@
       health: ['健康与身体', simpleHealth.map(function(item) { return '<article class="life-row"><div class="life-row-head"><h3 class="life-row-title">' + item.name + '</h3><strong>' + item.value + '</strong></div><p class="life-card-copy">' + item.note + '</p></article>'; }).join('')],
       review: ['复盘与回顾', simpleDecisions.map(function(item) { return '<article class="life-row"><div class="life-row-head"><h3 class="life-row-title">' + item.title + '</h3><span class="life-badge amber">' + item.reviewDate + '</span></div><p class="life-card-copy">' + item.result + '</p></article>'; }).join('')],
       resources: ['资源库', simpleResources.map(function(item) { return '<article class="life-row"><div class="life-row-head"><div><h3 class="life-row-title">' + item.name + ' · ' + item.value + '</h3><p class="life-card-copy">' + item.meta + '</p></div><button class="life-mini-btn">查看</button></div></article>'; }).join('')],
-      profile: ['个人档案', '<div class="life-wide-grid">' + [['记录总数','628 条'],['走过天数','9,862 天'],['城市','28 个'],['关系联系人','23 位'],['愿望完成','12 个'],['月度回顾','18 份']].map(function(item) { return '<div class="life-kpi"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join('') + '</div><p class="life-card-copy" style="margin-top:16px">偏好：清晨记录、月末复盘、重要关系提醒、愿望冷却 21 天。</p>']
+      profile: ['个人档案', '<div class="life-wide-grid">' + [['记录总数','628 条'],['走过天数','9,862 天'],['城市','28 个'],['关系联系人','23 位'],['愿望完成','12 个'],['月度回顾','18 份']].map(function(item) { return '<div class="life-kpi"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join('') + '</div>' + accountStatusPanel()]
     }[kind];
     els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-panel-title">' + config[0] + '</h2><p class="life-panel-sub">精简视图，保持与主应用一致的记录结构。</p></div><button class="life-secondary-btn">筛选</button></div><div class="life-list">' + config[1] + '</div></section>';
-    els.aside.innerHTML = '<section class="life-detail-card"><h2 class="life-detail-title">关联洞察</h2><p class="life-card-copy">这些内容会被时间河流、月度回顾和个人档案统一引用，避免记录散落在不同页面里。</p></section><section class="life-detail-card"><h2 class="life-detail-title">本周关注</h2><div class="life-chip-row"><span class="life-chip active">睡眠质量</span><span class="life-chip">专注力</span><span class="life-chip">情绪稳定</span></div></section>';
+    els.aside.innerHTML = kind === 'profile' ? accountSecurityPanel() : '<section class="life-detail-card"><h2 class="life-detail-title">关联洞察</h2><p class="life-card-copy">这些内容会被时间河流、月度回顾和个人档案统一引用，避免记录散落在不同页面里。</p></section><section class="life-detail-card"><h2 class="life-detail-title">本周关注</h2><div class="life-chip-row"><span class="life-chip active">睡眠质量</span><span class="life-chip">专注力</span><span class="life-chip">情绪稳定</span></div></section>';
   }
 
   function render() {
@@ -3621,6 +3807,11 @@
   }
 
   document.addEventListener('click', function(event) {
+    var accountAction = event.target.closest('[data-account-action]');
+    if (accountAction) {
+      handleAccountAction(accountAction.getAttribute('data-account-action'), accountAction);
+      return;
+    }
     if (event.target.closest('#mockModeBtn')) {
       var url = new URL(window.location.href);
       if (mockMode) {
@@ -4079,6 +4270,24 @@
   });
 
   document.addEventListener('submit', function(event) {
+    var accountForm = event.target.closest('#lifeAccountForm');
+    if (accountForm) {
+      event.preventDefault();
+      saveAccountProfile(accountForm);
+      return;
+    }
+    var accountPasswordForm = event.target.closest('#lifeAccountPasswordForm');
+    if (accountPasswordForm) {
+      event.preventDefault();
+      saveAccountPassword(accountPasswordForm);
+      return;
+    }
+    var accountAdminCreateForm = event.target.closest('#lifeAccountAdminCreateForm');
+    if (accountAdminCreateForm) {
+      event.preventDefault();
+      saveAdminAccount(accountAdminCreateForm);
+      return;
+    }
     var axisForm = event.target.closest('#lifeAxisEditForm');
     if (axisForm) {
       event.preventDefault();
