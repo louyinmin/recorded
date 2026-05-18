@@ -2549,6 +2549,24 @@ body[data-life-view="timeline"] .life-card-title {
   display: flex;
 }
 
+.life-axis-face-row em {
+  align-self: center;
+  margin-left: 8px;
+  color: var(--life-muted);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.life-axis-empty-copy {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--life-line);
+  border-radius: 8px;
+  color: var(--life-muted);
+  background: #fbfcfc;
+  font-size: 12px;
+}
+
 .life-axis-location {
   display: grid;
   grid-template-columns: 50px minmax(0, 1fr) 120px;
@@ -6177,6 +6195,10 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   gap: 8px;
   color: var(--life-muted);
   font-size: 12px;
+}
+
+.life-axis-edit-form .life-textarea.compact {
+  min-height: 82px;
 }
 
 .life-input,

@@ -1382,25 +1382,138 @@
     return 'gray';
   }
 
+  function axisLocationMeta(item) {
+    if (item.locationMeta) return item.locationMeta;
+    if (item.place === '待出发') return '行程尚未开始';
+    if (item.place === '上海') return '中国 · 上海市';
+    if (item.place === '日本') return '日本';
+    if (item.place === '新疆') return '中国 · 新疆';
+    if (item.place === '四川') return '中国 · 四川省';
+    if (item.place === '海南 · 万宁') return '中国 · 海南省';
+    if (item.place === '云南 · 大理') return '中国 · 云南省';
+    return item.place ? '记录地点 · ' + item.place : '未记录地点';
+  }
+
+  function axisLocationPhoto(item) {
+    var photos = item.photos || [];
+    return photos[0] || (item.type === '旅行' ? 'photo-mountain' : (item.type === '项目' ? 'photo-office' : 'photo-river'));
+  }
+
+  function axisPeopleCount(item) {
+    var value = Number(item.people || 0);
+    return value < 0 ? 0 : value;
+  }
+
+  function axisPeopleHtml(item) {
+    var count = axisPeopleCount(item);
+    if (!count) return '<p class="life-axis-empty-copy">暂无相关人物</p>';
+    var faces = [];
+    for (var index = 0; index < Math.min(count, 4); index += 1) faces.push('<i></i>');
+    return '<div class="life-axis-face-row">' + faces.join('') + (count > 4 ? '<em>+' + (count - 4) + '</em>' : '') + '</div>';
+  }
+
+  function axisRelatedDecisions(item) {
+    if (item.decisions && item.decisions.length) return item.decisions;
+    if (item.id === 'a7') {
+      return [
+        { title: '是否辞去稳定工作？', date: '2024-10-28', status: '已复盘' },
+        { title: '未来一年如何规划？', date: '2024-11-03', status: '待复盘' }
+      ];
+    }
+    return [];
+  }
+
+  function axisMoodDetail(item) {
+    var typeMood = {
+      '旅行': { score: 82, label: '愉快', dimensions: [['期待', 86, '高'], ['放松', 78, '明显'], ['新鲜感', 88, '强'], ['疲惫', 34, '较低']] },
+      '健康': { score: 76, label: '稳定', dimensions: [['平静', 78, '良好'], ['专注', 66, '一般'], ['能量', 72, '良好'], ['压力', 28, '较低']] },
+      '项目': { score: 74, label: '充实', dimensions: [['成就感', 76, '良好'], ['压力', 52, '一般'], ['专注', 80, '较高'], ['期待', 68, '一般']] },
+      '工作': { score: 70, label: '清醒', dimensions: [['期待', 66, '一般'], ['压力', 58, '中等'], ['掌控感', 72, '良好'], ['不安', 38, '较低']] }
+    };
+    var fallback = typeMood[item.type] || { score: 62, label: '中等偏上', dimensions: [['期待', 70, '兴奋'], ['焦虑', 45, '一般'], ['不安', 40, '偏高'], ['平静', 60, '一般']] };
+    if (!item.mood) return fallback;
+    return {
+      score: item.mood.score == null ? fallback.score : item.mood.score,
+      label: item.mood.label || fallback.label,
+      dimensions: item.mood.dimensions && item.mood.dimensions.length ? item.mood.dimensions : fallback.dimensions
+    };
+  }
+
+  function axisTags(item) {
+    if (item.tags && item.tags.length) return item.tags;
+    return [item.type, item.year, item.place].filter(Boolean).slice(0, 4);
+  }
+
+  function axisDecisionRows(item) {
+    var rows = axisRelatedDecisions(item);
+    if (!rows.length) return '<p class="life-axis-empty-copy">暂无相关决定</p>';
+    return rows.map(function(row) {
+      var pending = row.status !== '已复盘';
+      return '<div class="life-axis-decision-row">' + iconHtml('review') + '<strong>' + escapeHtml(row.title) + '</strong><span>' + escapeHtml(row.date) + '</span><em class="' + (pending ? 'pending' : '') + '">' + escapeHtml(row.status) + '</em></div>';
+    }).join('') + '<button class="life-card-link" data-action="view-decisions">查看全部相关决定 →</button>';
+  }
+
+  function axisMoodHtml(item) {
+    var mood = axisMoodDetail(item);
+    return '<div class="life-axis-mood-box"><div><strong>' + escapeHtml(mood.score) + '</strong><span>/100</span><p>' + escapeHtml(mood.label) + '</p></div><ul>' +
+      mood.dimensions.map(function(row) {
+        return '<li><span>' + escapeHtml(row[0]) + '</span><b style="--w:' + Number(row[1] || 0) + '%"></b><em>' + escapeHtml(row[1]) + ' ' + escapeHtml(row[2]) + '</em></li>';
+      }).join('') +
+    '</ul></div>';
+  }
+
+  function splitAxisList(value) {
+    return String(value || '').split(/[,，\\n]/).map(function(item) { return item.trim(); }).filter(Boolean);
+  }
+
+  function parseAxisDecisions(value) {
+    return String(value || '').split('\\n').map(function(line) {
+      var parts = line.split('|').map(function(part) { return part.trim(); });
+      if (!parts[0]) return null;
+      return { title: parts[0], date: parts[1] || '未记录日期', status: parts[2] || '待复盘' };
+    }).filter(Boolean);
+  }
+
+  function formatAxisDecisions(item) {
+    return axisRelatedDecisions(item).map(function(row) {
+      return [row.title, row.date, row.status].join(' | ');
+    }).join('\\n');
+  }
+
   function renderAxisAside(item) {
     if (!item) return '';
     if (state.axisEditing) return renderAxisEditForm(item);
     var detailPhotos = (item.photos && item.photos.length ? item.photos : ['photo-book','photo-office','photo-river']).slice(0, 4);
+    var peopleCount = axisPeopleCount(item);
+    var mood = axisMoodDetail(item);
     return '<section class="life-axis-detail-card">' +
       '<div class="life-axis-detail-head"><div class="life-axis-detail-icon ' + axisColor(item.type) + '">' + iconHtml(item.icon) + '</div><div><h2>' + escapeHtml(item.title) + '</h2><p>' + iconHtml('location') + ' ' + escapeHtml(item.place) + '<span>' + escapeHtml(item.date) + '</span></p></div><span class="life-badge ' + axisColor(item.type) + '">' + escapeHtml(item.type) + '</span></div>' +
       '<p class="life-axis-detail-copy">' + escapeHtml(item.desc) + '</p>' +
-      '<div class="life-axis-detail-photos">' + detailPhotos.map(function(photo, idx) { return '<span class="life-photo ' + photo + '">' + (idx === 3 ? '<em>+4</em>' : '') + '</span>'; }).join('') + '</div>' +
-      '<div class="life-axis-detail-section"><h3>相关人物 <span>' + (item.people || 4) + '</span></h3><div class="life-axis-face-row"><i></i><i></i><i></i><i></i></div></div>' +
-      '<div class="life-axis-detail-section"><h3>地点</h3><div class="life-axis-location"><span class="life-photo photo-river"></span><div><strong>上海</strong><p>中国 · 上海市</p></div><div class="life-map-pin">' + iconHtml('location') + '</div></div></div>' +
-      '<div class="life-axis-detail-section"><h3>相关决定 <span>2</span></h3><div class="life-axis-decision-row">' + iconHtml('review') + '<strong>是否辞去稳定工作？</strong><span>2024-10-28</span><em>已复盘</em></div><div class="life-axis-decision-row">' + iconHtml('review') + '<strong>未来一年如何规划？</strong><span>2024-11-03</span><em class="pending">待复盘</em></div><button class="life-card-link" data-action="view-decisions">查看全部相关决定 →</button></div>' +
-      '<div class="life-axis-detail-section"><div class="life-axis-mood-head"><h3>当时的情绪</h3><span>记录于 2024-11-02</span></div><div class="life-axis-mood-box"><div><strong>62</strong><span>/100</span><p>中等偏上</p></div><ul><li><span>期待</span><b style="--w:70%"></b><em>70 兴奋</em></li><li><span>焦虑</span><b style="--w:45%"></b><em>45 一般</em></li><li><span>不安</span><b style="--w:40%"></b><em>40 偏高</em></li><li><span>平静</span><b style="--w:60%"></b><em>60 一般</em></li></ul></div></div>' +
-      '<div class="life-axis-detail-section"><h3>标签</h3><div class="life-chip-row">' + ['人生转折','勇气','不确定','重新开始'].map(function(tag) { return '<span class="life-badge gray">' + tag + '</span>'; }).join('') + '</div></div>' +
+      '<div class="life-axis-detail-photos">' + detailPhotos.map(function(photo) { return '<span class="life-photo ' + photo + '"></span>'; }).join('') + '</div>' +
+      '<div class="life-axis-detail-section"><h3>相关人物 <span>' + peopleCount + '</span></h3>' + axisPeopleHtml(item) + '</div>' +
+      '<div class="life-axis-detail-section"><h3>地点</h3><div class="life-axis-location"><span class="life-photo ' + axisLocationPhoto(item) + '"></span><div><strong>' + escapeHtml(item.place || '未记录地点') + '</strong><p>' + escapeHtml(axisLocationMeta(item)) + '</p></div><div class="life-map-pin">' + iconHtml('location') + '</div></div></div>' +
+      '<div class="life-axis-detail-section"><h3>相关决定 <span>' + axisRelatedDecisions(item).length + '</span></h3>' + axisDecisionRows(item) + '</div>' +
+      '<div class="life-axis-detail-section"><div class="life-axis-mood-head"><h3>当时的情绪</h3><span>记录于 ' + escapeHtml(item.moodDate || item.date) + '</span></div>' + axisMoodHtml(item) + '</div>' +
+      '<div class="life-axis-detail-section"><h3>标签</h3><div class="life-chip-row">' + axisTags(item).map(function(tag) { return '<span class="life-badge gray">' + escapeHtml(tag) + '</span>'; }).join('') + '</div></div>' +
       '<div class="life-axis-actions"><button class="life-secondary-btn" data-axis-action="edit">' + iconHtml('add') + ' 编辑</button><button class="life-danger-btn" data-axis-action="delete">删除</button><button class="life-kebab" data-axis-action="more">⋮</button></div>' +
     '</section>';
   }
 
   function renderAxisEditForm(item) {
-    return '<section class="life-axis-detail-card"><form id="lifeAxisEditForm" class="life-form"><div class="life-detail-head"><h2 class="life-detail-title">编辑里程碑</h2><button class="life-mini-btn" type="button" data-axis-action="cancel-edit">取消</button></div><label>标题<input class="life-input" name="title" value="' + escapeHtml(item.title) + '"></label><label>说明<textarea class="life-textarea" name="desc">' + escapeHtml(item.desc) + '</textarea></label><div class="life-two-grid"><label>年份<input class="life-input" name="year" value="' + escapeHtml(item.year) + '"></label><label>日期<input class="life-input" name="date" value="' + escapeHtml(item.date) + '"></label></div><button class="life-primary-btn" type="submit">保存修改</button></form></section>';
+    var mood = axisMoodDetail(item);
+    return '<section class="life-axis-detail-card"><form id="lifeAxisEditForm" class="life-form life-axis-edit-form"><div class="life-detail-head"><h2 class="life-detail-title">编辑里程碑</h2><button class="life-mini-btn" type="button" data-axis-action="cancel-edit">取消</button></div>' +
+      '<label>标题<input class="life-input" name="title" value="' + escapeHtml(item.title) + '"></label>' +
+      '<label>说明<textarea class="life-textarea" name="desc">' + escapeHtml(item.desc) + '</textarea></label>' +
+      '<div class="life-two-grid"><label>年份<input class="life-input" name="year" value="' + escapeHtml(item.year) + '"></label><label>日期<input class="life-input" name="date" value="' + escapeHtml(item.date) + '"></label></div>' +
+      '<div class="life-two-grid"><label>季节<input class="life-input" name="season" value="' + escapeHtml(item.season) + '"></label><label>日期标签<input class="life-input" name="day" value="' + escapeHtml(item.day) + '"></label></div>' +
+      '<div class="life-two-grid"><label>分类<input class="life-input" name="type" value="' + escapeHtml(item.type) + '"></label><label>地点<input class="life-input" name="place" value="' + escapeHtml(item.place) + '"></label></div>' +
+      '<label>地点说明<input class="life-input" name="locationMeta" value="' + escapeHtml(axisLocationMeta(item)) + '"></label>' +
+      '<div class="life-two-grid"><label>相关人物数量<input class="life-input" type="number" min="0" name="people" value="' + axisPeopleCount(item) + '"></label><label>情绪分数<input class="life-input" type="number" min="0" max="100" name="moodScore" value="' + escapeHtml(mood.score) + '"></label></div>' +
+      '<div class="life-two-grid"><label>情绪标签<input class="life-input" name="moodLabel" value="' + escapeHtml(mood.label) + '"></label><label>情绪记录日期<input class="life-input" name="moodDate" value="' + escapeHtml(item.moodDate || item.date) + '"></label></div>' +
+      '<label>照片 class（用逗号分隔）<input class="life-input" name="photos" value="' + escapeHtml((item.photos || []).join(', ')) + '"></label>' +
+      '<label>相关决定（一行一个：标题 | 日期 | 状态）<textarea class="life-textarea compact" name="decisions">' + escapeHtml(formatAxisDecisions(item)) + '</textarea></label>' +
+      '<label>标签（用逗号分隔）<input class="life-input" name="tags" value="' + escapeHtml(axisTags(item).join(', ')) + '"></label>' +
+      '<button class="life-primary-btn" type="submit">保存修改</button></form></section>';
   }
 
   function addAxisMilestone(template) {
@@ -1446,7 +1559,29 @@
     var desc = form.elements.desc.value.trim() || '暂无说明';
     var year = form.elements.year.value.trim() || '2026';
     var date = form.elements.date.value.trim() || year + '-01-01';
-    store.edits[state.selectedAxisId] = { title: title, desc: desc, year: year, date: date };
+    var type = form.elements.type.value.trim() || '项目';
+    store.edits[state.selectedAxisId] = {
+      title: title,
+      desc: desc,
+      year: year,
+      date: date,
+      season: form.elements.season.value.trim() || '春',
+      day: form.elements.day.value.trim() || date.slice(5) || '01-01',
+      type: type,
+      icon: type === '旅行' ? 'travel' : (type === '健康' ? 'health' : (type === '重要决定' ? 'star' : 'project')),
+      place: form.elements.place.value.trim() || '未记录地点',
+      locationMeta: form.elements.locationMeta.value.trim() || '',
+      people: Math.max(0, Number(form.elements.people.value || 0)),
+      photos: splitAxisList(form.elements.photos.value),
+      decisions: parseAxisDecisions(form.elements.decisions.value),
+      moodDate: form.elements.moodDate.value.trim() || date,
+      mood: {
+        score: Math.max(0, Math.min(100, Number(form.elements.moodScore.value || 0))),
+        label: form.elements.moodLabel.value.trim() || '未记录',
+        dimensions: axisMoodDetail(axisMilestones().filter(function(item) { return item.id === state.selectedAxisId; })[0] || {}).dimensions
+      },
+      tags: splitAxisList(form.elements.tags.value)
+    };
     saveAxisStore(store);
     state.axisEditing = false;
     showToast('里程碑已保存');
