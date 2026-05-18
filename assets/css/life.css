@@ -6201,6 +6201,26 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   min-height: 82px;
 }
 
+.life-axis-link-hint {
+  border: 1px solid rgba(11,143,141,0.18);
+  border-radius: 8px;
+  background: #f6fbfa;
+  padding: 10px 12px;
+}
+
+.life-axis-link-hint strong {
+  display: block;
+  color: var(--life-accent);
+  font-size: 13px;
+}
+
+.life-axis-link-hint p {
+  margin: 6px 0 0;
+  color: var(--life-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .life-input,
 .life-textarea,
 .life-select {
