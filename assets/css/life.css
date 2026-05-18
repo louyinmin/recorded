@@ -93,6 +93,18 @@ button {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.76), 0 12px 28px rgba(21,36,34,0.08);
 }
 
+.life-avatar.account-avatar {
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.life-avatar.account-avatar .life-avatar-token {
+  width: 58px;
+  height: 58px;
+  flex-basis: 58px;
+}
+
 .life-profile strong {
   font-size: 15px;
 }
@@ -249,7 +261,8 @@ body[data-life-view="life-axis"] .life-topbar,
 body[data-life-view="decisions"] .life-topbar,
 body[data-life-view="mood"] .life-topbar,
 body[data-life-view="relationships"] .life-topbar,
-body[data-life-view="wishes"] .life-topbar {
+body[data-life-view="wishes"] .life-topbar,
+body[data-life-view="monthly"] .life-topbar {
   display: grid;
   grid-template-columns: 280px minmax(220px, 1fr) auto;
 }
@@ -258,7 +271,8 @@ body[data-life-view="life-axis"] .life-topbar > div:first-child,
 body[data-life-view="decisions"] .life-topbar > div:first-child,
 body[data-life-view="mood"] .life-topbar > div:first-child,
 body[data-life-view="relationships"] .life-topbar > div:first-child,
-body[data-life-view="wishes"] .life-topbar > div:first-child {
+body[data-life-view="wishes"] .life-topbar > div:first-child,
+body[data-life-view="monthly"] .life-topbar > div:first-child {
   display: contents;
 }
 
@@ -266,7 +280,8 @@ body[data-life-view="life-axis"] .life-topbar h1,
 body[data-life-view="decisions"] .life-topbar h1,
 body[data-life-view="mood"] .life-topbar h1,
 body[data-life-view="relationships"] .life-topbar h1,
-body[data-life-view="wishes"] .life-topbar h1 {
+body[data-life-view="wishes"] .life-topbar h1,
+body[data-life-view="monthly"] .life-topbar h1 {
   grid-column: 1;
   grid-row: 1;
   display: inline-flex;
@@ -279,7 +294,8 @@ body[data-life-view="life-axis"] .life-topbar h1::before,
 body[data-life-view="decisions"] .life-topbar h1::before,
 body[data-life-view="mood"] .life-topbar h1::before,
 body[data-life-view="relationships"] .life-topbar h1::before,
-body[data-life-view="wishes"] .life-topbar h1::before {
+body[data-life-view="wishes"] .life-topbar h1::before,
+body[data-life-view="monthly"] .life-topbar h1::before {
   content: "";
   width: 18px;
   height: 14px;
@@ -292,7 +308,8 @@ body[data-life-view="life-axis"] .life-date,
 body[data-life-view="decisions"] .life-date,
 body[data-life-view="mood"] .life-date,
 body[data-life-view="relationships"] .life-date,
-body[data-life-view="wishes"] .life-date {
+body[data-life-view="wishes"] .life-date,
+body[data-life-view="monthly"] .life-date {
   grid-column: 2;
   justify-self: center;
   font-size: 14px;
@@ -302,7 +319,8 @@ body[data-life-view="life-axis"] .life-topbar-actions,
 body[data-life-view="decisions"] .life-topbar-actions,
 body[data-life-view="mood"] .life-topbar-actions,
 body[data-life-view="relationships"] .life-topbar-actions,
-body[data-life-view="wishes"] .life-topbar-actions {
+body[data-life-view="wishes"] .life-topbar-actions,
+body[data-life-view="monthly"] .life-topbar-actions {
   grid-column: 3;
 }
 
@@ -310,7 +328,8 @@ body[data-life-view="life-axis"] .life-search,
 body[data-life-view="decisions"] .life-search,
 body[data-life-view="mood"] .life-search,
 body[data-life-view="relationships"] .life-search,
-body[data-life-view="wishes"] .life-search {
+body[data-life-view="wishes"] .life-search,
+body[data-life-view="monthly"] .life-search {
   width: 300px;
 }
 
@@ -6424,6 +6443,307 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   gap: 0;
 }
 
+.life-account-entry {
+  white-space: nowrap;
+}
+
+.life-account-empty,
+.life-account-card {
+  margin-top: 18px;
+  border: 1px solid var(--life-line);
+  border-radius: var(--life-radius-lg);
+  background: linear-gradient(135deg, rgba(230,245,243,0.9), #fff);
+  padding: 18px;
+}
+
+.life-account-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.life-account-empty h3,
+.life-account-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.life-account-empty p,
+.life-account-head p {
+  margin: 6px 0 0;
+  color: var(--life-muted);
+  line-height: 1.6;
+}
+
+.life-account-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--life-line);
+}
+
+.life-account-head span {
+  display: block;
+  color: var(--life-muted);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.life-account-head em {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--life-accent-soft);
+  color: var(--life-accent-dark);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.life-account-form {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.life-account-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--life-muted);
+  font-size: 13px;
+}
+
+.life-account-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.life-account-lifecycle {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--life-radius-md);
+  background: #fff;
+  border: 1px solid var(--life-line);
+}
+
+.life-account-lifecycle div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.life-account-lifecycle span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--life-accent);
+  box-shadow: 0 0 0 5px var(--life-accent-soft);
+}
+
+.life-account-lifecycle div.todo span {
+  background: var(--life-faint);
+  box-shadow: none;
+}
+
+.life-account-lifecycle strong {
+  font-size: 13px;
+}
+
+.life-account-lifecycle small {
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-account-log-summary {
+  margin-top: 14px;
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--life-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-account-log-summary strong {
+  color: var(--life-text);
+  font-size: 13px;
+}
+
+.life-account-log-summary small {
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-account-password-form {
+  display: grid;
+  gap: 12px;
+}
+
+.life-account-danger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.life-account-danger button {
+  min-height: 38px;
+  border: 1px solid rgba(223, 83, 99, 0.28);
+  border-radius: var(--life-radius-sm);
+  background: rgba(223, 83, 99, 0.08);
+  color: var(--life-red);
+  font-weight: 800;
+}
+
+.life-account-admin-panel {
+  background: #fff;
+}
+
+.life-account-admin-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+.life-account-admin-head span {
+  display: inline-flex;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--life-accent-soft);
+  color: var(--life-accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.life-account-admin-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.life-account-admin-head p {
+  margin: 6px 0 0;
+  color: var(--life-muted);
+  line-height: 1.6;
+}
+
+.life-account-admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.life-account-admin-kpis div {
+  padding: 12px;
+  border: 1px solid var(--life-line);
+  border-radius: var(--life-radius-md);
+  background: var(--life-soft);
+}
+
+.life-account-admin-kpis span {
+  display: block;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-account-admin-kpis strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.life-account-admin-create {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px dashed var(--life-line-strong);
+  border-radius: var(--life-radius-md);
+  background: #fbfefd;
+}
+
+.life-account-admin-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.life-account-admin-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.life-account-admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--life-line);
+  border-radius: var(--life-radius-md);
+  background: #fff;
+}
+
+.life-account-admin-row > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.life-account-admin-row strong,
+.life-account-admin-row small {
+  display: block;
+}
+
+.life-account-admin-row small {
+  margin-top: 3px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-account-admin-row button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(223, 83, 99, 0.28);
+  border-radius: var(--life-radius-sm);
+  background: rgba(223, 83, 99, 0.07);
+  color: var(--life-red);
+  font-weight: 800;
+}
+
+.life-account-admin-row button:disabled {
+  border-color: var(--life-line);
+  background: var(--life-soft);
+  color: var(--life-muted);
+  cursor: not-allowed;
+}
+
+.life-account-admin-entry .life-primary-btn {
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  margin-top: 12px;
+  color: #fff;
+  text-decoration: none;
+}
+
 .life-detail-title {
   margin: 0;
   font-size: 16px;
@@ -6847,6 +7167,522 @@ body[data-life-view="wishes"] .life-workspace {
   accent-color: var(--life-amber);
 }
 
+body[data-life-view="monthly"] {
+  background: #fbfaf8;
+}
+
+body[data-life-view="monthly"] .life-workspace {
+  grid-template-columns: minmax(760px, 1fr) 360px;
+  gap: 32px;
+  padding: 20px 34px 32px;
+}
+
+.life-monthly-page {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.life-monthly-header,
+.life-monthly-month,
+.life-monthly-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.life-monthly-header h2 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 24px;
+}
+
+.life-monthly-bookmark,
+.life-monthly-month button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--life-line);
+  border-radius: 9px;
+  color: var(--life-accent-dark);
+  background: #fff;
+  display: inline-grid;
+  place-items: center;
+}
+
+.life-monthly-bookmark.active {
+  background: var(--life-accent-soft);
+  border-color: rgba(11,143,141,0.35);
+}
+
+.life-monthly-month {
+  justify-content: flex-start;
+}
+
+.life-monthly-month strong {
+  min-width: 104px;
+  text-align: center;
+}
+
+.life-monthly-highlights {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(3, 1fr);
+  gap: 14px;
+}
+
+.life-monthly-highlight {
+  min-height: 258px;
+  border: 1px solid var(--life-line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: var(--life-shadow-soft);
+  cursor: pointer;
+}
+
+.life-monthly-highlight:hover {
+  border-color: rgba(11,143,141,0.36);
+  box-shadow: 0 12px 28px rgba(15,45,41,0.1);
+}
+
+.life-monthly-highlight .life-photo {
+  width: 100%;
+  height: 108px;
+  border: 0;
+  border-radius: 0;
+}
+
+.life-monthly-highlight.featured .life-photo {
+  height: 100%;
+  min-height: 258px;
+}
+
+.life-monthly-highlight.featured {
+  display: grid;
+  grid-template-columns: 1fr 0.92fr;
+}
+
+.life-monthly-highlight.featured > div {
+  align-self: end;
+  margin: 0 0 20px -74px;
+  max-width: 210px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.94);
+  box-shadow: var(--life-shadow-soft);
+}
+
+.life-monthly-highlight > div {
+  padding: 14px;
+}
+
+.life-monthly-highlight small,
+.life-monthly-highlight footer,
+.life-monthly-card-head span,
+.life-monthly-sub,
+.life-monthly-letter small,
+.life-monthly-side-card span,
+.life-monthly-wish small {
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-monthly-highlight h3 {
+  margin: 4px 0 8px;
+  font-size: 16px;
+}
+
+.life-monthly-highlight p {
+  min-height: 42px;
+  margin: 0;
+  color: var(--life-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.life-monthly-highlight footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.life-monthly-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.life-monthly-grid.two {
+  grid-template-columns: 1.05fr 1fr;
+}
+
+.life-monthly-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.life-monthly-card,
+.life-monthly-side-card {
+  border: 1px solid var(--life-line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: var(--life-shadow-soft);
+}
+
+.life-monthly-card h3,
+.life-monthly-side-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.life-monthly-card-head button {
+  border: 0;
+  color: var(--life-accent-dark);
+  background: transparent;
+  font-weight: 650;
+}
+
+.life-monthly-lines {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.life-monthly-line {
+  display: grid;
+  grid-template-columns: 26px 52px minmax(0, 1fr) 72px 190px;
+  align-items: center;
+  gap: 10px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-monthly-line strong {
+  color: var(--life-text);
+  font-size: 13px;
+}
+
+.life-monthly-line em {
+  font-style: normal;
+}
+
+.life-monthly-mood-svg {
+  width: 100%;
+  min-height: 170px;
+  display: block;
+}
+
+.life-monthly-mood-card {
+  cursor: default;
+}
+
+.life-monthly-mood-wrap {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #fff9ed, #fff2f2 48%, #eff9ef);
+  padding: 10px;
+}
+
+.life-monthly-mood-wrap .life-monthly-mood-svg {
+  min-height: 154px;
+}
+
+.life-monthly-mood-scale {
+  display: grid;
+  align-content: space-between;
+  padding: 12px 0;
+  color: #748884;
+  font-size: 12px;
+}
+
+.life-monthly-people,
+.life-monthly-places {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.life-monthly-people {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.life-monthly-person {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border-right: 1px solid var(--life-line);
+  padding-right: 12px;
+}
+
+.life-monthly-person:last-child {
+  border-right: 0;
+}
+
+.life-monthly-person header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.life-monthly-person-face .life-avatar-token {
+  width: 46px;
+  height: 46px;
+}
+
+.life-monthly-people strong,
+.life-monthly-places strong {
+  font-size: 13px;
+}
+
+.life-monthly-people p {
+  margin: 4px 0 0;
+  color: var(--life-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.life-monthly-places {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.life-monthly-place {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.life-monthly-places .life-photo {
+  width: 100%;
+  height: 92px;
+  border-radius: 8px;
+}
+
+.life-monthly-place strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.life-monthly-wish {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 58px;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--life-line);
+}
+
+.life-monthly-wish .life-photo {
+  width: 54px;
+  height: 46px;
+}
+
+.life-monthly-wish p {
+  margin: 4px 0 0;
+  color: var(--life-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.life-monthly-wish-main {
+  min-width: 0;
+}
+
+.life-monthly-wish-main > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.life-monthly-wish-main strong {
+  overflow: hidden;
+  color: var(--life-text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.life-monthly-wish-main em {
+  margin-left: auto;
+  color: var(--life-muted);
+  font-style: normal;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.life-monthly-learned {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.life-monthly-learning-row {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--life-muted);
+  text-align: left;
+  line-height: 1.5;
+}
+
+.life-monthly-learning-row:hover {
+  background: var(--life-accent-soft);
+}
+
+.life-monthly-learning-row strong {
+  color: #425955;
+  font-weight: 520;
+  font-size: 13px;
+}
+
+.life-monthly-learn-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff7df;
+  display: inline-grid;
+  place-items: center;
+  font-size: 13px;
+}
+
+.life-monthly-summary p {
+  margin: 0 0 12px;
+  color: #415551;
+  line-height: 1.9;
+  font-size: 13px;
+}
+
+.life-monthly-side-card {
+  margin-bottom: 14px;
+}
+
+.life-monthly-side-card.quote {
+  position: relative;
+  background: #fffdf9;
+}
+
+.life-monthly-side-card.quote .life-monthly-card-head button {
+  border: 0;
+  color: var(--life-accent-dark);
+  background: transparent;
+  font-weight: 650;
+}
+
+.life-monthly-handwriting {
+  margin: 18px 0;
+  border-top: 1px solid #eadfce;
+  padding: 22px 18px;
+  color: #2a2722;
+  font-size: 23px;
+  line-height: 1.8;
+  letter-spacing: 0;
+  font-family: "Kaiti SC", "STKaiti", serif;
+}
+
+.life-monthly-heart {
+  position: absolute;
+  top: 104px;
+  right: 28px;
+  color: #f0838c;
+  font-size: 28px;
+}
+
+.life-monthly-side-card.quote .life-photo,
+.life-monthly-side-card.archive .life-photo {
+  width: 100%;
+  height: 118px;
+  margin-top: 10px;
+}
+
+.life-monthly-letter {
+  margin-top: 12px;
+  border: 1px solid var(--life-line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.life-monthly-letter p,
+.life-monthly-side-card p {
+  margin: 0;
+  color: var(--life-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.life-monthly-letter button {
+  justify-self: end;
+  border: 0;
+  color: var(--life-accent-dark);
+  background: transparent;
+}
+
+.life-monthly-side-card.report {
+  background: linear-gradient(135deg, #f2fbff, #fff);
+}
+
+.life-monthly-side-card.archive {
+  background: linear-gradient(135deg, #fff9ed, #fff);
+}
+
+.life-monthly-side-card.report,
+.life-monthly-side-card.archive {
+  display: grid;
+  gap: 12px;
+}
+
+.life-monthly-side-card .life-secondary-btn {
+  justify-self: end;
+}
+
+.life-monthly-letter-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.life-monthly-quote-form {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.life-monthly-quote-form .life-textarea {
+  min-height: 132px;
+  font-family: "Kaiti SC", "STKaiti", serif;
+  font-size: 20px;
+  line-height: 1.7;
+}
+
+.life-monthly-letter-form label,
+.life-monthly-quote-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-monthly-letter-form div,
+.life-monthly-quote-form div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 900px) {
   .life-workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -6877,6 +7713,52 @@ body[data-life-view="wishes"] .life-workspace {
 
   .life-wish-actions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .life-monthly-highlights,
+  .life-monthly-grid.two,
+  .life-monthly-grid.three,
+  .life-monthly-highlight.featured,
+  .life-monthly-people,
+  .life-monthly-places {
+    grid-template-columns: 1fr;
+  }
+
+  .life-monthly-highlight.featured > div {
+    margin: 0;
+    max-width: none;
+  }
+
+  .life-monthly-line {
+    grid-template-columns: 26px 52px minmax(0, 1fr);
+  }
+
+  .life-monthly-line .life-badge,
+  .life-monthly-line em {
+    grid-column: 3;
+  }
+
+  .life-monthly-mood-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .life-monthly-mood-scale {
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0;
+  }
+
+  .life-monthly-person {
+    border-right: 0;
+    border-bottom: 1px solid var(--life-line);
+    padding: 0 0 12px;
+  }
+
+  .life-monthly-wish {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .life-monthly-wish .life-photo {
+    grid-column: 2;
   }
 }
 

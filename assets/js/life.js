@@ -11,6 +11,8 @@
   var MOCK_RELATIONSHIP_STORAGE_KEY = 'life_mock_relationships_v1';
   var WISH_STORAGE_KEY = 'life_wishes_v1';
   var MOCK_WISH_STORAGE_KEY = 'life_mock_wishes_v1';
+  var MONTHLY_STORAGE_KEY = 'life_monthly_v1';
+  var MOCK_MONTHLY_STORAGE_KEY = 'life_mock_monthly_v1';
   var PROJECT_STORAGE_KEY = 'life_projects_v1';
   var MOCK_PROJECT_STORAGE_KEY = 'life_mock_projects_v1';
   var HEALTH_STORAGE_KEY = 'life_health_records_v1';
@@ -47,6 +49,10 @@
     wishCategory: '全部',
     wishSort: '按剩余天数排序',
     wishFormMode: null,
+    monthlyYear: 2026,
+    monthlyMonth: 4,
+    monthlyLetterMode: false,
+    monthlyQuoteMode: false,
     selectedMomentId: 'm1',
     selectedAxisId: 'a7',
     selectedDecisionId: 'd1',
@@ -624,6 +630,29 @@
 
   function saveWishStore(store) {
     localStorage.setItem(wishStorageKey(), JSON.stringify(store));
+  }
+
+  function monthlyStorageKey() {
+    return mockMode ? MOCK_MONTHLY_STORAGE_KEY : MONTHLY_STORAGE_KEY;
+  }
+
+  function getMonthlyStore() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(monthlyStorageKey()) || '{}');
+      return {
+        bookmarked: raw.bookmarked || {},
+        reports: raw.reports || {},
+        archived: raw.archived || {},
+        letters: raw.letters || {},
+        quotes: raw.quotes || {}
+      };
+    } catch (err) {
+      return { bookmarked: {}, reports: {}, archived: {}, letters: {}, quotes: {} };
+    }
+  }
+
+  function saveMonthlyStore(store) {
+    localStorage.setItem(monthlyStorageKey(), JSON.stringify(store));
   }
 
   function projectStorageKey() {
@@ -2858,15 +2887,295 @@
     persistWishUpdate(Object.assign({}, current, { completedPlan: completed }), '计划进度已更新');
   }
 
+  function monthlyKey() {
+    return state.monthlyYear + '-' + String(state.monthlyMonth + 1).padStart(2, '0');
+  }
+
+  function monthlyTitle() {
+    return state.monthlyYear + ' 年 ' + (state.monthlyMonth + 1) + ' 月';
+  }
+
+  function monthlyDateText(day) {
+    return String(state.monthlyMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+
+  function getMonthlyMeta() {
+    var store = getMonthlyStore();
+    var key = monthlyKey();
+    return {
+      bookmarked: store.bookmarked[key] !== false,
+      report: store.reports[key] || null,
+      archived: !!store.archived[key],
+      quote: store.quotes[key] || '在探索与连接中，我更靠近自己想要的生活。',
+      letter: store.letters[key] || {
+        title: '写给 3 个月后的自己',
+        date: '2026-05-13 写下',
+        body: '希望那时的你，还记得今天想要的生活是什么样子。也希望你依然在勇敢地选择自己。'
+      }
+    };
+  }
+
+  function monthlySet(key, value, message) {
+    var store = getMonthlyStore();
+    var month = monthlyKey();
+    if (key === 'bookmarked') store.bookmarked[month] = value;
+    if (key === 'report') store.reports[month] = value;
+    if (key === 'archived') store.archived[month] = value;
+    if (key === 'letter') store.letters[month] = value;
+    if (key === 'quote') store.quotes[month] = value;
+    saveMonthlyStore(store);
+    if (message) showToast(message);
+    renderMonthly();
+  }
+
+  function shiftMonthly(delta) {
+    state.monthlyMonth += delta;
+    if (state.monthlyMonth < 0) {
+      state.monthlyMonth = 11;
+      state.monthlyYear -= 1;
+    }
+    if (state.monthlyMonth > 11) {
+      state.monthlyMonth = 0;
+      state.monthlyYear += 1;
+    }
+    state.monthlyLetterMode = false;
+    state.monthlyQuoteMode = false;
+    renderMonthly();
+  }
+
+  function monthlyMomentDay(item) {
+    var match = String(item.date || '').match(/(\d{2})-(\d{2})/);
+    if (!match) return 1;
+    return Number(match[2] || 1);
+  }
+
+  function monthlyMediaImageHtml(item) {
+    if (item.image) return '<span class="life-photo life-uploaded-photo"><img src="' + escapeHtml(item.image) + '" alt=""></span>';
+    return '<span class="life-photo ' + escapeHtml(item.photo || 'photo-book') + '"></span>';
+  }
+
+  function monthlyMediaCandidates() {
+    var candidates = [];
+    allMoments().filter(function(item) {
+      return item.photos && item.photos.length && String(item.date || '').indexOf(String(state.monthlyMonth + 1).padStart(2, '0') + '-') >= 0;
+    }).forEach(function(item, idx) {
+      candidates.push({
+        id: 'moment-' + item.id,
+        day: monthlyMomentDay(item),
+        title: item.title,
+        copy: item.copy,
+        tag: (item.tags || [item.type])[0] || item.type,
+        source: '时间河流',
+        view: 'timeline',
+        likes: 12 + idx,
+        photo: item.photos[0]
+      });
+    });
+    allRelationships().forEach(function(person) {
+      [
+        ['memories', '共同记忆', 'memory'],
+        ['gifts', '送的礼物', 'gift'],
+        ['places', '一起去过的地方', 'place']
+      ].forEach(function(config) {
+        normalizeRelationshipMedia(person[config[0]]).forEach(function(media, idx) {
+          candidates.push({
+            id: 'relationship-' + person.id + '-' + config[0] + '-' + idx,
+            day: [3, 5, 8, 10, 13][idx % 5],
+            title: media.text || person.name + '的' + config[1],
+            copy: person.name + ' · ' + (person.notes || ['重要关系图片记录'])[0],
+            tag: config[1],
+            source: '关系温度',
+            view: 'relationships',
+            likes: person.score ? Math.max(8, Math.round(person.score / 8)) : 10,
+            image: media.image || '',
+            photo: relationshipMediaClasses(config[2], idx)
+          });
+        });
+      });
+    });
+    allWishes().filter(function(item) {
+      return item.photo;
+    }).forEach(function(item, idx) {
+      candidates.push({
+        id: 'wish-' + item.id,
+        day: Number((String(item.due || '').split('-')[2] || 13)),
+        title: item.name,
+        copy: item.reason,
+        tag: item.status,
+        source: '愿望冷却箱',
+        view: 'wishes',
+        likes: Math.max(8, Math.round(item.desire / 6)),
+        photo: wishPhoto(item)
+      });
+    });
+    return candidates;
+  }
+
+  function monthlyHighlights() {
+    var picked = [];
+    var used = {};
+    function pickFrom(sourceName, fallbackIndex) {
+      var item = monthlyMediaCandidates().filter(function(candidate) {
+        return candidate.source === sourceName && !used[candidate.id];
+      })[fallbackIndex || 0];
+      if (item) {
+        used[item.id] = true;
+        picked.push(item);
+      }
+    }
+    pickFrom('时间河流', 0);
+    pickFrom('关系温度', 0);
+    pickFrom('愿望冷却箱', 0);
+    pickFrom('时间河流', 1);
+    monthlyMediaCandidates().forEach(function(item) {
+      if (picked.length < 4 && !used[item.id]) {
+        used[item.id] = true;
+        picked.push(item);
+      }
+    });
+    return picked.slice(0, 4);
+  }
+
+  function monthlyMoodScores() {
+    return allMoodRecords().filter(function(item) {
+      return Number(item.year) === Number(state.monthlyYear) && Number(item.month) === Number(state.monthlyMonth);
+    }).map(function(item) { return item.score; });
+  }
+
+  function monthlyMoodSvg(scores) {
+    var values = scores.length ? scores : [64, 70, 58, 76, 68, 72, 66, 80, 74, 62, 78, 70];
+    var width = 520;
+    var height = 150;
+    var points = values.map(function(score, idx) {
+      var x = 20 + idx * ((width - 40) / Math.max(values.length - 1, 1));
+      var y = height - 24 - ((score - 35) / 60) * (height - 44);
+      return { x: Math.round(x), y: Math.round(Math.max(18, Math.min(height - 20, y))), score: score };
+    });
+    return '<svg class="life-monthly-mood-svg" viewBox="0 0 ' + width + ' ' + height + '" aria-label="本月情绪曲线">' +
+      '<defs><linearGradient id="monthlyMoodBg" x1="0" x2="1"><stop offset="0" stop-color="#fdf7e6"/><stop offset="0.48" stop-color="#fff2f2"/><stop offset="1" stop-color="#eef8ee"/></linearGradient></defs>' +
+      '<rect width="' + width + '" height="' + height + '" rx="10" fill="url(#monthlyMoodBg)"/>' +
+      '<path d="' + points.map(function(point, idx) { return (idx ? 'L' : 'M') + point.x + ' ' + point.y; }).join(' ') + '" fill="none" stroke="#0b8f8d" stroke-width="2.2"/>' +
+      points.map(function(point) { return '<circle cx="' + point.x + '" cy="' + point.y + '" r="4" fill="#fff" stroke="#0b8f8d" stroke-width="2"/>'; }).join('') +
+      '<g fill="#667b78" font-size="11"><text x="18" y="136">05-01</text><text x="180" y="136">05-10</text><text x="342" y="136">05-20</text><text x="462" y="136">05-31</text></g></svg>';
+  }
+
+  function renderMonthlyHighlightCard(item, idx) {
+    return '<article class="life-monthly-highlight ' + (idx === 0 ? 'featured' : '') + '" data-view="' + escapeHtml(item.view || 'timeline') + '">' + monthlyMediaImageHtml(item) + '<div><small>' + monthlyDateText(item.day) + ' · 来自' + escapeHtml(item.source || '时间河流') + '</small><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.copy) + '</p><footer><span class="life-badge ' + (idx === 0 ? 'amber' : idx === 1 ? 'green' : idx === 2 ? 'red' : 'blue') + '">' + escapeHtml(item.tag) + '</span><span>❤ ' + item.likes + '</span></footer></div></article>';
+  }
+
+  function renderMonthlyDecisionRows() {
+    return allDecisions().slice(0, 4).map(function(item, idx) {
+      return '<div class="life-monthly-line"><span class="life-side-icon ' + (idx % 2 ? 'green' : 'amber') + '">' + iconHtml('decision') + '</span><span>' + monthlyDateText([5, 10, 12, 13][idx]) + '</span><strong>' + escapeHtml(item.title) + '</strong><span class="life-badge ' + decisionTone(item) + '">' + escapeHtml(decisionStatus(item)) + '</span><em>选择：' + escapeHtml(item.choice) + '　|　信心：' + item.confidence + '%</em></div>';
+    }).join('');
+  }
+
+  function renderMonthlyPeople() {
+    return allRelationships().slice(0, 4).map(function(item, idx) {
+      var note = (item.notes || [])[0] || '有一段温暖的交流。';
+      return '<article class="life-monthly-person"><header><span class="life-monthly-person-face">' + relationshipAvatarHtml(item, 'sm') + '</span><div><strong>' + escapeHtml(item.name) + '</strong><small>见面 ' + (idx === 0 ? 2 : 1) + ' 次</small></div></header><p>' + escapeHtml(note) + '</p></article>';
+    }).join('');
+  }
+
+  function renderMonthlyPlaces() {
+    return [
+      ['苏州 · 拙政园', 'photo-garden'],
+      ['上海 · 外滩', 'photo-river'],
+      ['杭州 · 西湖', 'photo-mountain'],
+      ['南京 · 先锋书店', 'photo-cafe'],
+      ['家附近的公园', 'photo-book']
+    ].map(function(item) {
+      return '<article class="life-monthly-place"><span class="life-photo ' + item[1] + '"></span><strong>' + item[0] + '</strong></article>';
+    }).join('');
+  }
+
+  function renderMonthlyWishResults() {
+    return allWishes().filter(function(item) {
+      return ['愿望冷却中', '可以决定', '已实现'].indexOf(item.status) >= 0;
+    }).slice(0, 3).map(function(item) {
+      return '<div class="life-monthly-wish"><span class="life-side-icon green">' + iconHtml('wish') + '</span><div class="life-monthly-wish-main"><div><strong>' + escapeHtml(item.name) + '</strong><span class="life-badge green">' + escapeHtml(item.status) + '</span>' + (item.days ? '<em>还有 ' + item.days + ' 天</em>' : '') + '</div><p>' + escapeHtml(item.reason) + '</p></div><span class="life-photo ' + wishPhoto(item) + '"></span></div>';
+    }).join('');
+  }
+
+  function renderMonthlyLearned() {
+    return ['睡眠比我想象中更影响情绪，早睡真的有用。', '把大目标拆成小任务，行动会更轻松。', '真诚地沟通，可以减少很多误解和内耗。', '给自己留出独处的时间，才能听见内心的声音。', '慢慢来，比匆忙赶路更重要。'].map(function(text, idx) {
+      return '<button type="button" class="life-monthly-learning-row" data-monthly-action="view-learnings"><span class="life-monthly-learn-icon">' + ['❤', '💡', '👤', '★', '☘'][idx] + '</span><strong>' + escapeHtml(text) + '</strong></button>';
+    }).join('');
+  }
+
   function renderMonthly() {
-    var monthlyDecisions = allDecisions();
-    els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-panel-title">本月值得记住</h2><p class="life-panel-sub">2026 年 5 月</p></div><button class="life-secondary-btn">生成月报</button></div>' +
-      '<div class="life-wide-grid">' + ['黄浦江日落骑行','项目上线','和老朋友重逢'].map(function(title, idx) {
-        return '<article class="life-card"><span class="life-photo ' + ['photo-river','photo-office','photo-cafe'][idx] + '" style="width:100%;height:126px"></span><h3 class="life-card-title" style="margin-top:12px">' + title + '</h3><p class="life-card-copy">' + ['傍晚沿着江边骑行，风很大，但心里很轻。','团队一起熬了两个夜晚，今天终于上线了。','两年没见的大学室友，从下午聊到深夜。'][idx] + '</p></article>';
-      }).join('') + '</div></section>' +
-      '<section class="life-two-grid" style="margin-top:14px"><div class="life-panel"><h2 class="life-panel-title">做过的决定</h2><div class="life-list">' + monthlyDecisions.map(function(item) { return '<div class="life-row"><div class="life-row-head"><h3 class="life-row-title">' + item.title + '</h3><span class="life-badge">' + item.status + '</span></div><p class="life-card-copy">选择：' + item.choice + ' · 信心 ' + item.confidence + '%</p></div>'; }).join('') + '</div></div><div class="life-panel"><h2 class="life-panel-title">情绪模式</h2><div class="life-line-chart" style="height:150px">' + [42,76,88,50,70,44,66,82,58,88,72].map(function(v) { return '<span class="life-bar" style="height:' + v + '%"></span>'; }).join('') + '</div><p class="life-card-copy">整体感受：良好。规律作息与运动对情绪影响最大。</p></div></section>' +
-      '<section class="life-wide-grid" style="margin-top:14px"><div class="life-panel"><h2 class="life-panel-title">见过的人</h2>' + ['张敏','陈昊','李想','Emily'].map(function(name) { return '<div class="life-person" style="margin-top:12px"><span class="life-person-avatar">' + name.slice(0,1) + '</span><span>' + name + '</span></div>'; }).join('') + '</div><div class="life-panel"><h2 class="life-panel-title">过去的地方</h2><div class="life-media-row"><span class="life-photo photo-garden"></span><span class="life-photo photo-river"></span><span class="life-photo photo-cafe"></span></div><p class="life-card-copy">苏州 · 上海 · 杭州 · 南京</p></div><div class="life-panel"><h2 class="life-panel-title">总结感受</h2><p class="life-card-copy">这个月是充实又温柔的一个月。工作有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要。</p></div></section>';
-    els.aside.innerHTML = '<section class="life-detail-card"><h2 class="life-detail-title">本月一句话</h2><div class="life-quote">在探索与连接中，我更靠近自己想要的生活。</div></section><section class="life-detail-card"><h2 class="life-detail-title">写给未来的自己</h2><p class="life-card-copy">写给 3 个月后的自己：希望那时的你，还记得今天想要的生活是什么样子。</p><button class="life-secondary-btn">写一封信</button></section><section class="life-detail-card"><h2 class="life-detail-title">归档本月</h2><p class="life-card-copy">将本月回顾内容归档保存，便于未来跨时间对比。</p><button class="life-primary-btn" style="width:100%">归档</button></section>';
+    var meta = getMonthlyMeta();
+    var scores = monthlyMoodScores();
+    els.content.innerHTML = mockNotice() + '<section class="life-monthly-page"><header class="life-monthly-header"><div><h2>本月值得记住 <button type="button" class="life-monthly-bookmark ' + (meta.bookmarked ? 'active' : '') + '" data-monthly-action="bookmark">' + iconHtml('monthly') + '</button></h2></div><div class="life-monthly-month"><button type="button" data-monthly-action="prev-month">‹</button><strong>' + monthlyTitle() + '</strong><button type="button" data-monthly-action="next-month">›</button></div></header>' +
+      '<section class="life-monthly-highlights">' + monthlyHighlights().map(renderMonthlyHighlightCard).join('') + '</section>' +
+      '<section class="life-monthly-grid two"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>做过的决定</h3><span>4 个决定</span><button type="button" data-monthly-action="view-decisions">查看全部 →</button></div><div class="life-monthly-lines">' + renderMonthlyDecisionRows() + '</div></article><article class="life-monthly-card life-monthly-mood-card"><div class="life-monthly-card-head"><h3>情绪模式</h3><span>整体感受：<b>良好</b></span><button type="button" data-monthly-action="view-mood">查看情绪 →</button></div><p class="life-monthly-sub">本月情绪曲线</p><div class="life-monthly-mood-wrap"><div class="life-monthly-mood-scale"><span>晴朗</span><span>微笑</span><span>平静</span><span>低落</span></div>' + monthlyMoodSvg(scores) + '</div></article></section>' +
+      '<section class="life-monthly-grid two compact"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>见过的人</h3><span>' + allRelationships().length + ' 位</span></div><div class="life-monthly-people">' + renderMonthlyPeople() + '</div></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>去过的地方</h3><span>5 个地点</span><button type="button" data-monthly-action="view-map">查看地图 →</button></div><div class="life-monthly-places">' + renderMonthlyPlaces() + '</div></article></section>' +
+      '<section class="life-monthly-grid three"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>愿望结果</h3><span>3 个结果</span></div>' + renderMonthlyWishResults() + '<button class="life-link-btn" type="button" data-view="wishes">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>学到的事</h3><span>5 条</span></div><div class="life-monthly-learned">' + renderMonthlyLearned() + '</div><button class="life-link-btn" type="button" data-monthly-action="view-learnings">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>总结感受</h3></div><div class="life-monthly-summary"><p>这个月是充实又温柔的一个月。</p><p>工作上有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要：健康的身体、真诚的关系、持续成长，以及自由的时间。</p><p>下个月，希望继续保持这份节奏，也给自己更多的耐心和信任。</p></div></article></section></section>';
+    els.aside.innerHTML = renderMonthlyAside(meta);
+  }
+
+  function renderMonthlyAside(meta) {
+    var reportText = meta.report ? '已生成于 ' + meta.report.createdAt : '记录、统计、故事，一键生成';
+    var archiveText = meta.archived ? '本月内容已归档，后续可在复盘与回顾中查看。' : '将本月回顾内容归档保存，便于未来随时回顾与对比';
+    return '<section class="life-monthly-side-card quote"><div class="life-monthly-card-head"><h3>本月一句话</h3>' + (state.monthlyQuoteMode ? '<span>编辑中</span>' : '<button type="button" data-monthly-action="edit-quote">修改</button>') + '</div>' + (state.monthlyQuoteMode ? renderMonthlyQuoteForm(meta.quote) : '<div class="life-monthly-handwriting">' + escapeHtml(meta.quote) + '</div><span class="life-monthly-heart">♡</span><span class="life-photo photo-book"></span>') + '</section>' +
+      '<section class="life-monthly-side-card"><div class="life-monthly-card-head"><h3>写给未来的自己</h3><span>1 封信</span></div>' + (state.monthlyLetterMode ? renderMonthlyLetterForm(meta.letter) : '<article class="life-monthly-letter"><strong>' + escapeHtml(meta.letter.title) + '</strong><small>' + escapeHtml(meta.letter.date) + '</small><p>' + escapeHtml(meta.letter.body) + '</p><button type="button" data-monthly-action="write-letter">' + iconHtml('add') + ' 编辑信件</button></article>') + '</section>' +
+      '<section class="life-monthly-side-card report"><h3>生成月报</h3><p>自动生成本月生活月报</p><span>' + reportText + '</span><button class="life-secondary-btn" type="button" data-monthly-action="generate-report">' + iconHtml('star') + ' 生成月报</button></section>' +
+      '<section class="life-monthly-side-card archive"><h3>归档本月</h3><p>' + archiveText + '</p><button class="life-secondary-btn" type="button" data-monthly-action="archive-month">' + iconHtml('resource') + ' ' + (meta.archived ? '已归档' : '归档') + '</button><span class="life-photo photo-cafe"></span></section>';
+  }
+
+  function renderMonthlyQuoteForm(quote) {
+    return '<form id="lifeMonthlyQuoteForm" class="life-monthly-quote-form"><label>一句话<textarea class="life-textarea" name="quote" maxlength="80">' + escapeHtml(quote) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-quote">取消</button><button class="life-primary-btn" type="submit">保存一句话</button></div></form>';
+  }
+
+  function renderMonthlyLetterForm(letter) {
+    return '<form id="lifeMonthlyLetterForm" class="life-monthly-letter-form"><label>标题<input class="life-input" name="title" value="' + escapeHtml(letter.title) + '"></label><label>内容<textarea class="life-textarea" name="body">' + escapeHtml(letter.body) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-letter">取消</button><button class="life-primary-btn" type="submit">保存信件</button></div></form>';
+  }
+
+  function saveMonthlyQuote(form) {
+    state.monthlyQuoteMode = false;
+    monthlySet('quote', form.elements.quote.value.trim() || '在探索与连接中，我更靠近自己想要的生活。', '本月一句话已保存');
+  }
+
+  function saveMonthlyLetter(form) {
+    state.monthlyLetterMode = false;
+    monthlySet('letter', {
+      title: form.elements.title.value.trim() || '写给 3 个月后的自己',
+      date: '2026-05-13 写下',
+      body: form.elements.body.value.trim() || '希望那时的你，还记得今天想要的生活是什么样子。'
+    }, '信件已保存');
+  }
+
+  function handleMonthlyAction(actionName) {
+    var meta = getMonthlyMeta();
+    if (actionName === 'prev-month') shiftMonthly(-1);
+    if (actionName === 'next-month') shiftMonthly(1);
+    if (actionName === 'bookmark') monthlySet('bookmarked', !meta.bookmarked, meta.bookmarked ? '已取消本月收藏' : '已收藏本月');
+    if (actionName === 'edit-quote') {
+      state.monthlyQuoteMode = true;
+      state.monthlyLetterMode = false;
+      renderMonthly();
+    }
+    if (actionName === 'cancel-quote') {
+      state.monthlyQuoteMode = false;
+      renderMonthly();
+    }
+    if (actionName === 'write-letter') {
+      state.monthlyQuoteMode = false;
+      state.monthlyLetterMode = true;
+      renderMonthly();
+    }
+    if (actionName === 'cancel-letter') {
+      state.monthlyLetterMode = false;
+      renderMonthly();
+    }
+    if (actionName === 'generate-report') monthlySet('report', { createdAt: '2026-05-13 09:30', records: allMoments().length, moodAverage: 64 }, '月报已生成');
+    if (actionName === 'archive-month') {
+      if (!meta.archived && !window.confirm('确认归档本月回顾吗？归档后仍可继续查看。')) return;
+      monthlySet('archived', true, '本月已归档');
+    }
+    if (actionName === 'view-decisions') setView('decisions');
+    if (actionName === 'view-map') showToast('地图视图已筛选本月地点');
+    if (actionName === 'view-mood') setView('mood');
+    if (actionName === 'view-learnings') setView('review');
   }
 
   function addTypeList() {
@@ -3344,6 +3653,11 @@
       if (actionName === 'link-suggestion') showToast('已关联到当前记录草稿');
       return;
     }
+    var monthlyAction = event.target.closest('[data-monthly-action]');
+    if (monthlyAction) {
+      handleMonthlyAction(monthlyAction.getAttribute('data-monthly-action'));
+      return;
+    }
     var axisAction = event.target.closest('[data-axis-action]');
     if (axisAction) {
       var axisActionName = axisAction.getAttribute('data-axis-action');
@@ -3800,6 +4114,18 @@
     if (relationshipInlineForm) {
       event.preventDefault();
       saveRelationshipInlineForm(relationshipInlineForm);
+      return;
+    }
+    var monthlyLetterForm = event.target.closest('#lifeMonthlyLetterForm');
+    if (monthlyLetterForm) {
+      event.preventDefault();
+      saveMonthlyLetter(monthlyLetterForm);
+      return;
+    }
+    var monthlyQuoteForm = event.target.closest('#lifeMonthlyQuoteForm');
+    if (monthlyQuoteForm) {
+      event.preventDefault();
+      saveMonthlyQuote(monthlyQuoteForm);
       return;
     }
     var wishForm = event.target.closest('#lifeWishForm');
