@@ -1366,10 +1366,13 @@
   }
 
   function renderAxisThumbs(item) {
+    if (item.photos && item.photos.length) {
+      return item.photos.slice(0, 3).map(function(photo) { return axisPhotoHtml(photo, ''); }).join('');
+    }
     if (item.people) {
       return '<div class="life-axis-people"><span></span><span></span><span></span>' + (item.people > 3 ? '<em>+' + (item.people - 3) + '</em>' : '') + '</div>';
     }
-    return (item.photos || []).map(function(photo) { return '<span class="life-photo ' + photo + '"></span>'; }).join('');
+    return '';
   }
 
   function axisColor(type) {
@@ -1397,6 +1400,15 @@
   function axisLocationPhoto(item) {
     var photos = item.photos || [];
     return photos[0] || (item.type === '旅行' ? 'photo-mountain' : (item.type === '项目' ? 'photo-office' : 'photo-river'));
+  }
+
+  function axisPhotoHtml(photo, extraClass) {
+    var value = String(photo || '').trim();
+    var className = extraClass ? ' ' + extraClass : '';
+    if (/^(data:image\/|https?:\/\/|\.\/|\/)/.test(value)) {
+      return '<span class="life-photo life-photo-upload' + className + '"><img src="' + escapeHtml(value) + '" alt=""></span>';
+    }
+    return '<span class="life-photo ' + escapeHtml(value) + className + '"></span>';
   }
 
   function axisLinkedRelationships(item) {
@@ -1495,9 +1507,9 @@
     return '<section class="life-axis-detail-card">' +
       '<div class="life-axis-detail-head"><div class="life-axis-detail-icon ' + axisColor(item.type) + '">' + iconHtml(item.icon) + '</div><div><h2>' + escapeHtml(item.title) + '</h2><p>' + iconHtml('location') + ' ' + escapeHtml(item.place) + '<span>' + escapeHtml(item.date) + '</span></p></div><span class="life-badge ' + axisColor(item.type) + '">' + escapeHtml(item.type) + '</span></div>' +
       '<p class="life-axis-detail-copy">' + escapeHtml(item.desc) + '</p>' +
-      '<div class="life-axis-detail-photos">' + detailPhotos.map(function(photo) { return '<span class="life-photo ' + photo + '"></span>'; }).join('') + '</div>' +
+      '<div class="life-axis-detail-photos">' + detailPhotos.map(function(photo) { return axisPhotoHtml(photo, ''); }).join('') + '</div>' +
       '<div class="life-axis-detail-section"><h3>相关人物 <span>' + peopleCount + '</span></h3>' + axisPeopleHtml(item) + '</div>' +
-      '<div class="life-axis-detail-section"><h3>地点</h3><div class="life-axis-location"><span class="life-photo ' + axisLocationPhoto(item) + '"></span><div><strong>' + escapeHtml(item.place || '未记录地点') + '</strong><p>' + escapeHtml(axisLocationMeta(item)) + '</p></div><div class="life-map-pin">' + iconHtml('location') + '</div></div></div>' +
+      '<div class="life-axis-detail-section"><h3>地点</h3><div class="life-axis-location">' + axisPhotoHtml(axisLocationPhoto(item), '') + '<div><strong>' + escapeHtml(item.place || '未记录地点') + '</strong><p>' + escapeHtml(axisLocationMeta(item)) + '</p></div><div class="life-map-pin">' + iconHtml('location') + '</div></div></div>' +
       '<div class="life-axis-detail-section"><h3>相关决定 <span>' + axisRelatedDecisions(item).length + '</span></h3>' + axisDecisionRows(item) + '</div>' +
       '<div class="life-axis-detail-section"><div class="life-axis-mood-head"><h3>当时的情绪</h3><span>' + (mood ? '记录于 ' + escapeHtml(mood.date) : '来自情绪天气站') + '</span></div>' + axisMoodHtml(item) + '</div>' +
       '<div class="life-axis-detail-section"><h3>标签</h3><div class="life-chip-row">' + axisTags(item).map(function(tag) { return '<span class="life-badge gray">' + escapeHtml(tag) + '</span>'; }).join('') + '</div></div>' +
@@ -1512,10 +1524,9 @@
       '<div class="life-two-grid"><label>年份<input class="life-input" name="year" value="' + escapeHtml(item.year) + '"></label><label>日期<input class="life-input" name="date" value="' + escapeHtml(item.date) + '"></label></div>' +
       '<div class="life-two-grid"><label>季节<input class="life-input" name="season" value="' + escapeHtml(item.season) + '"></label><label>日期标签<input class="life-input" name="day" value="' + escapeHtml(item.day) + '"></label></div>' +
       '<div class="life-two-grid"><label>分类<input class="life-input" name="type" value="' + escapeHtml(item.type) + '"></label><label>地点<input class="life-input" name="place" value="' + escapeHtml(item.place) + '"></label></div>' +
-      '<label>地点说明<input class="life-input" name="locationMeta" value="' + escapeHtml(axisLocationMeta(item)) + '"></label>' +
-      '<label>照片 class（用逗号分隔）<input class="life-input" name="photos" value="' + escapeHtml((item.photos || []).join(', ')) + '"></label>' +
-      '<label>标签（用逗号分隔）<input class="life-input" name="tags" value="' + escapeHtml(axisTags(item).join(', ')) + '"></label>' +
-      '<div class="life-axis-link-hint"><strong>关联内容自动获取</strong><p>相关人物来自关系温度，相关决定来自决策档案馆，当时情绪来自情绪天气站；这里只维护里程碑本身。</p></div>' +
+      '<label>图片<input class="life-input" name="photos" value="' + escapeHtml((item.photos || []).join(', ')) + '" placeholder="图片地址或样式名，用逗号分隔"></label>' +
+      '<input type="hidden" name="uploadedPhoto" data-axis-uploaded-photo>' +
+      '<div class="life-axis-upload-row"><label class="life-media-file-label">上传图片<input type="file" accept="image/*" data-axis-image-upload></label><div class="life-axis-upload-preview" data-axis-upload-preview>' + (item.photos && item.photos[0] ? axisPhotoHtml(item.photos[0], '') : '<span>未选择图片</span>') + '</div></div>' +
       '<button class="life-primary-btn" type="submit">保存修改</button></form></section>';
   }
 
@@ -1563,6 +1574,7 @@
     var year = form.elements.year.value.trim() || '2026';
     var date = form.elements.date.value.trim() || year + '-01-01';
     var type = form.elements.type.value.trim() || '项目';
+    var uploadedPhoto = form.elements.uploadedPhoto ? form.elements.uploadedPhoto.value : '';
     store.edits[state.selectedAxisId] = {
       title: title,
       desc: desc,
@@ -1573,9 +1585,7 @@
       type: type,
       icon: type === '旅行' ? 'travel' : (type === '健康' ? 'health' : (type === '重要决定' ? 'star' : 'project')),
       place: form.elements.place.value.trim() || '未记录地点',
-      locationMeta: form.elements.locationMeta.value.trim() || '',
-      photos: splitAxisList(form.elements.photos.value),
-      tags: splitAxisList(form.elements.tags.value)
+      photos: splitAxisList(form.elements.photos.value).concat(uploadedPhoto ? [uploadedPhoto] : [])
     };
     saveAxisStore(store);
     state.axisEditing = false;
@@ -4373,6 +4383,20 @@
   });
 
   document.addEventListener('change', function(event) {
+    if (event.target.matches('[data-axis-image-upload]')) {
+      var axisFile = event.target.files && event.target.files[0];
+      var axisForm = event.target.closest('#lifeAxisEditForm');
+      var axisHidden = axisForm && axisForm.querySelector('[data-axis-uploaded-photo]');
+      var axisPreview = axisForm && axisForm.querySelector('[data-axis-upload-preview]');
+      if (!axisFile || !axisHidden || typeof FileReader === 'undefined') return;
+      var axisReader = new FileReader();
+      axisReader.onload = function() {
+        axisHidden.value = String(axisReader.result || '');
+        if (axisPreview) axisPreview.innerHTML = axisPhotoHtml(axisHidden.value, '') + '<em>' + escapeHtml(axisFile.name) + '</em>';
+      };
+      axisReader.readAsDataURL(axisFile);
+      return;
+    }
     if (!event.target.matches('[data-relationship-editor-image-upload]')) return;
     var file = event.target.files && event.target.files[0];
     var row = event.target.closest('[data-relationship-media-row]');

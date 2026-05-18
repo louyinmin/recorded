@@ -2391,6 +2391,19 @@ body[data-life-view="timeline"] .life-card-title {
   border-radius: 6px;
 }
 
+.life-photo-upload {
+  display: block;
+  overflow: hidden;
+  background: #edf4f2;
+}
+
+.life-photo-upload img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
 .life-axis-add {
   min-width: 100px;
   min-height: 42px;
@@ -6197,28 +6210,38 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   font-size: 12px;
 }
 
-.life-axis-edit-form .life-textarea.compact {
-  min-height: 82px;
+.life-axis-upload-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
 }
 
-.life-axis-link-hint {
-  border: 1px solid rgba(11,143,141,0.18);
+.life-axis-upload-preview {
+  min-height: 64px;
+  border: 1px dashed var(--life-line-strong);
   border-radius: 8px;
-  background: #f6fbfa;
-  padding: 10px 12px;
-}
-
-.life-axis-link-hint strong {
-  display: block;
-  color: var(--life-accent);
-  font-size: 13px;
-}
-
-.life-axis-link-hint p {
-  margin: 6px 0 0;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--life-muted);
   font-size: 12px;
-  line-height: 1.6;
+}
+
+.life-axis-upload-preview .life-photo {
+  width: 78px;
+  height: 54px;
+  border-radius: 6px;
+  flex: 0 0 78px;
+}
+
+.life-axis-upload-preview em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: normal;
+  white-space: nowrap;
 }
 
 .life-input,
