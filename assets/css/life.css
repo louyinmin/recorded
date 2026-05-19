@@ -924,14 +924,15 @@ body[data-life-view="timeline"] .life-card-title {
 .life-relationship-card,
 .life-wish-card,
 .life-memory-card,
+.life-axis-home-card,
 .life-compact-card {
   display: grid;
-  align-items: center;
+  align-items: start;
   gap: 14px;
 }
 
 .life-morning-main {
-  grid-template-columns: 42px minmax(0, 1fr) 128px;
+  grid-template-columns: 92px minmax(0, 1fr) 144px;
   padding: 16px 22px 12px;
 }
 
@@ -1024,6 +1025,8 @@ body[data-life-view="timeline"] .life-card-title {
 
 .life-card-label {
   align-self: start;
+  width: 92px;
+  line-height: 1.4;
   font-size: 14px;
   font-weight: 650;
 }
@@ -1040,20 +1043,54 @@ body[data-life-view="timeline"] .life-card-title {
   color: #3985d0;
 }
 
+.life-card-label.green {
+  color: var(--life-accent);
+}
+
 .life-home-card-main strong {
   color: var(--life-accent);
+}
+
+.life-home-card-main {
+  align-self: start;
 }
 
 .life-decision-card,
 .life-relationship-card,
 .life-wish-card,
 .life-memory-card,
+.life-axis-home-card,
 .life-compact-card {
   padding: 18px 20px;
 }
 
 .life-decision-card {
   grid-template-columns: 92px minmax(0, 1fr) 144px;
+}
+
+.life-axis-home-card {
+  grid-template-columns: 92px minmax(0, 1fr) 144px;
+}
+
+.life-axis-box {
+  align-self: start;
+  justify-self: end;
+  min-width: 128px;
+  padding: 14px;
+  border: 1px solid rgba(11,143,141,0.22);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f7fffd, #fbfefd);
+  display: grid;
+  gap: 6px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-axis-box strong {
+  color: var(--life-accent-dark);
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 650;
 }
 
 .life-link-btn {
@@ -1067,6 +1104,7 @@ body[data-life-view="timeline"] .life-card-title {
 
 .life-review-box,
 .life-cool-box {
+  align-self: start;
   justify-self: end;
   min-width: 128px;
   padding: 14px;
@@ -1097,10 +1135,11 @@ body[data-life-view="timeline"] .life-card-title {
 }
 
 .life-relationship-card {
-  grid-template-columns: 90px minmax(0, 1fr) 128px 62px 104px;
+  grid-template-columns: 92px minmax(0, 1fr) 128px 62px 104px;
 }
 
 .life-relation-change {
+  align-self: start;
   border-left: 1px solid var(--life-line);
   padding-left: 18px;
   display: grid;
@@ -1130,6 +1169,7 @@ body[data-life-view="timeline"] .life-card-title {
 }
 
 .life-avatar-pair {
+  align-self: start;
   display: flex;
 }
 
@@ -1153,6 +1193,7 @@ body[data-life-view="timeline"] .life-card-title {
 }
 
 .life-distance-badge {
+  align-self: start;
   justify-self: end;
   min-width: 86px;
   min-height: 34px;
@@ -1165,11 +1206,11 @@ body[data-life-view="timeline"] .life-card-title {
 }
 
 .life-wish-card {
-  grid-template-columns: 112px minmax(0, 1fr) 116px;
+  grid-template-columns: 92px minmax(0, 1fr) 144px;
 }
 
 .life-memory-card {
-  grid-template-columns: 112px minmax(0, 1fr) 1.05fr;
+  grid-template-columns: 92px minmax(0, 1fr) minmax(220px, 0.9fr);
   align-items: start;
 }
 
@@ -1188,7 +1229,7 @@ body[data-life-view="timeline"] .life-card-title {
   grid-column: 1 / -1;
   min-height: 32px;
   margin-top: -2px;
-  padding: 8px 20px 0 132px;
+  padding: 8px 20px 0 112px;
   border-top: 1px solid var(--life-line);
   display: flex;
   gap: 22px;
@@ -1197,11 +1238,12 @@ body[data-life-view="timeline"] .life-card-title {
 }
 
 .life-compact-card {
-  grid-template-columns: 42px minmax(0, 1fr) 1fr auto;
+  grid-template-columns: 92px minmax(0, 1fr) 1fr auto;
 }
 
 .life-team-note,
 .life-sleep-note {
+  align-self: start;
   border-left: 1px solid var(--life-line);
   padding-left: 20px;
   color: var(--life-muted);
@@ -4342,6 +4384,73 @@ body[data-life-view="add"] .life-aside {
   font-weight: 500;
 }
 
+.life-link-timeline-row {
+  border: 1px solid rgba(11,143,141,0.16);
+  border-radius: var(--life-radius-sm);
+  background: rgba(11,143,141,0.045);
+  min-height: 72px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 16px;
+}
+
+.life-link-timeline-row .life-link-timeline-check {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--life-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.life-link-timeline-row .life-link-timeline-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--life-primary);
+}
+
+.life-link-timeline-row .life-link-timeline-check span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.life-link-timeline-row .life-link-timeline-check strong {
+  color: var(--life-text);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.life-link-timeline-row .life-link-timeline-check em {
+  color: var(--life-muted);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.life-link-timeline-row .life-link-timeline-privacy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.life-link-timeline-row .life-link-timeline-privacy span {
+  color: var(--life-muted);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.life-link-timeline-row .life-link-timeline-privacy .life-select {
+  min-height: 42px;
+  padding-right: 28px;
+}
+
 .life-add-compare {
   display: grid;
   grid-template-columns: 0.9fr 1.3fr 1.3fr 0.9fr;
@@ -6210,30 +6319,60 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   font-size: 12px;
 }
 
+.life-axis-photo-editor {
+  border: 1px solid var(--life-line);
+  border-radius: var(--life-radius);
+  background: linear-gradient(180deg, rgba(11,143,141,0.04), #fff);
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.life-axis-photo-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.life-axis-photo-head strong {
+  display: block;
+  color: var(--life-text);
+  font-size: 14px;
+}
+
+.life-axis-photo-head span {
+  display: block;
+  color: var(--life-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .life-axis-upload-row {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 108px;
   gap: 10px;
   align-items: stretch;
 }
 
 .life-axis-upload-preview {
-  min-height: 64px;
+  min-height: 68px;
   border: 1px dashed var(--life-line-strong);
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: 10px;
+  padding: 7px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--life-muted);
   font-size: 12px;
+  background: rgba(255,255,255,0.75);
+  min-width: 0;
 }
 
 .life-axis-upload-preview .life-photo {
-  width: 78px;
-  height: 54px;
-  border-radius: 6px;
-  flex: 0 0 78px;
+  width: 84px;
+  height: 56px;
+  border-radius: 8px;
+  flex: 0 0 84px;
 }
 
 .life-axis-upload-preview em {
@@ -6242,6 +6381,22 @@ body[data-life-view="add"] .life-add-side-rail .life-add-tip {
   text-overflow: ellipsis;
   font-style: normal;
   white-space: nowrap;
+}
+
+.life-axis-upload-button {
+  border: 1px solid rgba(11,143,141,0.28);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--life-primary);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.life-axis-upload-button input {
+  display: none;
 }
 
 .life-input,
@@ -7214,6 +7369,69 @@ body[data-life-view="wishes"] .life-workspace {
 
 .life-wish-form .life-textarea {
   min-height: 86px;
+}
+
+.life-wish-product-image {
+  border: 1px solid var(--life-line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(11,143,141,0.04), #fff);
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.life-wish-image-head strong {
+  display: block;
+  color: var(--life-text);
+  font-size: 14px;
+}
+
+.life-wish-image-head span {
+  display: block;
+  margin-top: 4px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-wish-image-preview {
+  min-height: 92px;
+  border: 1px dashed var(--life-line-strong);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.78);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--life-muted);
+  font-size: 12px;
+}
+
+.life-wish-image-preview .life-photo {
+  width: 116px;
+  height: 74px;
+  border-radius: 8px;
+  flex: 0 0 116px;
+}
+
+.life-wish-image-preview em {
+  font-style: normal;
+}
+
+.life-wish-upload-button {
+  min-height: 42px;
+  border: 1px solid rgba(11,143,141,0.28);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--life-primary);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.life-wish-upload-button input {
+  display: none;
 }
 
 .life-wish-range {
