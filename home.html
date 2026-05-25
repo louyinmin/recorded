@@ -16,8 +16,9 @@
       --travel-b: #1f57cf;
       --expiry-a: #15a7b8;
       --expiry-b: #06788d;
-      --life-a: #0f9f9d;
-      --life-b: #0b6f73;
+      --life-a: #ff6fa6;
+      --life-b: #d93376;
+      --life-soft: #fff0f6;
     }
 
     * {
@@ -95,7 +96,7 @@
 
     .entry-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 18px;
       margin-top: 24px;
     }
@@ -117,6 +118,34 @@
       box-shadow: 0 20px 30px rgba(18, 44, 71, 0.12);
     }
 
+    .entry-card.life-main {
+      grid-column: 1 / -1;
+      min-height: 168px;
+      padding: 24px 28px;
+      background:
+        radial-gradient(circle at 85% 18%, rgba(255, 255, 255, 0.72), transparent 24%),
+        linear-gradient(135deg, rgba(255, 240, 246, 0.96), rgba(255, 255, 255, 0.88));
+      border-color: rgba(255, 111, 166, 0.34);
+      box-shadow: 0 18px 40px rgba(217, 51, 118, 0.16);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      align-items: center;
+      column-gap: 30px;
+    }
+
+    .entry-card.life-main .entry-title {
+      margin-top: 12px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.14;
+    }
+
+    .entry-card.life-main .entry-copy {
+      max-width: 560px;
+      font-size: 16px;
+      line-height: 1.8;
+      margin-top: 10px;
+    }
+
     .entry-title {
       margin: 0;
       font-size: 24px;
@@ -125,7 +154,7 @@
     .entry-copy {
       margin: 0;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.65;
     }
 
     .entry-pill {
@@ -174,6 +203,7 @@
 
     .entry-btn.life {
       background: linear-gradient(120deg, var(--life-a), var(--life-b));
+      box-shadow: 0 12px 24px rgba(217, 51, 118, 0.2);
     }
 
     .entry-foot {
@@ -197,6 +227,11 @@
         grid-template-columns: 1fr;
       }
 
+      .entry-card.life-main {
+        grid-template-columns: 1fr;
+        min-height: 0;
+      }
+
       .entry-card {
         padding: 18px;
       }
@@ -216,6 +251,15 @@
     </header>
 
     <section class="entry-grid">
+      <article class="entry-card life-main">
+        <div>
+          <span class="entry-pill life">Life Atlas</span>
+          <h2 class="entry-title">生活航迹</h2>
+          <p class="entry-copy">记录日常、情绪、关系与重要决定，把生活片段沉淀成可复盘的人生时间轴。</p>
+        </div>
+        <a class="entry-btn life" href="/login.html">进入生活航迹</a>
+      </article>
+
       <article class="entry-card">
         <span class="entry-pill travel">Travel Accounting</span>
         <h2 class="entry-title">旅游记账</h2>
@@ -228,13 +272,6 @@
         <h2 class="entry-title">续费雷达</h2>
         <p class="entry-copy">管理各类会员与服务到期日，查看月度/年度预计支出并接收提醒。</p>
         <a class="entry-btn expiry" href="/expiry/login.html">进入续费雷达</a>
-      </article>
-
-      <article class="entry-card">
-        <span class="entry-pill life">Life Atlas</span>
-        <h2 class="entry-title">生活航迹</h2>
-        <p class="entry-copy">记录日常、情绪、关系与重要决定，把生活片段沉淀成可复盘的人生时间轴。</p>
-        <a class="entry-btn life" href="/login.html">进入生活航迹</a>
       </article>
     </section>
 

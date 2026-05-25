@@ -1438,7 +1438,7 @@ a { color: var(--primary); text-decoration: none; }
 }
 
 .life-admin-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   padding: 10px;
   border: 1px solid #e1ecea;
   border-radius: 10px;
@@ -1454,6 +1454,11 @@ a { color: var(--primary); text-decoration: none; }
 .life-admin-row button:not(:disabled) {
   color: #d83b3b;
   border-color: rgba(216,59,59,0.25);
+}
+
+.life-admin-row button[data-auth-action="admin-set-status"] {
+  color: #087a78;
+  border-color: rgba(8,122,120,0.25);
 }
 
 .life-admin-row button:disabled {
@@ -2020,16 +2025,7 @@ a { color: var(--primary); text-decoration: none; }
   text-align: center;
 }
 
-.life-login-panel::after {
-  content: "登录即表示你同意《服务条款》和《隐私政策》  需要帮助？ 联系我们";
-  position: absolute;
-  left: clamp(54px, 5vw, 92px);
-  right: clamp(54px, 5vw, 92px);
-  bottom: 18px;
-  color: #7b8987;
-  font-size: 12px;
-  text-align: center;
-}
+.life-login-panel::after { content: none; }
 
 .life-login-demo b {
   color: #087a78;

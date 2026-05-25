@@ -9,14 +9,20 @@
   var MOCK_MOOD_STORAGE_KEY = 'life_mock_mood_records_v1';
   var RELATIONSHIP_STORAGE_KEY = 'life_relationships_v1';
   var MOCK_RELATIONSHIP_STORAGE_KEY = 'life_mock_relationships_v1';
+  var RELATIONSHIP_MEDIA_LIMIT = 2;
   var WISH_STORAGE_KEY = 'life_wishes_v1';
   var MOCK_WISH_STORAGE_KEY = 'life_mock_wishes_v1';
   var MONTHLY_STORAGE_KEY = 'life_monthly_v1';
   var MOCK_MONTHLY_STORAGE_KEY = 'life_mock_monthly_v1';
+  var WATCH_STORAGE_KEY = 'life_watch_v1';
+  var MOCK_WATCH_STORAGE_KEY = 'life_mock_watch_v1';
   var PROJECT_STORAGE_KEY = 'life_projects_v1';
   var MOCK_PROJECT_STORAGE_KEY = 'life_mock_projects_v1';
   var HEALTH_STORAGE_KEY = 'life_health_records_v1';
   var MOCK_HEALTH_STORAGE_KEY = 'life_mock_health_records_v1';
+  var RESOURCE_STORAGE_KEY = 'life_resources_v1';
+  var MOCK_RESOURCE_STORAGE_KEY = 'life_mock_resources_v1';
+  var initialToday = new Date();
   var state = {
     view: 'timeline',
     query: '',
@@ -30,13 +36,12 @@
     decisionFormMode: null,
     decisionMoreOpen: false,
     moodTab: 'overview',
-    moodYear: 2026,
-    moodMonth: 4,
-    selectedMoodDay: 13,
+    moodYear: initialToday.getFullYear(),
+    moodMonth: initialToday.getMonth(),
+    selectedMoodDay: initialToday.getDate(),
     moodRange: '近 14 天',
     moodSleepRange: '近 14 天',
     moodTriggerRange: '近 7 天',
-    moodWeekRange: '05-04 ~ 05-10',
     moodRangeMenu: null,
     moodFormMode: null,
     moodEditingId: '',
@@ -47,30 +52,58 @@
     relationshipInlineEditor: '',
     wishFilter: '愿望冷却中',
     wishCategory: '全部',
-    wishSort: '按剩余天数排序',
+    wishSort: 'asc',
     wishFormMode: null,
+    watchMode: 'wall',
+    watchStatus: 'watched',
+    watchKind: 'movie',
+    watchYear: 'recent2',
+    watchMonth: 4,
+    watchSort: '按观看日期',
+    watchFormMode: null,
+    watchEditingId: '',
+    watchCreatePreset: null,
+    selectedWatchId: 'ws5',
     monthlyYear: 2026,
     monthlyMonth: 4,
     monthlyLetterMode: false,
     monthlyQuoteMode: false,
+    monthlySummaryMode: false,
+    timelineQuickAdd: 'mood',
     accountAdminCreateOpen: false,
     selectedMomentId: 'm1',
     selectedAxisId: 'a7',
     selectedDecisionId: 'd1',
     selectedRelationshipId: 'r1',
-    selectedWishId: 'w1'
+    selectedWishId: 'w1',
+    timelineVisible: 10,
+    axisVisible: 10,
+    decisionVisible: 10,
+    moodRecentVisible: 5,
+    relationshipVisible: 10,
+    wishVisible: 10
+  };
+
+  var pageLimits = {
+    timeline: 10,
+    axis: 10,
+    decision: 10,
+    moodRecent: 5,
+    relationship: 10,
+    wish: 10
   };
 
   var els = {
     title: document.getElementById('lifeTitle'),
+    topDate: document.getElementById('lifeTopDate'),
     content: document.getElementById('lifeContent'),
     aside: document.getElementById('lifeAside'),
     search: document.getElementById('lifeSearch'),
-    mockModeBtn: document.getElementById('mockModeBtn'),
     toast: document.getElementById('lifeToast')
   };
 
   var mockMode = new URLSearchParams(window.location.search).get('mock') === '1';
+  var directApiMode = !mockMode;
 
   function lifeAccount() {
     return window.LifeAccount || null;
@@ -80,12 +113,103 @@
     return lifeAccount() ? lifeAccount().getSession() : null;
   }
 
+  var adminOnlyViews = ['projects', 'health', 'review', 'resources'];
+  var userHiddenProfileControls = ['reminder', 'danger'];
+
+  function isAdminSession() {
+    var session = accountSession();
+    return !!(session && session.role === 'admin' && session.username === 'admin' && session.name === 'admin');
+  }
+
+  function isAdminOnlyView(view) {
+    return adminOnlyViews.indexOf(view) >= 0;
+  }
+
+  function canAccessView(view) {
+    return !isAdminOnlyView(view) || isAdminSession();
+  }
+
+  function isUserHiddenProfileControl(control) {
+    return userHiddenProfileControls.indexOf(control) >= 0 && !isAdminSession();
+  }
+
+  function requireLogin() {
+    if (accountSession()) return true;
+    redirectToLogin();
+    return false;
+  }
+
+  if (!requireLogin()) return;
+
+  function redirectToLogin() {
+    window.location.replace('login.html');
+  }
+
+  function blockLoggedOutInteraction(event) {
+    if (accountSession()) return false;
+    var accountAction = event.target.closest('[data-account-action]');
+    if (accountAction) {
+      handleAccountAction(accountAction.getAttribute('data-account-action'), accountAction);
+      return true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    redirectToLogin();
+    return true;
+  }
+
+  function todayISO() {
+    var now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  }
+
+  function weekdayCN(date) {
+    var labels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return labels[date.getDay()];
+  }
+
+  function normalizeISODate(value, fallback) {
+    var text = String(value || '').trim().replace(/\//g, '-');
+    var full = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (full) return full[1] + '-' + String(full[2]).padStart(2, '0') + '-' + String(full[3]).padStart(2, '0');
+    var yearMonth = text.match(/^(\d{4})-(\d{1,2})$/);
+    if (yearMonth) return yearMonth[1] + '-' + String(yearMonth[2]).padStart(2, '0') + '-01';
+    var yearOnly = text.match(/^(\d{4})$/);
+    if (yearOnly) return yearOnly[1] + '-01-01';
+    return fallback || todayISO();
+  }
+
+  function selectedAxisDateISO() {
+    var selected = axisMilestones().filter(function(item) { return item.id === state.selectedAxisId; })[0];
+    return normalizeISODate(selected && selected.date, todayISO());
+  }
+
+  function selectedDecisionDateISO() {
+    var selected = getSelectedDecision();
+    return normalizeISODate(selected && selected.date, todayISO());
+  }
+
+  function selectedRelationshipDateISO() {
+    var selected = getSelectedRelationship(allRelationships());
+    return normalizeISODate(selected && selected.nextDate, todayISO());
+  }
+
+  function selectedWishDateISO() {
+    var selected = selectedWish(allWishes());
+    return normalizeISODate(selected && selected.due, todayISO());
+  }
+
   function accountAvatarKey(account) {
-    return String((account && account.avatar) || 'Q1').toLowerCase();
+    var key = String((account && account.avatar) || 'Q1').toLowerCase();
+    return key === 'q6' ? 'q5' : key;
   }
 
   function accountRoleText(account) {
     return account && account.role === 'admin' ? '管理员' : '普通用户';
+  }
+
+  function accountStatusText(account) {
+    return account && account.status === 'inactive' ? '已停用' : 'active';
   }
 
   var viewTitles = {
@@ -96,6 +220,7 @@
     relationships: '关系温度',
     wishes: '愿望冷却箱',
     monthly: '本月值得记住',
+    watch: '观影墙',
     add: '添加一刻',
     projects: '项目与目标',
     health: '健康与身体',
@@ -110,7 +235,7 @@
       type: '情绪',
       icon: '☀',
       time: '09:30',
-      date: '今天 05-13',
+      date: todayISO(),
       title: '今日心情：晴朗 78/100',
       copy: '早上起来阳光很好，心情也跟着明亮起来。',
       location: '情绪天气站',
@@ -118,14 +243,14 @@
       mood: '晴朗',
       photos: ['photo-river'],
       tags: ['情绪', '睡眠 7.2h', '压力 35/100'],
-      linkedMoodDate: '2026-05-13'
+      linkedMoodDate: todayISO()
     },
     {
       id: 'm2',
       type: '决策',
       icon: '♎',
       time: '10:45',
-      date: '今天 05-13',
+      date: todayISO(),
       title: '是否接受新工作的 Offer？',
       copy: '我的选择：接受新 Offer；信心 70/100，计划 2026-10-20 复盘。',
       location: '决策档案馆',
@@ -140,9 +265,9 @@
       type: '关系',
       icon: '♟',
       time: '14:20',
-      date: '今天 05-13',
+      date: todayISO(),
       title: '关系温度：张敏',
-      copy: '最近联系：昨天 · 微信；亲密度 88/100，下次联系 4 天后。',
+      copy: '最近联系：昨天 · 微信；亲密度 88/100，预计下次联系 4 天后。',
       location: '关系温度',
       people: ['张敏'],
       mood: '平静',
@@ -155,7 +280,7 @@
       type: '愿望',
       icon: '❄',
       time: '16:40',
-      date: '今天 05-13',
+      date: todayISO(),
       title: '愿望冷却：相机 Sony A7C II',
       copy: '剩余 12 天，当前想要程度 72%，价格 ¥12,999。',
       location: '愿望冷却箱',
@@ -170,7 +295,7 @@
       type: '旅行',
       icon: '▣',
       time: '20:15',
-      date: '今天 05-13',
+      date: todayISO(),
       title: '苏州一日游',
       copy: '和家人一起在苏州逛园林，吃了很绵的苏帮菜。',
       location: '苏州 · 拙政园',
@@ -224,6 +349,7 @@
       background: '目前在 A 公司担任产品经理 2 年，整体发展稳定，但晋升空间有限。近期收到 B 公司的 Offer，岗位级别更高，薪资涨幅明显，但需要搬到上海工作。',
       reason: ['岗位级别和职责提升，有机会带团队、积累管理经验。', '薪资涨幅约 62%，能更好地支持未来阶段目标。', 'B 公司在行业内更有影响力，对个人品牌和履历有加成。'],
       risks: ['需要搬到上海，短期生活成本上升。', '工作强度可能更高，影响生活平衡和健康。', '新环境存在不确定性，团队和文化需要时间磨合。'],
+      emotion: { name: '偏紧张', expectation: 60, anxiety: 40, keywords: ['不确定', '兴奋', '担心', '期待'] },
       options: [
         ['接受 Offer', '高级产品经理', '上海 · 需搬迁', '¥680,000', '更大，团队更成熟'],
         ['留在当前公司', '产品经理', '北京 · 无需搬迁', '¥420,000', '一般，晋升较慢']
@@ -292,6 +418,39 @@
     { id: 'w12', status: '已实现', category: '关系', name: '给妈妈做一本照片书', reason: '把过去几年的合照整理成礼物。', days: 0, due: '2026-05-01', desire: 90, price: '¥268', alternatives: ['线上相册', '打印几张照片'], plan: ['已送出并记录到关系温度'], photo: 'photo-cafe', counterReasons: [] }
   ];
 
+  var watchEntries = [
+    { id: 'wm1', kind: 'movie', title: '雨夜列车', year: 2026, month: 0, date: '2026-01-18', rating: 8.6, review: '节奏紧凑，氛围感很强。', tags: ['悬疑', '电影'], finished: true, progress: '', duration: '2小时02分', cover: 'photo-night' },
+    { id: 'ws1', kind: 'series', title: '北方来信', year: 2026, month: 2, date: '2026-03-07', rating: 9.1, review: '群像写得很细腻，角色弧线很稳。', tags: ['悬疑', '剧集'], finished: false, progress: '看到 S01E08', duration: '3小时12分/季', cover: 'photo-mountain' },
+    { id: 'wm2', kind: 'movie', title: '春日回声', year: 2026, month: 3, date: '2026-04-21', rating: 8.7, review: '日常叙事但情绪真实，后劲很足。', tags: ['文艺', '电影'], finished: true, progress: '', duration: '1小时46分', cover: 'photo-garden' },
+    { id: 'ws2', kind: 'series', title: '城市余温', year: 2026, month: 4, date: '2026-05-03', rating: 8.7, review: '不俗套的都市片，关于选择和继续前行。', tags: ['都市', '剧集'], finished: false, progress: '看到 S02E06', duration: '45分钟/集', cover: 'photo-river' },
+    { id: 'wm3', kind: 'movie', title: '海边的日落', year: 2026, month: 5, date: '2026-06-07', rating: 7.7, review: '影像很美，剧情稍平。', tags: ['治愈', '电影'], finished: true, progress: '', duration: '1小时52分', cover: 'photo-river' },
+    { id: 'ws3', kind: 'series', title: '漫长周末', year: 2026, month: 6, date: '2026-07-11', rating: 7.9, review: '开局不错，节奏还在找平衡。', tags: ['剧情', '剧集'], finished: false, progress: '看到 第5集', duration: '50分钟/集', cover: 'photo-cafe' },
+
+    { id: 'wm4', kind: 'movie', title: '宇宙尽头小镇', year: 2025, month: 0, date: '2025-01-05', rating: 8.2, review: '设定有趣，情感线也成立。', tags: ['科幻', '电影'], finished: true, progress: '', duration: '2小时14分', cover: 'photo-night' },
+    { id: 'ws4', kind: 'series', title: '光的孩子', year: 2025, month: 1, date: '2025-02-14', rating: 8.5, review: '人物关系细腻，家庭戏很打动人。', tags: ['家庭', '剧集'], finished: true, progress: '已看完', duration: '42分钟/集', cover: 'photo-cafe' },
+    { id: 'wm5', kind: 'movie', title: '雪山记', year: 2025, month: 2, date: '2025-03-02', rating: 8.8, review: '摄影非常出色，情绪铺垫很稳。', tags: ['冒险', '电影'], finished: true, progress: '', duration: '2小时01分', cover: 'photo-mountain' },
+    { id: 'wm6', kind: 'movie', title: '沉默的海', year: 2025, month: 3, date: '2025-04-10', rating: 8.4, review: '克制的叙事，留白恰到好处。', tags: ['悬疑', '电影'], finished: true, progress: '', duration: '1小时58分', cover: 'photo-river' },
+    { id: 'ws5', kind: 'series', title: '城市余温', year: 2025, month: 4, date: '2025-05-08', rating: 8.7, review: '越看越喜欢，角色塑造很扎实。', tags: ['都市', '剧集'], finished: false, progress: '看到 S02E06', duration: '2小时10分/季', cover: 'photo-river' },
+    { id: 'wm7', kind: 'movie', title: '春日回声', year: 2025, month: 4, date: '2025-05-14', rating: 7.9, review: '完成度不错，情绪表达自然。', tags: ['爱情', '电影'], finished: true, progress: '', duration: '1小时46分', cover: 'photo-garden' },
+    { id: 'ws6', kind: 'series', title: '北方来信', year: 2025, month: 4, date: '2025-05-20', rating: 8.4, review: '中段节奏提升，期待后续。', tags: ['悬疑', '剧集'], finished: true, progress: '第8集', duration: '3小时12分/季', cover: 'photo-office' },
+    { id: 'wm8', kind: 'movie', title: '雨夜列车', year: 2025, month: 4, date: '2025-05-03', rating: 8.6, review: '夜戏镜头很有魅力。', tags: ['悬疑', '电影'], finished: true, progress: '', duration: '2小时02分', cover: 'photo-night' },
+    { id: 'wm9', kind: 'movie', title: '回到1999', year: 2025, month: 5, date: '2025-06-28', rating: 7.8, review: '怀旧质感到位，剧情稍弱。', tags: ['怀旧', '电影'], finished: true, progress: '', duration: '1小时48分', cover: 'photo-cafe' },
+    { id: 'wm10', kind: 'movie', title: '同成浪潮', year: 2025, month: 6, date: '2025-07-01', rating: 7.8, review: '音乐配得很亮眼。', tags: ['成长', '电影'], finished: true, progress: '', duration: '1小时40分', cover: 'photo-garden' },
+    { id: 'ws7', kind: 'series', title: '夜航船', year: 2025, month: 7, date: '2025-08-06', rating: 8.9, review: '气质独特，剪辑节奏很好。', tags: ['悬疑', '剧集'], finished: true, progress: '已看完', duration: '48分钟/集', cover: 'photo-night' },
+    { id: 'wm11', kind: 'movie', title: '远方的灯塔', year: 2025, month: 10, date: '2025-11-02', rating: 8.3, review: '叙事简洁，镜头语言很成熟。', tags: ['治愈', '电影'], finished: true, progress: '', duration: '1小时35分', cover: 'photo-office' },
+    { id: 'wm12', kind: 'movie', title: '最后一页', year: 2025, month: 11, date: '2025-12-19', rating: 7.6, review: '结尾有点仓促，但整体还行。', tags: ['文艺', '电影'], finished: true, progress: '', duration: '1小时43分', cover: 'photo-book' },
+
+    { id: 'wm13', kind: 'movie', title: '无尽之境', year: 2024, month: 0, date: '2024-01-12', rating: 8.6, review: '世界观完整，调度漂亮。', tags: ['科幻', '电影'], finished: true, progress: '', duration: '2小时06分', cover: 'photo-mountain' },
+    { id: 'wm14', kind: 'movie', title: '小城旧事', year: 2024, month: 1, date: '2024-02-03', rating: 8.2, review: '生活细节很真实。', tags: ['剧情', '电影'], finished: true, progress: '', duration: '1小时54分', cover: 'photo-office' },
+    { id: 'ws8', kind: 'series', title: '雾中来客', year: 2024, month: 1, date: '2024-02-28', rating: 8.7, review: '悬疑线抓人，反转有惊喜。', tags: ['悬疑', '剧集'], finished: true, progress: '已看完', duration: '46分钟/集', cover: 'photo-night' },
+    { id: 'wm15', kind: 'movie', title: '河畔的午后', year: 2024, month: 2, date: '2024-03-15', rating: 8.1, review: '慢节奏但很治愈。', tags: ['治愈', '电影'], finished: true, progress: '', duration: '1小时38分', cover: 'photo-river' },
+    { id: 'ws9', kind: 'series', title: '我在未来等你', year: 2024, month: 3, date: '2024-04-08', rating: 8.3, review: '青春感很足。', tags: ['成长', '剧集'], finished: false, progress: '看到 第10集', duration: '42分钟/集', cover: 'photo-garden' },
+    { id: 'wm16', kind: 'movie', title: '沙漠之花', year: 2024, month: 4, date: '2024-05-03', rating: 8.3, review: '色彩和声音设计非常好。', tags: ['文艺', '电影'], finished: true, progress: '', duration: '1小时57分', cover: 'photo-cafe' },
+    { id: 'ww1', watchState: 'want', kind: 'movie', title: '潮汐旅馆', year: 2026, month: 8, date: '2026-09-21', rating: 8.2, review: '预告片氛围不错，想周末去看。', tags: ['想看', '悬疑', '电影'], finished: true, progress: '', duration: '2小时08分', cover: 'photo-river' },
+    { id: 'ww2', watchState: 'want', kind: 'series', title: '玻璃森林', year: 2026, month: 9, date: '2026-10-03', rating: 8.5, review: '题材很对胃口，先加入想看列表。', tags: ['想看', '剧集', '成长'], finished: false, progress: '未开始', duration: '45分钟/集', cover: 'photo-garden' },
+    { id: 'ww3', watchState: 'want', kind: 'movie', title: '雨后书店', year: 2025, month: 10, date: '2025-11-18', rating: 7.9, review: '想看轻松一点的片子。', tags: ['想看', '文艺', '电影'], finished: true, progress: '', duration: '1小时39分', cover: 'photo-book' }
+  ];
+
   var projects = [
     { name: '个人网站改版', progress: 60, status: '设计稿还未最终确定', next: '完成首页视觉稿', people: '团队协作 8/10' },
     { name: '摄影作品集整理', progress: 35, status: '照片筛选完成一半', next: '完成 20 张精修', people: '个人项目' },
@@ -326,7 +485,7 @@
     { id: 'm9', type: '健康', icon: '♡', time: '07:10', date: '05-10', title: '健康与身体：年度体检完成', copy: '指标整体正常，医生建议继续保持运动，减少久坐。', location: '健康与身体', people: [], mood: '安心', photos: ['photo-office'], tags: ['健康', '身体信号'], linkedView: 'health' },
     { id: 'm10', type: '项目', icon: '▤', time: '16:00', date: '05-09', title: '项目与目标：个人网站首页评审', copy: '主视觉方向确定，下一步补齐作品集详情页和联系表单。', location: '项目与目标', people: ['May', '陈昊'], mood: '充实', photos: ['photo-office', 'photo-book'], tags: ['项目', '作品集', '工作'], linkedView: 'projects' },
     { id: 'm11', type: '愿望', icon: '♢', time: '22:20', date: '05-08', title: '愿望冷却：Apple Watch Series 9', copy: '剩余 1 天，当前想要程度 40%，用于健康和运动数据记录。', location: '愿望冷却箱', people: [], mood: '期待', photos: ['photo-book'], tags: ['愿望', '数码', '冷却中'], linkedWish: 'w6' },
-    { id: 'm12', type: '关系', icon: '♟', time: '18:30', date: '05-07', title: '关系温度：爸爸', copy: '最近联系：3 天前 · 电话；亲密度 78/100，下次联系 12 天后。', location: '关系温度', people: ['爸爸'], mood: '平静', photos: [], tags: ['关系', '家人'], linkedRelationship: 'r2' },
+    { id: 'm12', type: '关系', icon: '♟', time: '18:30', date: '05-07', title: '关系温度：爸爸', copy: '最近联系：3 天前 · 电话；亲密度 78/100，预计下次联系 12 天后。', location: '关系温度', people: ['爸爸'], mood: '平静', photos: [], tags: ['关系', '家人'], linkedRelationship: 'r2' },
     { id: 'm13', type: '决策', icon: '♎', time: '11:00', date: '05-06', title: '是否继续租现在的房子？', copy: '通勤便利，但房租上涨明显，需要对比搬家成本。', location: '上海 · 徐汇', people: [], mood: '纠结', photos: ['photo-office'], tags: ['决策', '居住', '冷却中'], linkedDecision: 'd4' },
     { id: 'm14', type: '旅行', icon: '✈', time: '14:30', date: '05-04', title: '本月值得记住：杭州西湖散步', copy: '阴天的湖边很安静，走了很长一段路，心情慢慢沉下来。', location: '本月值得记住', people: ['Emma'], mood: '平静', photos: ['photo-garden', 'photo-river'], tags: ['旅行', '朋友'], linkedView: 'monthly' },
     { id: 'm15', type: '记忆', icon: '☾', time: '23:10', date: '05-03', title: '资源库：睡前读完一本书', copy: '读完《被讨厌的勇气》，关于课题分离的部分很有启发。', location: '资源库', people: [], mood: '安静', photos: ['photo-book'], tags: ['记忆', '学习', '阅读'], linkedView: 'resources' },
@@ -406,6 +565,12 @@
     { id: 'w9', status: '已实现', category: '学习', name: '读完 3 本书', reason: '本月希望恢复阅读节奏。', days: 0, due: '2026-05-01', desire: 90, price: '¥145', alternatives: [], plan: ['已完成并写入月度回顾'], photo: 'photo-book' }
   ];
 
+  var mockWatchEntries = [
+    { id: 'mwx1', kind: 'series', title: '长夜电台', year: 2026, month: 8, date: '2026-09-16', rating: 8.1, review: '整体稳定，台词有亮点。', tags: ['悬疑', '剧集'], finished: false, progress: '看到 S01E04', duration: '44分钟/集', cover: 'photo-night' },
+    { id: 'mwx2', kind: 'movie', title: '雾港来信', year: 2026, month: 8, date: '2026-09-21', rating: 7.8, review: '风格化明显，故事一般。', tags: ['文艺', '电影'], finished: true, progress: '', duration: '1小时41分', cover: 'photo-river' },
+    { id: 'mwx3', watchState: 'want', kind: 'movie', title: '银色公路', year: 2026, month: 10, date: '2026-11-04', rating: 8.0, review: '朋友推荐，准备下月看。', tags: ['想看', '电影'], finished: true, progress: '', duration: '1小时52分', cover: 'photo-night' }
+  ];
+
   var mockProjects = [
     { name: '月度生活报告生成器', progress: 42, status: '摘要模板还需要打磨', next: '补齐情绪和关系模块的摘要规则', people: '个人项目' },
     { name: '家庭照片归档', progress: 25, status: '老照片命名不统一', next: '按年份和人物做第一轮整理', people: '家人协作' },
@@ -441,7 +606,9 @@
     '决策': 'amber',
     '愿望': 'blue',
     '情绪': 'amber',
-    '记忆': 'green'
+    '记忆': 'green',
+    '观影': 'purple',
+    '想看': 'purple'
   };
 
   var typeIcons = {
@@ -453,7 +620,9 @@
     '愿望': 'wish',
     '健康': 'health',
     '项目': 'project',
-    '旅行': 'travel'
+    '旅行': 'travel',
+    '观影': 'watch',
+    '想看': 'watch'
   };
 
   var moodIcons = {
@@ -475,6 +644,7 @@
     mood: '<path d="M4 14.5a8 8 0 0 1 15.5-2.8"/><path d="M19 6v5h-5"/><path d="M8 14h.01"/><path d="M14 14h.01"/><path d="M9 18c1.8 1.2 4.2 1.2 6 0"/>',
     relationship: '<path d="M16.5 18.5v-1.2c0-1.8-1.6-3.3-3.5-3.3h-2c-1.9 0-3.5 1.5-3.5 3.3v1.2"/><circle cx="12" cy="8" r="3"/><path d="M4 19c.4-2.4 1.8-4.1 3.8-4.8"/><path d="M20 19c-.4-2.4-1.8-4.1-3.8-4.8"/>',
     wish: '<path d="M5 9h14v11H5z"/><path d="M12 9v11"/><path d="M4 9h16"/><path d="M8.5 9C6.5 7.6 6.4 5 8.4 4.5c2-.5 3.2 2.2 3.6 4.5"/><path d="M15.5 9c2-1.4 2.1-4 .1-4.5-2-.5-3.2 2.2-3.6 4.5"/>',
+    watch: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 4v2"/><path d="M16 4v2"/><path d="M4 11h16"/><path d="M9 15h6"/>',
     monthly: '<path d="M7 4h10a1 1 0 0 1 1 1v16l-6-3-6 3V5a1 1 0 0 1 1-1Z"/>',
     add: '<path d="M12 5v14"/><path d="M5 12h14"/>',
     project: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 4v3h6V4"/><path d="m8.5 13 2 2 5-5"/>',
@@ -549,11 +719,77 @@
     localStorage.setItem(mockMode ? MOCK_STORAGE_KEY : STORAGE_KEY, JSON.stringify(items));
   }
 
+  function weekdayFromISO(isoDate) {
+    var parts = String(isoDate || '').split('-').map(Number);
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return weekdayCN(new Date());
+    return weekdayCN(new Date(parts[0], parts[1] - 1, parts[2]));
+  }
+
+  function todayAndYesterdayISO() {
+    var today = todayISO();
+    return { today: today, yesterday: addDateDays(today, -1) };
+  }
+
   function timelineDateLabel(date) {
-    var value = String(date || '2026-05-13');
-    if (value === '2026-05-13') return '今天 05-13';
-    if (value === '2026-05-12') return '昨天 05-12';
-    return value.slice(5) || value;
+    var normalized = normalizeISODate(date, '');
+    var relative = todayAndYesterdayISO();
+    if (normalized) {
+      if (normalized === relative.today) return '今天 ' + normalized.slice(5);
+      if (normalized === relative.yesterday) return '昨天 ' + normalized.slice(5);
+      return normalized.slice(5);
+    }
+    var text = String(date || '').trim();
+    if (text.indexOf('今天') === 0) return '今天 ' + relative.today.slice(5);
+    if (text.indexOf('昨天') === 0) return '昨天 ' + relative.yesterday.slice(5);
+    return text;
+  }
+
+  function timelineDateISOFromMoment(moment) {
+    var relative = todayAndYesterdayISO();
+    var fromAbsolute = normalizeISODate(moment && moment.absoluteDate, '');
+    if (fromAbsolute) return fromAbsolute;
+    var raw = String((moment && moment.date) || '').trim();
+    if (raw.indexOf('今天') === 0) return relative.today;
+    if (raw.indexOf('昨天') === 0) return relative.yesterday;
+    var normalized = normalizeISODate(raw, '');
+    if (normalized) return normalized;
+    var monthDay = raw.match(/(\d{2})-(\d{2})/);
+    if (monthDay) {
+      var year = String(new Date().getFullYear());
+      return year + '-' + monthDay[1] + '-' + monthDay[2];
+    }
+    return '';
+  }
+
+  function timelineRailMeta(moment) {
+    var iso = timelineDateISOFromMoment(moment);
+    var relative = todayAndYesterdayISO();
+    if (iso) {
+      return {
+        dayLabel: iso === relative.today ? '今天' : (iso === relative.yesterday ? '昨天' : '记录'),
+        dateLabel: iso.slice(2),
+        weekday: weekdayFromISO(iso)
+      };
+    }
+    var text = String((moment && moment.date) || '').trim();
+    var parts = text.split(' ');
+    return {
+      dayLabel: parts.length > 1 ? parts[0] : '记录',
+      dateLabel: parts.length > 1 ? parts.slice(1).join(' ') : text,
+      weekday: weekdayCN(new Date())
+    };
+  }
+
+  function normalizeTimelineMoment(item) {
+    var moment = Object.assign({}, item);
+    var iso = timelineDateISOFromMoment(moment);
+    if (iso) {
+      moment.absoluteDate = iso;
+      moment.date = timelineDateLabel(iso);
+    } else {
+      moment.date = timelineDateLabel(moment.date);
+    }
+    return moment;
   }
 
   function linkedTimelineId(module, recordId) {
@@ -576,7 +812,7 @@
     var stored = getStoredMoments().filter(function(moment) {
       return !(moment.linkedModule === module && moment.linkedRecordId === recordId);
     });
-    var date = config.date || '2026-05-13';
+    var date = config.date || todayISO();
     var moment = {
       id: linkedTimelineId(module, recordId),
       type: config.type || '记忆',
@@ -605,11 +841,31 @@
     saveStoredMoments(stored);
   }
 
-  function renderTimelineLinkControls(isLinked) {
-    var checked = isLinked === false ? '' : ' checked';
+  function linkedTimelineMoment(module, recordId) {
+    if (!module || !recordId) return null;
+    var matched = getStoredMoments().filter(function(moment) {
+      return moment.linkedModule === module && moment.linkedRecordId === recordId;
+    })[0];
+    return matched || null;
+  }
+
+  function isTimelineLinked(module, recordId) {
+    return !!linkedTimelineMoment(module, recordId);
+  }
+
+  function renderTimelineLinkedBadge(module, recordId) {
+    if (!isTimelineLinked(module, recordId)) return '';
+    return '<span class="life-badge purple">已关联时间河流</span>';
+  }
+
+  function renderTimelineLinkControls(isLinked, privacy, alreadyLinked) {
+    var linked = isLinked !== false;
+    var checked = linked ? ' checked' : '';
+    var selectedPrivacy = privacy === '可进入月度回顾' ? '可进入月度回顾' : '仅自己可见';
+    var actionText = alreadyLinked === true ? '关联时间河流' : '关联到时间河流';
     return '<div class="life-link-timeline-row">' +
-      '<label class="life-link-timeline-check"><input type="checkbox" name="linkTimeline"' + checked + '><span><strong>关联到时间河流</strong><em>保存后会同步到首页时间河流</em></span></label>' +
-      '<label class="life-link-timeline-privacy"><span>可见范围</span><select class="life-select" name="timelinePrivacy"><option>仅自己可见</option><option>可进入月度回顾</option></select></label>' +
+      '<label class="life-link-timeline-check"><input type="checkbox" name="linkTimeline"' + checked + '><span><strong>' + actionText + '</strong></span></label>' +
+      '<label class="life-link-timeline-privacy"><span>可见范围</span><select class="life-select" name="timelinePrivacy"><option' + (selectedPrivacy === '仅自己可见' ? ' selected' : '') + '>仅自己可见</option><option' + (selectedPrivacy === '可进入月度回顾' ? ' selected' : '') + '>可进入月度回顾</option></select></label>' +
     '</div>';
   }
 
@@ -713,6 +969,27 @@
     localStorage.setItem(wishStorageKey(), JSON.stringify(store));
   }
 
+  function watchStorageKey() {
+    return mockMode ? MOCK_WATCH_STORAGE_KEY : WATCH_STORAGE_KEY;
+  }
+
+  function getWatchStore() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(watchStorageKey()) || '{}');
+      return {
+        added: raw.added || [],
+        edits: raw.edits || {},
+        deleted: raw.deleted || []
+      };
+    } catch (err) {
+      return { added: [], edits: {}, deleted: [] };
+    }
+  }
+
+  function saveWatchStore(store) {
+    localStorage.setItem(watchStorageKey(), JSON.stringify(store));
+  }
+
   function monthlyStorageKey() {
     return mockMode ? MOCK_MONTHLY_STORAGE_KEY : MONTHLY_STORAGE_KEY;
   }
@@ -725,10 +1002,11 @@
         reports: raw.reports || {},
         archived: raw.archived || {},
         letters: raw.letters || {},
-        quotes: raw.quotes || {}
+        quotes: raw.quotes || {},
+        summaries: raw.summaries || {}
       };
     } catch (err) {
-      return { bookmarked: {}, reports: {}, archived: {}, letters: {}, quotes: {} };
+      return { bookmarked: {}, reports: {}, archived: {}, letters: {}, quotes: {}, summaries: {} };
     }
   }
 
@@ -742,6 +1020,10 @@
 
   function healthStorageKey() {
     return mockMode ? MOCK_HEALTH_STORAGE_KEY : HEALTH_STORAGE_KEY;
+  }
+
+  function resourceStorageKey() {
+    return mockMode ? MOCK_RESOURCE_STORAGE_KEY : RESOURCE_STORAGE_KEY;
   }
 
   function getSimpleStore(key) {
@@ -777,13 +1059,30 @@
 
   function saveDecisionMeta(meta) {
     localStorage.setItem(decisionMetaKey(), JSON.stringify(meta));
+    if (directApiMode || mockMode) {
+      var items = getStoredDecisions().filter(function(item) {
+        return meta.deleted.indexOf(item.id) < 0;
+      }).map(function(item) {
+        var edited = Object.assign({}, item, meta.edits[item.id] || {});
+        if (meta.confidence[item.id] != null) edited.confidence = meta.confidence[item.id];
+        if (meta.reviewed[item.id]) {
+          edited.status = '已复盘';
+          edited.result = meta.reviewed[item.id].result || edited.result;
+          edited.reviewSummary = meta.reviewed[item.id];
+        }
+        return edited;
+      });
+      saveStoredDecisions(items);
+    }
   }
 
   function allMoments() {
-    return getStoredMoments().concat(seedMoments).concat(mockMode ? mockMoments : []);
+    if (directApiMode || mockMode) return getStoredMoments().map(normalizeTimelineMoment);
+    return getStoredMoments().concat(seedMoments).concat(mockMode ? mockMoments : []).map(normalizeTimelineMoment);
   }
 
   function allDecisions() {
+    if (directApiMode || mockMode) return getStoredDecisions();
     return getStoredDecisions().concat(withMockData(decisions, mockDecisions));
   }
 
@@ -796,12 +1095,21 @@
   }
 
   function parseMoodDate(value) {
-    var parts = String(value || '').split('-').map(Number);
+    var fallback = todayISO().split('-').map(Number);
+    var match = String(value || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    var parts = match ? [Number(match[1]), Number(match[2]), Number(match[3])] : String(value || '').split('-').map(Number);
     return {
-      year: parts[0] || 2026,
-      month: Math.max(0, (parts[1] || 5) - 1),
-      day: parts[2] || 13
+      year: parts[0] || fallback[0],
+      month: Math.max(0, (parts[1] || fallback[1]) - 1),
+      day: parts[2] || fallback[2]
     };
+  }
+
+  function selectMoodDate(value) {
+    var parsed = parseMoodDate(value || todayISO());
+    state.moodYear = parsed.year;
+    state.moodMonth = parsed.month;
+    state.selectedMoodDay = Math.min(parsed.day, new Date(parsed.year, parsed.month + 1, 0).getDate());
   }
 
   function normalizeMoodRecord(item) {
@@ -826,6 +1134,13 @@
   function allMoodRecords() {
     var store = getMoodStore();
     var deleted = store.deleted || [];
+    if (directApiMode || mockMode) {
+      return (store.added || []).map(normalizeMoodRecord).map(function(item) {
+        return Object.assign({}, item, store.edits[item.id] || {});
+      }).filter(function(item) {
+        return deleted.indexOf(item.id) < 0;
+      }).sort(moodSortAsc);
+    }
     var seedItems = moodRecords.map(normalizeMoodRecord).map(function(item) {
       return Object.assign({}, item, store.edits[item.id] || {});
     });
@@ -859,8 +1174,8 @@
       last: '今天',
       channel: '微信',
       score: 70,
-      next: '7 天后',
       nextDate: '2026-05-20',
+      next: '',
       trend: [60, 64, 66, 70, 68, 72],
       dates: [],
       notes: [],
@@ -869,13 +1184,15 @@
       places: [],
       avatar: item.avatar || '',
       avatarUrl: item.avatarUrl || '',
-      memo: '保持稳定、温暖、不过度打扰的连接。',
+      memo: '',
       reminded: false,
       source: 'seed'
     }, item);
     normalized.memories = normalizeRelationshipMedia(normalized.memories);
     normalized.gifts = normalizeRelationshipMedia(normalized.gifts);
     normalized.places = normalizeRelationshipMedia(normalized.places);
+    if (normalized.memo === '保持稳定、温暖、不过度打扰的连接。') normalized.memo = '';
+    normalized.next = relationshipNextLabel(normalized.nextDate, normalized.next);
     return normalized;
   }
 
@@ -887,12 +1204,19 @@
         image: item.image || item.imageUrl || '',
         date: item.date || ''
       };
-    }).filter(function(item) { return item.text || item.image; });
+    }).filter(function(item) { return item.text || item.image; }).slice(0, RELATIONSHIP_MEDIA_LIMIT);
   }
 
   function allRelationships() {
     var store = getRelationshipStore();
     var deleted = store.deleted || [];
+    if (directApiMode || mockMode) {
+      return (store.added || []).map(normalizeRelationship).map(function(item) {
+        return normalizeRelationship(Object.assign({}, item, store.edits[item.id] || {}));
+      }).filter(function(item) {
+        return deleted.indexOf(item.id) < 0;
+      });
+    }
     var baseItems = withMockData(relationships, mockRelationships).map(normalizeRelationship).map(function(item) {
       return normalizeRelationship(Object.assign({}, item, store.edits[item.id] || {}));
     });
@@ -905,6 +1229,7 @@
   }
 
   function normalizeWish(item) {
+    var hasDue = !!(item && item.due);
     var normalized = Object.assign({
       id: item.id || 'w-local-' + Date.now(),
       status: '愿望冷却中',
@@ -912,7 +1237,7 @@
       name: '未命名愿望',
       reason: '',
       days: 21,
-      due: '2026-06-03',
+      due: addDateDays(todayISO(), 21),
       desire: 50,
       price: '待定',
       alternatives: [],
@@ -920,14 +1245,14 @@
       photo: 'photo-book',
       image: '',
       addedAt: '2026-05-13',
-      coolStart: '2026-05-01',
-      priceHistory: '最低记录：¥11,999（2026-04-28）',
+      coolStart: todayISO(),
       notes: '',
       counterReasons: [],
       future: '可以更自由地记录和表达，让生活更有仪式感。',
       completedPlan: []
     }, item);
     normalized.days = Math.max(0, Number(normalized.days || 0));
+    if (!hasDue) normalized.due = addDateDays(todayISO(), normalized.days);
     normalized.desire = Math.max(0, Math.min(100, Number(normalized.desire || 0)));
     normalized.alternatives = Array.isArray(normalized.alternatives) ? normalized.alternatives : splitLines(normalized.alternatives, []);
     normalized.plan = Array.isArray(normalized.plan) ? normalized.plan : splitLines(normalized.plan, []);
@@ -939,6 +1264,13 @@
   function allWishes() {
     var store = getWishStore();
     var deleted = store.deleted || [];
+    if (directApiMode || mockMode) {
+      return (store.added || []).map(normalizeWish).map(function(item) {
+        return normalizeWish(Object.assign({}, item, store.edits[item.id] || {}));
+      }).filter(function(item) {
+        return deleted.indexOf(item.id) < 0;
+      });
+    }
     var baseItems = withMockData(wishes, mockWishes).map(normalizeWish).map(function(item) {
       return normalizeWish(Object.assign({}, item, store.edits[item.id] || {}));
     });
@@ -950,16 +1282,72 @@
     });
   }
 
+  function normalizeWatchEntry(item) {
+    var date = normalizeISODate(item.date, todayISO());
+    var rating = Number(item.rating == null ? 8 : item.rating);
+    var normalized = Object.assign({
+      id: item.id || ('watch-local-' + Date.now()),
+      kind: item.kind === 'series' ? 'series' : 'movie',
+      title: item.title || '未命名观影',
+      date: date,
+      year: Number(date.slice(0, 4)),
+      month: Number(date.slice(5, 7)) - 1,
+      rating: Math.max(1, Math.min(10, Number.isFinite(rating) ? rating : 8)),
+      review: item.review || '',
+      tags: Array.isArray(item.tags) ? item.tags.filter(Boolean) : splitLines(item.tags, []),
+      finished: item.finished !== false,
+      progress: item.progress || '',
+      duration: item.duration || '',
+      cover: item.cover || 'photo-river',
+      image: item.image || '',
+      watchState: item.watchState === 'want' ? 'want' : 'watched',
+      linkTimeline: item.linkTimeline !== false,
+      timelinePrivacy: item.timelinePrivacy || '仅自己可见'
+    }, item);
+    normalized.date = date;
+    normalized.year = Number(date.slice(0, 4));
+    normalized.month = Number(date.slice(5, 7)) - 1;
+    if (normalized.kind !== 'series') {
+      normalized.finished = true;
+      normalized.progress = '';
+    }
+    normalized.watchState = normalized.watchState === 'want' ? 'want' : 'watched';
+    return normalized;
+  }
+
+  function allWatchEntries() {
+    var store = getWatchStore();
+    var deleted = store.deleted || [];
+    if (directApiMode || mockMode) {
+      return (store.added || []).map(normalizeWatchEntry).map(function(item) {
+        return normalizeWatchEntry(Object.assign({}, item, store.edits[item.id] || {}));
+      }).filter(function(item) {
+        return deleted.indexOf(item.id) < 0;
+      });
+    }
+    var baseItems = withMockData(watchEntries, mockWatchEntries).map(normalizeWatchEntry).map(function(item) {
+      return normalizeWatchEntry(Object.assign({}, item, store.edits[item.id] || {}));
+    });
+    var addedItems = (store.added || []).map(normalizeWatchEntry).map(function(item) {
+      return normalizeWatchEntry(Object.assign({}, item, store.edits[item.id] || {}));
+    });
+    return baseItems.concat(addedItems).filter(function(item) {
+      return deleted.indexOf(item.id) < 0;
+    });
+  }
+
   function allProjects() {
+    if (directApiMode || mockMode) return getSimpleStore(projectStorageKey());
     return getSimpleStore(projectStorageKey()).concat(withMockData(projects, mockProjects));
   }
 
   function allHealth() {
+    if (directApiMode || mockMode) return getSimpleStore(healthStorageKey());
     return getSimpleStore(healthStorageKey()).concat(withMockData(health, mockHealth));
   }
 
   function allResources() {
-    if (mockMode) return resourceAssets.slice();
+    if (directApiMode || mockMode) return getSimpleStore(resourceStorageKey());
     return [
       { name: '照片素材', value: '128 张', meta: '默认原型素材' },
       { name: '月报归档', value: '4 份', meta: '默认原型归档' },
@@ -969,8 +1357,14 @@
   }
 
   function mockNotice() {
-    if (!mockMode) return '';
-    return '<section class="life-panel" style="margin-bottom:14px;border-color:#f0ca8e;background:#fffaf0"><div class="life-row-head"><div><h2 class="life-panel-title">测试数据模式</h2><p class="life-panel-sub">当前页面追加了隔离 mock 数据，仅用于功能页面测试；新增与编辑会写入独立的 life_mock_* 存储，不会混入真实保存数据。</p></div><span class="life-badge amber">Mock Only</span></div></section>';
+    if (state.view !== 'profile') return '';
+    var actionText = mockMode ? '关闭测试数据' : '开启测试数据';
+    var modeText = mockMode ? '测试数据模式' : '真实数据模式';
+    var badgeText = mockMode ? 'Mock Only' : 'Production';
+    var copy = mockMode
+      ? '当前页面正在读取隔离 mock 数据，仅用于功能页面测试；新增与编辑会写入独立的 life_mock_* 存储，不会混入真实保存数据。'
+      : '当前页面正在读取真实保存数据。开启测试数据后，会通过 URL 参数进入隔离 mock 数据环境。';
+    return '<section class="life-panel" style="margin-bottom:14px;border-color:#f0ca8e;background:#fffaf0"><div class="life-row-head"><div><h2 class="life-panel-title">' + modeText + '</h2><p class="life-panel-sub">' + copy + '</p></div><div class="life-chip-row"><span class="life-badge amber">' + badgeText + '</span><button class="life-secondary-btn ' + (mockMode ? 'active' : '') + '" type="button" data-action="toggle-mock-mode">' + actionText + '</button></div></div></section>';
   }
 
   function queryMatch(text) {
@@ -982,6 +1376,33 @@
     return (tags || []).map(function(tag) {
       return '<span class="life-badge ' + (colors[tag] || 'gray') + '">' + escapeHtml(tag) + '</span>';
     }).join('');
+  }
+
+  function pageStateName(scope) {
+    return scope + 'Visible';
+  }
+
+  function resetPage(scope) {
+    if (pageLimits[scope]) state[pageStateName(scope)] = pageLimits[scope];
+  }
+
+  function resetPages(scopes) {
+    scopes.forEach(resetPage);
+  }
+
+  function visibleItems(scope, items) {
+    var limit = state[pageStateName(scope)] || pageLimits[scope] || items.length;
+    return items.slice(0, limit);
+  }
+
+  function renderLoadMore(scope, shown, total) {
+    if (total <= shown) return '';
+    return '<div class="life-load-more"><button type="button" class="life-secondary-btn" data-load-more="' + escapeHtml(scope) + '">加载更多</button><span>已显示 ' + shown + ' / ' + total + '</span></div>';
+  }
+
+  function loadMore(scope) {
+    state[pageStateName(scope)] = (state[pageStateName(scope)] || pageLimits[scope] || 0) + (pageLimits[scope] || 10);
+    render();
   }
 
   function photosHtml(photos) {
@@ -1073,15 +1494,92 @@
   }
 
   function setView(view) {
+    if (!canAccessView(view)) {
+      state.view = 'timeline';
+      state.timelineFilter = '全部';
+      resetPage('timeline');
+      showToast('该模块仅管理员可见');
+      render();
+      return;
+    }
     state.view = view;
     if (view !== 'timeline') state.timelineFilter = '全部';
+    if (view === 'timeline') resetPage('timeline');
+    if (view === 'life-axis') resetPage('axis');
+    if (view === 'decisions') resetPage('decision');
+    if (view === 'mood') {
+      resetPage('moodRecent');
+      selectMoodDate(todayISO());
+    }
+    if (view === 'relationships') resetPage('relationship');
+    if (view === 'wishes') resetPage('wish');
     render();
+  }
+
+  function openQuickAddTargetFromTimeline() {
+    var target = state.timelineQuickAdd || 'mood';
+    if (target === 'mood') {
+      setView('mood');
+      startMoodCreate();
+      return;
+    }
+    if (target === 'decision') {
+      setView('decisions');
+      addDecision();
+      return;
+    }
+    if (target === 'relationship') {
+      setView('relationships');
+      startRelationshipCreate();
+      return;
+    }
+    if (target === 'wish') {
+      setView('wishes');
+      startWishCreate();
+      return;
+    }
+    if (target === 'watch') {
+      setView('watch');
+      startWatchCreate();
+      return;
+    }
+    setView('add');
   }
 
   function openMomentTarget(momentId, targetType, targetId) {
     state.selectedMomentId = momentId;
     var moment = findById(allMoments(), momentId);
     var target = targetType ? { type: targetType, id: targetId } : targetFromMoment(moment);
+    if (moment && (moment.linkedModule === 'watch' || target.id === 'watch')) {
+      var watch = findById(allWatchEntries(), moment.linkedRecordId);
+      var fallbackDate = normalizeISODate(moment.absoluteDate, todayISO());
+      var fallbackYear = Number(fallbackDate.slice(0, 4));
+      var fallbackMonth = Number(fallbackDate.slice(5, 7)) - 1;
+      state.view = 'watch';
+      if (watch) {
+        state.selectedWatchId = watch.id;
+        state.watchKind = watch.kind === 'series' ? 'series' : 'movie';
+        state.watchStatus = watch.watchState === 'want' ? 'want' : 'watched';
+        if (state.watchStatus === 'want') {
+          state.watchMode = 'want';
+          state.watchYear = 'all';
+        } else {
+          state.watchYear = Number(watch.year);
+          state.watchMonth = Number(watch.month);
+          state.watchMode = 'month';
+        }
+      } else {
+        state.watchStatus = 'watched';
+        state.watchKind = 'movie';
+        state.watchYear = fallbackYear;
+        state.watchMonth = fallbackMonth;
+        state.watchMode = 'month';
+      }
+      state.watchFormMode = null;
+      state.watchCreatePreset = null;
+      render();
+      return;
+    }
     if (target.type === 'decision') {
       var decision = findById(decisionArchiveItems(), target.id);
       state.selectedDecisionId = target.id;
@@ -1126,10 +1624,7 @@
       return;
     }
     if (target.type === 'mood') {
-      var parsed = parseMoodDate(target.id);
-      state.moodYear = parsed.year;
-      state.moodMonth = parsed.month;
-      state.selectedMoodDay = parsed.day;
+      selectMoodDate(target.id || todayISO());
       state.moodTab = 'overview';
       state.moodFormMode = null;
       state.moodEditingId = '';
@@ -1145,23 +1640,50 @@
   }
 
   function updateChrome() {
-    els.title.textContent = (state.view === 'life-axis' || state.view === 'decisions' || state.view === 'mood' || state.view === 'add') ? '生活航迹' : (viewTitles[state.view] || '生活航迹');
+    els.title.textContent = (state.view === 'life-axis' || state.view === 'decisions' || state.view === 'mood' || state.view === 'add' || state.view === 'watch') ? '生活航迹' : (viewTitles[state.view] || '生活航迹');
+    if (!canAccessView(state.view)) {
+      state.view = 'timeline';
+      state.timelineFilter = '全部';
+      resetPage('timeline');
+    }
     document.body.setAttribute('data-life-view', state.view);
     Array.prototype.forEach.call(document.querySelectorAll('.life-nav-item'), function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-view') === state.view);
+      var view = btn.getAttribute('data-view');
+      var restricted = isAdminOnlyView(view) && !isAdminSession();
+      btn.hidden = restricted;
+      btn.disabled = restricted;
+      btn.setAttribute('aria-hidden', restricted ? 'true' : 'false');
+      btn.classList.toggle('active', view === state.view && !restricted);
     });
-    if (els.mockModeBtn) {
-      els.mockModeBtn.textContent = mockMode ? '关闭测试数据' : '测试数据';
-      els.mockModeBtn.classList.toggle('active', mockMode);
-    }
     var addBtn = document.querySelector('.life-topbar [data-action="go-add"]');
-    if (addBtn) addBtn.textContent = state.view === 'life-axis' ? '+ 添加里程碑' : (state.view === 'decisions' ? '+ 添加决定' : (state.view === 'mood' ? '+ 记录情绪' : (state.view === 'wishes' ? '+ 添加愿望' : '+ 添加一刻')));
+    if (addBtn) addBtn.textContent =
+      state.view === 'life-axis' ? '+ 添加里程碑'
+        : (state.view === 'decisions' ? '+ 添加决定'
+          : (state.view === 'mood' ? '+ 记录情绪'
+            : (state.view === 'relationships' ? '+ 添加关系'
+              : (state.view === 'wishes' ? '+ 添加愿望'
+                : (state.view === 'watch' ? (state.watchStatus === 'want' ? '+ 添加想看' : '+ 添加观影') : '+ 添加一刻')))));
     if (els.search) {
-      els.search.placeholder = state.view === 'life-axis' ? '搜索地点、事件、人物、决定...' : (state.view === 'wishes' ? '搜索愿望、原因、标签...' : (state.view === 'decisions' || state.view === 'mood' ? '搜索记录、地点、人物...' : '搜索记录、地点、人物、决策...'));
+      els.search.placeholder = state.view === 'life-axis'
+        ? '搜索地点、事件、人物、决定...'
+        : (state.view === 'wishes'
+          ? '搜索愿望、原因、标签...'
+          : (state.view === 'watch'
+            ? '搜索片名 / 剧名 / 标签 / 备注...'
+            : (state.view === 'decisions' || state.view === 'mood'
+              ? '搜索记录、地点、人物...'
+              : '搜索记录、地点、人物、决策...')));
+    }
+    if (els.topDate) {
+      var now = new Date();
+      var dateText = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      els.topDate.innerHTML = dateText + ' ' + weekdayCN(now) + ' · ' + iconHtml('sun') + ' 晴 22℃';
     }
     var session = accountSession();
     var accountBtn = document.querySelector('[data-account-action="profile"]');
     if (accountBtn) accountBtn.textContent = session ? session.name : '登录';
+    var topLogoutBtn = document.querySelector('[data-account-action="logout-top"]');
+    if (topLogoutBtn) topLogoutBtn.hidden = !session;
     var profile = document.querySelector('.life-profile');
     if (profile) {
       var nameNode = profile.querySelector('strong');
@@ -1196,13 +1718,13 @@
   }
 
   function momentCard(moment, index, items) {
-    var timeParts = String(moment.date).split(' ');
-    var dayLabel = timeParts.length > 1 ? timeParts[0] : '';
-    var dateLabel = timeParts.length > 1 ? timeParts.slice(1).join(' ') : moment.date;
+    var rail = timelineRailMeta(moment);
+    var dayLabel = rail.dayLabel;
+    var dateLabel = rail.dateLabel;
     var previous = index > 0 ? items[index - 1] : null;
     var isNewDay = !previous || previous.date !== moment.date;
     var dayBlock = isNewDay
-      ? '<div class="life-day-rail ' + (dayLabel === '昨天' ? 'muted' : '') + '"><strong>' + escapeHtml(dayLabel || '记录') + '</strong><span>' + escapeHtml(dateLabel) + '</span><span>' + (dayLabel === '昨天' ? '周二' : '周三') + '</span></div>'
+      ? '<div class="life-day-rail ' + (dayLabel === '昨天' ? 'muted' : '') + '"><strong>' + escapeHtml(dayLabel || '记录') + '</strong><span>' + escapeHtml(dateLabel) + '</span><span>' + escapeHtml(rail.weekday) + '</span></div>'
       : '';
     var cardExtra = moment.id === 'm1' ? renderTodayWeatherInset() : '';
     return '<article class="life-moment">' +
@@ -1221,19 +1743,33 @@
     '</article>';
   }
 
+  function renderWeatherMetric(label, value, level) {
+    return '<span class="' + level.tone + '">' + escapeHtml(label) + ' <strong>' + escapeHtml(value) + '</strong><em>' + escapeHtml(level.label) + '</em></span>';
+  }
+
+  function renderWeatherMetrics(record) {
+    return '<div class="life-weather-metrics"><span>情绪天气</span>' +
+      renderWeatherMetric('睡眠', record.sleep + 'h', moodSleepLevel(record.sleep)) +
+      renderWeatherMetric('压力', record.pressure + '/100', moodPressureLevel(record.pressure)) +
+      renderWeatherMetric('精力', record.energy + '/100', moodEnergyLevel(record.energy)) +
+      '<span>感受 <strong>' + escapeHtml(record.feeling) + '</strong></span></div>';
+  }
+
   function renderTodayWeatherInset() {
-    return '<div class="life-weather-inset"><div><span class="life-muted">最近情绪</span><strong>' + iconHtml('sun') + ' 晴朗 <em>78/100</em></strong></div><div class="life-energy-note">精力充沛，适合推进重要的事。</div><div class="life-weather-metrics"><span>情绪天气</span><span>睡眠 <strong>7.2h</strong> 良好</span><span>压力 <strong>35/100</strong> 较低</span><span>精力 <strong>80/100</strong> 充沛</span><span>感受 平静</span></div></div>';
+    var today = parseMoodDate(todayISO());
+    var record = moodRecordForMonth(today.day, today.year, today.month) || { weather: '晴朗', score: 78, sleep: 7.2, pressure: 35, energy: 80, feeling: '平静' };
+    var moodState = moodStateByScore(record.score);
+    return '<div class="life-weather-inset"><div><span class="life-muted">最近情绪</span><strong>' + iconHtml(moodState.icon) + ' ' + escapeHtml(moodState.label) + ' <em>' + escapeHtml(record.score) + '/100</em></strong></div><div class="life-energy-note">' + escapeHtml(moodState.description) + '</div>' + renderWeatherMetrics(record) + '</div>';
   }
 
   function homeMomentCard(moment, index, items) {
-    var timeParts = String(moment.date).split(' ');
-    var dayLabel = timeParts.length > 1 ? timeParts[0] : '';
-    var dateLabel = timeParts.length > 1 ? timeParts.slice(1).join(' ') : moment.date;
+    var rail = timelineRailMeta(moment);
+    var dayLabel = rail.dayLabel;
+    var dateLabel = rail.dateLabel;
     var previous = index > 0 ? items[index - 1] : null;
     var isNewDay = !previous || previous.date !== moment.date;
-    var weekday = dayLabel === '昨天' ? '周二' : '周三';
     var dayBlock = isNewDay
-      ? '<div class="life-day-rail ' + (dayLabel === '昨天' ? 'muted' : '') + '"><strong>' + escapeHtml(dayLabel || '记录') + '</strong><span>' + escapeHtml(dateLabel) + '</span><span>' + weekday + '</span></div>'
+      ? '<div class="life-day-rail ' + (dayLabel === '昨天' ? 'muted' : '') + '"><strong>' + escapeHtml(dayLabel || '记录') + '</strong><span>' + escapeHtml(dateLabel) + '</span><span>' + escapeHtml(rail.weekday) + '</span></div>'
       : '';
     return '<article class="life-moment life-home-moment">' +
       '<div class="life-moment-date">' + dayBlock + '</div>' +
@@ -1259,6 +1795,7 @@
     if (moment.linkedModule === 'monthly' || moment.linkedView === 'monthly') return renderMemoryHomeCard(moment);
     if (moment.linkedView === 'projects' || moment.type === '项目') return renderProjectHomeCard(moment);
     if (moment.linkedView === 'health' || moment.type === '健康') return renderSleepHomeCard(moment);
+    if (moment.linkedView === 'watch' || moment.linkedModule === 'watch' || moment.type === '观影' || moment.type === '想看') return renderWatchHomeCard(moment);
     return '<div class="life-home-card life-card clickable"' + momentTargetAttrs(moment) + '><div class="life-row-head"><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p></div><span class="life-badge ' + (colors[moment.type] || 'gray') + '">' + escapeHtml(moment.type) + '</span></div>' + photosHtml(moment.photos) + '<div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div>';
   }
 
@@ -1266,12 +1803,17 @@
     var record = null;
     if (moment.linkedMoodDate) record = findById(allMoodRecords(), moment.linkedMoodDate);
     if (record) return record;
+    if (moment.linkedMoodDate) {
+      var parsedMoodDate = parseMoodDate(moment.linkedMoodDate);
+      record = moodRecordForMonth(parsedMoodDate.day, parsedMoodDate.year, parsedMoodDate.month);
+      if (record) return record;
+    }
     var title = String(moment.title || '');
     var scoreMatch = title.match(/(\d+)\s*\/\s*100/);
-    var weatherMatch = title.match(/：\s*([^\s]+)\s+\d+/);
+    var score = scoreMatch ? Number(scoreMatch[1]) : 78;
     return {
-      weather: weatherMatch ? weatherMatch[1] : (moment.mood || '晴朗'),
-      score: scoreMatch ? Number(scoreMatch[1]) : 78,
+      weather: moodStateByScore(score).label,
+      score: score,
       sleep: 7.2,
       pressure: 35,
       energy: 80,
@@ -1282,13 +1824,17 @@
 
   function renderMorningCard(moment) {
     var record = moment.id === 'm1'
-      ? (moodRecordForMonth(13, 2026, 4) || selectedMoodRecord() || { weather: '晴朗', score: 78, sleep: 7.2, pressure: 35, energy: 80, feeling: '平静' })
+      ? (function() {
+        var today = parseMoodDate(todayISO());
+        return moodRecordForMonth(today.day, today.year, today.month) || selectedMoodRecord() || { weather: '晴朗', score: 78, sleep: 7.2, pressure: 35, energy: 80, feeling: '平静' };
+      })()
       : moodRecordFromMoment(moment);
-    var weather = record.weather || '晴朗';
+    var moodState = moodStateByScore(record.score);
+    var weather = moodState.label;
     return '<div class="life-home-card life-card life-weather-card clickable"' + momentTargetAttrs(moment) + '>' +
-      '<div class="life-morning-main"><div class="life-home-type-icon amber">' + iconHtml(moodIcons[weather] || 'sun') + '</div><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(record.note || moment.copy) + '</p><div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div>' + photoSpanHtml((moment.photos && moment.photos[0]) || 'photo-river', 'life-main-photo') + '</div>' +
-      '<div class="life-mood-row"><span class="life-muted">最近情绪</span><div class="life-mood-now">' + iconHtml(moodIcons[weather] || 'sun') + '<strong>' + escapeHtml(weather) + '</strong><span>' + escapeHtml(record.score) + '/100</span></div><span class="life-energy-note">精力充沛，适合推进重要的事。</span></div>' +
-      '<div class="life-weather-metrics"><span>情绪天气</span><span>睡眠 <strong>' + escapeHtml(record.sleep) + 'h</strong> 良好</span><span>压力 <strong>' + escapeHtml(record.pressure) + '/100</strong> 较低</span><span>精力 <strong>' + escapeHtml(record.energy) + '/100</strong> 充沛</span><span>感受 <strong>' + escapeHtml(record.feeling) + '</strong></span></div>' +
+      '<div class="life-morning-main"><div class="life-home-type-icon amber">' + iconHtml(moodState.icon) + '</div><div><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">' + escapeHtml(record.note || moment.copy) + '</p><div class="life-meta"><span>' + iconHtml('location') + ' ' + escapeHtml(moment.location) + '</span>' + tagsHtml(moment.tags) + '</div></div></div>' +
+      '<div class="life-mood-row"><span class="life-muted">最近情绪</span><div class="life-mood-now">' + iconHtml(moodState.icon) + '<strong>' + escapeHtml(weather) + '</strong><span>' + escapeHtml(record.score) + '/100</span></div><span class="life-energy-note">' + escapeHtml(moodState.description) + '</span></div>' +
+      renderWeatherMetrics(record) +
     '</div>';
   }
 
@@ -1303,14 +1849,14 @@
     var confidence = decision.confidence || (confidenceMatch ? Number(confidenceMatch[1]) : 70);
     var reason = (decision.reason && decision.reason[0]) || moment.copy || '这条决定来自子页面关联记录。';
     return '<div class="life-home-card life-card life-decision-card clickable"' + momentTargetAttrs(moment) + '>' +
-      '<div class="life-card-label amber">重要决定</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge amber">' + escapeHtml(status) + '</span> <span class="life-card-date">记录于 ' + escapeHtml(decision.date || moment.absoluteDate || '2026-04-20') + '</span></h3><p class="life-card-copy">我的选择：<strong>' + escapeHtml(choice) + '</strong><span class="life-gap"></span>信心：' + escapeHtml(confidence) + '/100</p><p class="life-card-copy">' + escapeHtml(reason) + '</p><button class="life-link-btn" type="button">查看详情 →</button></div><div class="life-review-box"><span>下次复盘日</span><strong>' + escapeHtml(decision.reviewDate || '2026-10-20') + '</strong><span>决策档案馆</span></div>' +
+      '<div class="life-card-label amber">重要决定</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge amber">' + escapeHtml(status) + '</span> <span class="life-card-date">记录于 ' + escapeHtml(decision.date || moment.absoluteDate || '2026-04-20') + '</span></h3><p class="life-card-copy">我的选择：<strong>' + escapeHtml(choice) + '</strong><span class="life-gap"></span>信心：' + escapeHtml(confidence) + '/100</p><p class="life-card-copy">' + escapeHtml(reason) + '</p></div><div class="life-review-box"><span>下次复盘日</span><strong>' + escapeHtml(decision.reviewDate || '2026-10-20') + '</strong><span>决策档案馆</span></div>' +
     '</div>';
   }
 
   function renderRelationshipHomeCard(moment) {
-    var relationship = findById(allRelationships(), moment.linkedRelationship) || { name: '张敏', score: 88, last: '昨天', channel: '微信', next: '4 天后' };
+    var relationship = findById(allRelationships(), moment.linkedRelationship) || normalizeRelationship({ name: '张敏', score: 88, last: '昨天', channel: '微信', nextDate: addDateDays(todayISO(), 4) });
     return '<div class="life-home-card life-card life-relationship-card clickable"' + momentTargetAttrs(moment) + '>' +
-      '<div class="life-card-label red">关系提醒</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">最近联系：' + escapeHtml(relationship.last) + ' · ' + escapeHtml(relationship.channel) + '；亲密度 ' + escapeHtml(relationship.score) + '/100</p></div><div class="life-relation-change"><span>下次联系</span><strong>' + escapeHtml(relationship.next) + '</strong><i></i><strong>' + escapeHtml(relationship.group || '朋友') + '</strong></div><div class="life-avatar-pair"><span>' + escapeHtml(relationship.name.slice(0, 1)) + '</span><span>' + escapeHtml(relationship.name.slice(-1)) + '</span></div><div class="life-distance-badge">去关系温度</div>' +
+      '<div class="life-card-label red">关系提醒</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + '</h3><p class="life-card-copy">最近联系：' + escapeHtml(relationship.last) + ' · ' + escapeHtml(relationship.channel) + '；亲密度 ' + escapeHtml(relationship.score) + '/100</p></div><div class="life-relationship-side"><div class="life-relation-change"><span>预计下次联系</span><strong>' + escapeHtml(relationship.next) + '</strong><i></i><strong>' + escapeHtml(relationship.group || '朋友') + '</strong></div><div class="life-avatar-pair"><span>' + escapeHtml(relationship.name.slice(0, 1)) + '</span><span>' + escapeHtml(relationship.name.slice(-1)) + '</span></div><div class="life-distance-badge">关系温度</div></div>' +
     '</div>';
   }
 
@@ -1333,7 +1879,7 @@
     var typeText = axis.type || ((moment.tags || [])[0]) || '里程碑';
     var placeText = axis.place || moment.location || '未记录地点';
     return '<div class="life-home-card life-card life-axis-home-card clickable"' + momentTargetAttrs(moment) + '>' +
-      '<div class="life-card-label green">人生时间轴</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge green">' + escapeHtml(typeText) + '</span> <span class="life-card-date">记录于 ' + escapeHtml(dateText) + '</span></h3><p class="life-card-copy">地点：<strong>' + escapeHtml(placeText) + '</strong><span class="life-gap"></span>年份：' + escapeHtml(axis.year || (dateText ? String(dateText).slice(0, 4) : '2026')) + '</p><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p><button class="life-link-btn" type="button">查看详情 →</button></div><div class="life-axis-box"><span>里程碑日期</span><strong>' + escapeHtml(dateText) + '</strong><span>人生时间轴</span></div>' +
+      '<div class="life-card-label green">人生时间轴</div><div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge green">' + escapeHtml(typeText) + '</span> <span class="life-card-date">记录于 ' + escapeHtml(dateText) + '</span></h3><p class="life-card-copy">地点：<strong>' + escapeHtml(placeText) + '</strong><span class="life-gap"></span>年份：' + escapeHtml(axis.year || (dateText ? String(dateText).slice(0, 4) : '2026')) + '</p><p class="life-card-copy">' + escapeHtml(moment.copy) + '</p></div><div class="life-axis-box"><span>里程碑日期</span><strong>' + escapeHtml(dateText) + '</strong><span>人生时间轴</span></div>' +
     '</div>';
   }
 
@@ -1351,6 +1897,18 @@
     '</div>';
   }
 
+  function renderWatchHomeCard(moment) {
+    var dateText = moment.absoluteDate || ('2026-' + String(moment.date || '').replace(/[^\d-]/g, '').slice(0, 5));
+    var watchDate = /^\d{4}-\d{2}-\d{2}$/.test(dateText) ? dateText : '2026-05-13';
+    var typeLabel = moment.type === '想看' ? '想看' : '观影';
+    return '<div class="life-home-card life-card life-watch-home-card clickable"' + momentTargetAttrs(moment) + '>' +
+      '<div class="life-card-label purple">' + escapeHtml(typeLabel === '想看' ? '想看清单' : '观影记录') + '</div>' +
+      '<div class="life-home-card-main"><h3 class="life-card-title">' + escapeHtml(moment.title) + ' <span class="life-badge purple">' + escapeHtml(typeLabel) + '</span></h3><p class="life-card-copy">' + escapeHtml(moment.copy || '来自观影墙的关联记录。') + '</p>' +
+      '<div class="life-meta"><span>' + iconHtml('location') + ' 观影墙</span>' + tagsHtml(moment.tags || []) + '</div></div>' +
+      '<div class="life-cool-box life-watch-box"><span>' + (typeLabel === '想看' ? '想看日期' : '观影日期') + '</span><strong>' + escapeHtml(watchDate) + '</strong><span>观影墙</span></div>' +
+    '</div>';
+  }
+
   function filteredMoments() {
     return allMoments().filter(function(item) {
       var inType = state.timelineFilter === '全部' || item.type === state.timelineFilter || item.tags.indexOf(state.timelineFilter) >= 0;
@@ -1361,11 +1919,13 @@
 
   function renderTimeline() {
     var moments = filteredMoments();
+    var shownMoments = visibleItems('timeline', moments);
     els.content.innerHTML = mockNotice() +
       '<section class="life-river-layout">' +
         '<div class="life-panel life-river-panel">' +
           '<div class="life-river-head"><div><h2 class="life-panel-title">时间河流 <span class="life-down-mark">⌄</span></h2><p class="life-panel-sub">记录生命的每一刻，连接过去与未来</p></div></div>' +
-          '<div class="life-timeline">' + (moments.length ? moments.map(function(item, idx) { return homeMomentCard(item, idx, moments); }).join('') : '<div class="life-empty">没有匹配的生活记录</div>') + '</div>' +
+          '<div class="life-timeline">' + (shownMoments.length ? shownMoments.map(function(item, idx) { return homeMomentCard(item, idx, shownMoments); }).join('') : '<div class="life-empty">没有匹配的生活记录</div>') + '</div>' +
+          renderLoadMore('timeline', shownMoments.length, moments.length) +
         '</div>' +
       '</section>';
     els.aside.innerHTML = renderAddMini() + renderPendingReview() + renderMonthlyMini();
@@ -1388,11 +1948,21 @@
   }
 
   function renderAddMini() {
+    var quickTypes = [
+      ['mood', '情绪'],
+      ['decision', '决定'],
+      ['relationship', '关系'],
+      ['wish', '愿望'],
+      ['watch', '观影']
+    ];
     return '<section class="life-detail-card life-quick-add"><div class="life-detail-head"><div><h2 class="life-detail-title">添加一刻</h2></div><span class="life-muted">今天</span></div>' +
-      '<button class="life-quick-input" type="button" data-action="go-add">今天发生了什么？</button>' +
+      '<div class="life-quick-input" role="note">每一刻都值得被记录，请做出你的选择。</div>' +
       '<div class="life-quick-types">' +
-      [['mood','情绪'], ['decision','决定'], ['relationship','关系'], ['wish','愿望'], ['location','地点']].map(function(item) { return '<button type="button" data-action="go-add">' + iconHtml(item[0]) + '<span>' + item[1] + '</span></button>'; }).join('') +
-      '</div><div class="life-quick-tools"><span>' + iconHtml('memory') + '</span><span>' + iconHtml('monthly') + '</span><span>' + iconHtml('add') + '</span><span>' + iconHtml('project') + '</span><button class="life-primary-btn" data-action="go-add">记录</button></div></section>';
+      quickTypes.map(function(item) {
+        var active = state.timelineQuickAdd === item[0] ? ' class="active"' : '';
+        return '<button type="button" data-action="choose-quick-add" data-quick-add="' + item[0] + '"' + active + '>' + iconHtml(item[0]) + '<span>' + item[1] + '</span></button>';
+      }).join('') +
+      '</div><div class="life-quick-tools"><span>' + iconHtml('memory') + '</span><span>' + iconHtml('monthly') + '</span><span>' + iconHtml('watch') + '</span><span>' + iconHtml('project') + '</span><button class="life-primary-btn" data-action="open-quick-add-target">记录</button></div></section>';
   }
 
   function renderPendingReview() {
@@ -1410,14 +1980,20 @@
       }).join('') + '</div><button class="life-card-link" type="button" data-action="view-monthly">查看全部 →</button></section>';
   }
 
+  function renderPageHead(title) {
+    return '<header class="life-page-head"><h2 class="life-page-title">' + escapeHtml(title) + '</h2></header>';
+  }
+
   function renderLifeAxis() {
     var items = filteredAxisMilestones();
+    var visibleAxis = visibleItems('axis', items);
     var allItems = axisMilestones();
-    var selected = items.filter(function(item) { return item.id === state.selectedAxisId; })[0] || items[0];
+    var selected = visibleAxis.filter(function(item) { return item.id === state.selectedAxisId; })[0] || visibleAxis[0];
     if (!selected) selected = allItems.filter(function(item) { return item.id === state.selectedAxisId; })[0] || allItems[0];
     if (selected) state.selectedAxisId = selected.id;
     els.content.innerHTML = mockNotice() + '<section class="life-axis-page">' +
-      '<div class="life-axis-titlebar"><h2>人生时间轴</h2><button class="life-secondary-btn ' + (state.axisFilterOpen ? 'active' : '') + '" data-axis-action="toggle-filter">' + iconHtml('search') + ' 筛选</button></div>' +
+      renderPageHead('人生时间轴') +
+      '<div class="life-axis-titlebar"><button class="life-secondary-btn ' + (state.axisFilterOpen ? 'active' : '') + '" data-axis-action="toggle-filter">' + iconHtml('search') + ' 筛选</button></div>' +
       (state.axisFilterOpen ? renderAxisFilterPanel(items.length, allItems.length) : '') +
       '<div class="life-axis-category-tabs">' + ['全部','旅行','项目','健康','关系','居住','工作','作品'].map(function(item) { return '<button class="' + (state.axisCategory === item ? 'active' : '') + '" data-axis-category="' + item + '">' + item + '</button>'; }).join('') + '</div>' +
       '<div class="life-axis-year-tabs">' + ['全部','2026','2025','2024','2023','2022','2021','2020','2019','2018','更早'].map(function(item) { return '<button class="' + (state.axisYear === item ? 'active' : '') + '" data-axis-year="' + item + '">' + item + '</button>'; }).join('') + '</div>' +
@@ -1427,7 +2003,8 @@
         renderAxisStageButton('突破与蜕变', '2024-2025', 'amber') +
         renderAxisStageButton('未来想象', '2026+', 'dashed') +
       '</div>' +
-      '<div class="life-axis-list">' + (items.length ? renderAxisYears(items, selected.id) : '<div class="life-empty">没有匹配的里程碑</div>') + '</div>' +
+      '<div class="life-axis-list">' + (visibleAxis.length ? renderAxisYears(visibleAxis, selected.id) : '<div class="life-empty">没有匹配的里程碑</div>') + '</div>' +
+      renderLoadMore('axis', visibleAxis.length, items.length) +
     '</section>';
     els.aside.innerHTML = renderAxisAside(selected);
   }
@@ -1456,6 +2033,15 @@
       { id: 'a11', year: '2023', season: '夏', day: '06-08', title: '新疆自驾之旅', desc: '辽阔到让人安静的土地。', type: '旅行', icon: 'travel', place: '新疆', date: '2023-07-05', photos: ['photo-mountain','photo-garden','photo-river'], people: 0 }
     ];
     var store = getAxisStore();
+    if (directApiMode || mockMode) {
+      return (store.added || []).filter(function(item) {
+        return store.deleted.indexOf(item.id) < 0;
+      }).map(function(item) {
+        return Object.assign({}, item, store.edits[item.id] || {});
+      }).sort(function(a, b) {
+        return String(b.date).localeCompare(String(a.date));
+      });
+    }
     return baseItems.concat(store.added).filter(function(item) {
       return store.deleted.indexOf(item.id) < 0;
     }).map(function(item) {
@@ -1503,7 +2089,7 @@
       '<div class="life-axis-date"><span>' + escapeHtml(item.season) + '</span><strong>' + escapeHtml(item.day) + '</strong></div>' +
       '<div class="life-axis-event-main"><h3>' + escapeHtml(item.title) + '<span class="life-badge ' + axisColor(item.type) + '">' + escapeHtml(item.type) + '</span></h3><p>' + escapeHtml(item.desc) + '</p></div>' +
       '<div class="life-axis-place"><span>' + escapeHtml(item.place) + '</span><strong>' + escapeHtml(item.date) + '</strong></div>' +
-      '<div class="life-axis-media">' + (item.action ? '<button class="life-axis-add" data-axis-action="add-near">+ 添加</button>' : renderAxisThumbs(item)) + '</div>' +
+      '<div class="life-axis-media">' + renderAxisThumbs(item) + '</div>' +
     '</article>';
   }
 
@@ -1563,16 +2149,36 @@
   }
 
   function renderAxisPhotoEditor(item) {
-    var currentPhotos = item.photos || [];
+    var currentPhotos = (item.photos || []).slice(0, 3);
     return '<section class="life-axis-photo-editor">' +
-      '<div class="life-axis-photo-head"><div><strong>图片</strong><span>未上传时使用默认占位图，可上传自定义图片</span></div></div>' +
-      '<input type="hidden" name="photos" value="' + escapeHtml(currentPhotos.join(', ')) + '">' +
-      '<input type="hidden" name="uploadedPhoto" data-axis-uploaded-photo>' +
+      '<div class="life-axis-photo-head"><div><strong>图片</strong><span>最多 3 张，未上传时使用默认占位图</span></div></div>' +
+      '<input type="hidden" name="photos" value="' + escapeHtml(axisPhotosValue(currentPhotos)) + '">' +
       '<div class="life-axis-upload-row">' +
-        '<div class="life-axis-upload-preview" data-axis-upload-preview>' + (currentPhotos[0] ? axisPhotoHtml(currentPhotos[0], '') : '<span>未选择图片</span>') + '<em>' + (currentPhotos[0] ? '当前图片' : '未选择图片') + '</em></div>' +
-        '<label class="life-axis-upload-button">上传图片<input type="file" accept="image/*" data-axis-image-upload></label>' +
+        '<div class="life-axis-upload-preview" data-axis-upload-preview>' + axisPhotoPreviewHtml(currentPhotos) + '</div>' +
+        '<label class="life-axis-upload-button">上传图片<input type="file" accept="image/*" multiple data-axis-image-upload></label>' +
       '</div>' +
     '</section>';
+  }
+
+  function axisPhotoPreviewHtml(photos) {
+    var items = (photos || []).slice(0, 3);
+    if (!items.length) return '<span>未选择图片</span>';
+    return items.map(function(photo, index) {
+      return '<div class="life-axis-upload-thumb">' + axisPhotoHtml(photo, '') +
+        '<em>图片 ' + (index + 1) + '</em>' +
+        '<div class="life-axis-upload-thumb-actions">' +
+          '<label>替换<input type="file" accept="image/*" data-axis-image-replace="' + index + '"></label>' +
+          '<button type="button" data-axis-image-delete="' + index + '">删除</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function setAxisFormPhotos(form, photos) {
+    var nextPhotos = (photos || []).slice(0, 3);
+    var hidden = form && form.elements.photos;
+    var preview = form && form.querySelector('[data-axis-upload-preview]');
+    if (hidden) hidden.value = axisPhotosValue(nextPhotos);
+    if (preview) preview.innerHTML = axisPhotoPreviewHtml(nextPhotos);
   }
 
   function axisLinkedRelationships(item) {
@@ -1626,9 +2232,9 @@
       score: exact.score,
       label: exact.feeling || exact.weather || '已记录',
       dimensions: [
-        ['睡眠', Math.round(Number(exact.sleep || 0) * 10), (exact.sleep || '--') + 'h'],
-        ['压力', Number(exact.pressure || 0), exact.pressure <= 40 ? '较低' : '偏高'],
-        ['精力', Number(exact.energy || 0), exact.energy >= 70 ? '充沛' : '一般'],
+        ['睡眠', Math.round(Number(exact.sleep || 0) * 10), moodSleepLevel(exact.sleep).label],
+        ['压力', Number(exact.pressure || 0), moodPressureLevel(exact.pressure).label],
+        ['精力', Number(exact.energy || 0), moodEnergyLevel(exact.energy).label],
         ['心情', Number(exact.score || 0), exact.weather || exact.feeling || '记录']
       ]
     };
@@ -1640,7 +2246,17 @@
   }
 
   function splitAxisList(value) {
-    return String(value || '').split(/[,，\n]/).map(function(item) { return item.trim(); }).filter(Boolean);
+    var text = String(value || '').trim();
+    if (!text) return [];
+    try {
+      var parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parsed.map(function(item) { return String(item || '').trim(); }).filter(Boolean);
+    } catch (err) {}
+    return text.split(/[,，\n]/).map(function(item) { return item.trim(); }).filter(Boolean);
+  }
+
+  function axisPhotosValue(photos) {
+    return JSON.stringify((photos || []).slice(0, 3));
   }
 
   function normalizeAxisDateValue(value, fallbackYear) {
@@ -1684,10 +2300,11 @@
   function renderAxisAside(item) {
     if (!item) return '';
     if (state.axisEditing) return renderAxisEditForm(item);
-    var detailPhotos = (item.photos && item.photos.length ? item.photos : ['photo-book','photo-office','photo-river']).slice(0, 4);
+    var detailPhotos = (item.photos && item.photos.length ? item.photos : ['photo-book','photo-office','photo-river']).slice(0, 3);
     var peopleCount = axisLinkedRelationships(item).length;
+    var linkedBadge = renderTimelineLinkedBadge('axis', item.id);
     return '<section class="life-axis-detail-card">' +
-      '<div class="life-axis-detail-head"><div class="life-axis-detail-icon ' + axisColor(item.type) + '">' + iconHtml(item.icon) + '</div><div><h2>' + escapeHtml(item.title) + '</h2><p>' + iconHtml('location') + ' ' + escapeHtml(item.place) + '<span>' + escapeHtml(item.date) + '</span></p></div><span class="life-badge ' + axisColor(item.type) + '">' + escapeHtml(item.type) + '</span></div>' +
+      '<div class="life-axis-detail-head"><div class="life-axis-detail-icon ' + axisColor(item.type) + '">' + iconHtml(item.icon) + '</div><div><h2>' + escapeHtml(item.title) + '</h2><p>' + iconHtml('location') + ' ' + escapeHtml(item.place) + '<span>' + escapeHtml(item.date) + '</span></p></div><span class="life-badge ' + axisColor(item.type) + '">' + escapeHtml(item.type) + '</span>' + linkedBadge + '</div>' +
       '<p class="life-axis-detail-copy">' + escapeHtml(item.desc) + '</p>' +
       '<div class="life-axis-detail-photos">' + detailPhotos.map(function(photo) { return axisPhotoHtml(photo, ''); }).join('') + '</div>' +
       '<div class="life-axis-detail-section"><h3>相关人物 <span>' + peopleCount + '</span></h3>' + axisPeopleHtml(item) + '</div>' +
@@ -1699,6 +2316,7 @@
 
   function renderAxisEditForm(item) {
     var normalizedDate = axisDateInputValue(item);
+    var linkedMoment = linkedTimelineMoment('axis', item.id);
     return '<section class="life-axis-detail-card"><form id="lifeAxisEditForm" class="life-form life-axis-edit-form"><div class="life-detail-head"><h2 class="life-detail-title">编辑里程碑</h2><button class="life-mini-btn" type="button" data-axis-action="cancel-edit">取消</button></div>' +
       '<label>标题<input class="life-input" name="title" value="' + escapeHtml(item.title) + '"></label>' +
       '<label>说明<textarea class="life-textarea" name="desc">' + escapeHtml(item.desc) + '</textarea></label>' +
@@ -1706,13 +2324,14 @@
       '<div class="life-two-grid"><label>季节' + axisSelectHtml('season', axisSeasonFromDate(normalizedDate), ['春','夏','秋','冬']) + '</label><label>日期标签<input class="life-input" name="day" value="' + escapeHtml(axisDayFromDate(normalizedDate)) + '" readonly></label></div>' +
       '<div class="life-two-grid"><label>分类' + axisSelectHtml('type', item.type, ['旅行','项目','健康','关系','居住','工作','作品','重要决定']) + '</label><label>地点<input class="life-input" name="place" value="' + escapeHtml(item.place || '') + '" placeholder="手动填写地点"></label></div>' +
       renderAxisPhotoEditor(item) +
-      renderTimelineLinkControls(true) +
+      renderTimelineLinkControls(!!linkedMoment, linkedMoment ? linkedMoment.privacy : '仅自己可见', !!linkedMoment) +
       '<button class="life-primary-btn" type="submit">保存修改</button></form></section>';
   }
 
   function addAxisMilestone(template) {
     var store = getAxisStore();
-    var source = template || { year: '2026', season: '秋', day: '09-01', type: '项目', icon: 'project', place: '上海', photos: ['photo-office'] };
+    var baseDate = todayISO();
+    var source = template || { year: baseDate.slice(0, 4), season: axisSeasonFromDate(baseDate), day: baseDate.slice(5), type: '项目', icon: 'project', place: '上海', photos: ['photo-office'], date: baseDate };
     var item = {
       id: 'a-local-' + Date.now(),
       year: source.year,
@@ -1723,8 +2342,8 @@
       type: source.type,
       icon: source.icon,
       place: source.place,
-      date: source.year + '-09-01',
-      photos: source.photos || ['photo-office'],
+      date: normalizeISODate(source.date || (source.year + '-' + source.day), baseDate),
+      photos: (source.photos || ['photo-office']).slice(0, 3),
       people: 0,
       draft: true
     };
@@ -1776,9 +2395,8 @@
     var day = axisDayFromDate(date);
     var season = axisSeasonFromDate(date);
     var type = form.elements.type.value.trim() || '项目';
-    var uploadedPhoto = form.elements.uploadedPhoto ? form.elements.uploadedPhoto.value : '';
-    var photoList = splitAxisList(form.elements.photos.value);
-    var defaultPhoto = photoList[0] || 'photo-office';
+    var photoList = splitAxisList(form.elements.photos.value).slice(0, 3);
+    var defaultPhotos = (photoList.length ? photoList : ['photo-office']).slice(0, 3);
     var edited = (store.added || []).filter(function(item) { return item.id === state.selectedAxisId; })[0];
     if (edited) edited.draft = false;
     store.edits[state.selectedAxisId] = {
@@ -1791,7 +2409,7 @@
       type: type,
       icon: type === '旅行' ? 'travel' : (type === '健康' ? 'health' : (type === '重要决定' ? 'star' : 'project')),
       place: form.elements.place.value.trim() || '未记录地点',
-      photos: uploadedPhoto ? [uploadedPhoto] : [defaultPhoto],
+      photos: defaultPhotos,
       draft: false
     };
     saveAxisStore(store);
@@ -1803,7 +2421,7 @@
       title: title,
       copy: desc,
       location: form.elements.place.value.trim() || '未记录地点',
-      photos: uploadedPhoto ? [uploadedPhoto] : [defaultPhoto],
+      photos: defaultPhotos,
       tags: [type, year, form.elements.place.value.trim()].filter(Boolean),
       linkedAxis: state.selectedAxisId,
       privacy: form.elements.timelinePrivacy ? form.elements.timelinePrivacy.value : '仅自己可见'
@@ -1818,16 +2436,18 @@
     var list = items.filter(function(item) {
       return decisionMatchesFilter(item) && queryMatch([item.title, item.choice, item.category, item.background, item.date].join(' '));
     });
-    var selected = list.filter(function(item) { return item.id === state.selectedDecisionId; })[0] || list[0] || items[0];
+    var visibleList = visibleItems('decision', list);
+    var selected = visibleList.filter(function(item) { return item.id === state.selectedDecisionId; })[0] || visibleList[0] || list[0] || items[0];
     if (selected) state.selectedDecisionId = selected.id;
     var detail = state.decisionFormMode === 'create' ? renderDecisionForm(null, 'create') : (state.decisionFormMode === 'edit' ? renderDecisionForm(selected, 'edit') : (state.decisionFormMode === 'review' ? renderDecisionReviewForm(selected) : renderDecisionDetail(selected)));
     els.content.innerHTML = mockNotice() + '<section class="life-decision-page">' +
       '<aside class="life-decision-list-panel">' +
-        '<h2>决策档案馆</h2>' +
+        '<h2 class="life-page-title">决策档案馆</h2>' +
         '<div class="life-decision-tabs">' + ['重要决定','冷却中','已归档'].map(function(item) { return '<button class="' + (state.decisionFilter === item ? 'active' : '') + '" data-decision-filter="' + item + '">' + item + '</button>'; }).join('') + '</div>' +
         '<div class="life-decision-flow"><span>重要决定</span><i></i><span>冷却中</span><i></i><span>已归档</span><p>新决定先进入重要决定；需要观察时进入冷却中；完成复盘或主动归档后进入已归档。</p></div>' +
         '<label class="life-decision-search">' + iconHtml('search') + '<input type="search" data-decision-search placeholder="搜索决定..." value="' + escapeHtml(state.query) + '"><button type="button" data-decision-action="toggle-filter">' + iconHtml('search') + '</button></label>' +
-        '<div class="life-decision-list">' + (list.length ? list.map(function(item) { return renderDecisionListItem(item, selected && selected.id === item.id); }).join('') : '<div class="life-empty">没有匹配的决定</div>') + '</div>' +
+        '<div class="life-decision-list">' + (visibleList.length ? visibleList.map(function(item) { return renderDecisionListItem(item, selected && selected.id === item.id); }).join('') : '<div class="life-empty">没有匹配的决定</div>') + '</div>' +
+        renderLoadMore('decision', visibleList.length, list.length) +
         '<div class="life-decision-count">共 ' + items.length + ' 项决定 <button type="button" data-decision-action="settings">' + iconHtml('settings') + '</button></div>' +
       '</aside>' +
       detail +
@@ -1837,12 +2457,16 @@
 
   function decisionArchiveItems() {
     var meta = getDecisionMeta();
-    return allDecisions().concat([
+    var baseItems = allDecisions();
+    if (!directApiMode) {
+      baseItems = baseItems.concat([
       { id: 'd-extra-1', status: '已归档', title: '是否购买这套房子？', date: '2025-11-18', category: '居住', choice: '暂不购买', confidence: 64, background: '房子位置不错，但总价和未来现金流压力偏高。', reason: ['先保留现金流安全边际。', '继续观察家庭居住需求。'], risks: ['可能错过合适房源。'], options: [['购买', '两居室', '上海', '首付压力大', '居住稳定'], ['暂不购买', '继续租住', '上海', '现金流安全', '选择灵活']], reviewDate: '2026-05-18', result: '已归档，继续观察市场。' },
       { id: 'd-extra-2', status: '已复盘', title: '是否结束这段关系？', date: '2025-08-30', category: '关系', choice: '保持边界', confidence: 72, background: '关系消耗感较强，需要重新定义边界。', reason: ['沟通成本长期偏高。', '需要优先保护自己的状态。'], risks: ['短期情绪波动。'], options: [['继续投入', '修复关系', '线上', '高精力', '不确定'], ['保持边界', '减少消耗', '线上', '中等', '更稳定']], reviewDate: '2026-02-28', result: '已复盘，状态更稳定。' },
       { id: 'd-extra-3', status: '冷却中', title: '是否辞去稳定工作？', date: '2025-07-12', category: '职业发展', choice: '继续观察', confidence: 58, background: '工作稳定但成长空间有限，需要确认真实动机。', reason: ['先做副业验证。', '评估现金流。'], risks: ['冲动决策风险。'], options: [['辞职', '自由职业', '上海', '收入不稳', '成长快'], ['继续工作', '保持稳定', '上海', '风险低', '成长慢']], reviewDate: '2026-01-12', result: '仍在冷却中。' },
       { id: 'd-extra-4', status: '冷却中', title: '是否购买相机？', date: '2026-05-08', category: '数码', choice: '冷却 30 天', confidence: 52, background: '想系统学习摄影，但要验证真实使用频率。', reason: ['先租赁体验。'], risks: ['冲动消费。'], options: [['购买', 'A7C II', '线上', '¥8,999', '体验好'], ['先租', '短期验证', '线上', '¥300', '风险低']], reviewDate: '2026-06-08', result: '冷却中。' }
-    ]).filter(function(item) {
+      ]);
+    }
+    return baseItems.filter(function(item) {
       return meta.deleted.indexOf(item.id) < 0;
     }).map(function(item) {
       var edited = Object.assign({}, item, meta.edits[item.id] || {});
@@ -1879,6 +2503,16 @@
     return item.status;
   }
 
+  function decisionEmotion(item) {
+    var emotion = item && item.emotion && typeof item.emotion === 'object' ? item.emotion : {};
+    return {
+      name: emotion.name || '偏紧张',
+      expectation: Number(emotion.expectation == null ? 60 : emotion.expectation),
+      anxiety: Number(emotion.anxiety == null ? 40 : emotion.anxiety),
+      keywords: Array.isArray(emotion.keywords) && emotion.keywords.length ? emotion.keywords : ['不确定', '兴奋', '担心', '期待']
+    };
+  }
+
   function isDecisionArchived(item) {
     return decisionBucket(item) === '已归档';
   }
@@ -1894,10 +2528,11 @@
     if (!item) return '<article class="life-decision-detail"><div class="life-empty">没有可查看的决定</div></article>';
     var meta = getDecisionMeta();
     var bookmarked = meta.bookmarks.indexOf(item.id) >= 0;
+    var linkedBadge = renderTimelineLinkedBadge('decision', item.id);
     return '<article class="life-decision-detail"><div class="life-decision-detail-top"><button class="life-back-btn" data-view="timeline">← 返回</button><div class="life-decision-actions"><button class="life-icon-btn ' + (bookmarked ? 'active' : '') + '" data-decision-action="bookmark">' + iconHtml('monthly') + '</button><button class="life-icon-btn" data-decision-action="more">···</button>' + (state.decisionMoreOpen ? '<div class="life-decision-menu"><button data-decision-action="edit-decision">编辑决定</button><button data-decision-action="move-cooling">移入冷却中</button><button data-decision-action="archive-decision">归档决定</button><button class="danger" data-decision-action="delete-decision">删除决定</button></div>' : '') + '</div></div>' +
-      '<h2>' + escapeHtml(item.title) + '</h2><div class="life-decision-meta">' + iconHtml('monthly') + ' 记录于 ' + escapeHtml(item.date) + '<span class="life-badge blue">' + escapeHtml(item.category) + '</span><span class="life-badge ' + decisionTone(item) + '">' + escapeHtml(decisionStatus(item)) + '</span></div>' +
+      '<h2>' + escapeHtml(item.title) + '</h2><div class="life-decision-meta">' + iconHtml('monthly') + ' 记录于 ' + escapeHtml(item.date) + '<span class="life-badge blue">' + escapeHtml(item.category) + '</span><span class="life-badge ' + decisionTone(item) + '">' + escapeHtml(decisionStatus(item)) + '</span>' + linkedBadge + '</div>' +
       '<section class="life-decision-section"><h3>背景</h3><p>' + escapeHtml(item.background) + '</p></section>' +
-      '<section class="life-decision-section"><h3>可选方案</h3><table class="life-decision-table"><thead><tr><th>方案</th><th>A. ' + escapeHtml(item.options[0][0]) + '</th><th>B. ' + escapeHtml(item.options[1][0]) + '</th></tr></thead><tbody>' + ['职位','地点','年薪（含奖金）','发展空间','工作强度','生活成本'].map(function(label, idx) { return '<tr><td>' + label + '</td><td>' + escapeHtml(item.options[0][idx + 1] || '-') + '</td><td>' + escapeHtml(item.options[1][idx + 1] || '-') + '</td></tr>'; }).join('') + '</tbody></table></section>' +
+      '<section class="life-decision-section"><h3>可选方案</h3><table class="life-decision-table"><thead><tr><th>方案</th><th>A. ' + escapeHtml(item.options[0][0]) + '</th><th>B. ' + escapeHtml(item.options[1][0]) + '</th></tr></thead><tbody>' + ['角色/内容','地点','成本','成长'].map(function(label, idx) { return '<tr><td>' + label + '</td><td>' + escapeHtml(item.options[0][idx + 1] || '-') + '</td><td>' + escapeHtml(item.options[1][idx + 1] || '-') + '</td></tr>'; }).join('') + '</tbody></table></section>' +
       '<section class="life-decision-section"><h3>选择理由</h3>' + item.reason.map(function(text) { return '<p class="life-point good">' + iconHtml('health') + escapeHtml(text) + '</p>'; }).join('') + '</section>' +
       '<section class="life-decision-section"><h3>风险</h3>' + item.risks.map(function(text) { return '<p class="life-point risk">' + iconHtml('anxious') + escapeHtml(text) + '</p>'; }).join('') + '</section>' +
       '<section class="life-my-choice"><div><h3>' + iconHtml('add') + ' 我的选择</h3><p><strong>我选择：</strong>' + escapeHtml(item.choice) + '</p><span>选择日期：' + escapeHtml(item.date) + '</span></div><div><h3>给未来的自己</h3><p>勇敢走出去，拥抱变化，相信自己的学习能力和适应力。</p></div></section></article>';
@@ -1907,10 +2542,10 @@
     if (!item) return '';
     var archived = isDecisionArchived(item);
     var resultAction = archived ? '' : '<button class="life-mini-btn" data-decision-action="edit-result">' + iconHtml('add') + '</button>';
+    var emotion = decisionEmotion(item);
     return '<section class="life-decision-side-card"><h2>信心 <strong data-confidence-value>' + item.confidence + '</strong><span>/100</span></h2>' + progress(item.confidence, 'var(--life-amber)') + '<p>详情页只展示当时信心；进入编辑决定后才能调整。</p></section>' +
       '<section class="life-decision-side-card"><div class="life-detail-head"><h2>实际结果</h2>' + resultAction + '</div><dl><dt>状态</dt><dd><span class="life-badge green">已在新公司工作中</span></dd><dt>入职日期</dt><dd>2026-05-18</dd></dl><p>' + escapeHtml(item.result) + '</p><button class="life-card-link" data-decision-action="records">查看全部记录 →</button></section>' +
-      '<section class="life-decision-side-card"><h2>当时情绪 <span>（记录时）</span></h2><div class="life-decision-emotion">' + iconHtml('smile') + '<strong>偏紧张</strong><span>期待 60%</span><span>焦虑 40%</span></div><p>关键词：不确定、兴奋、担心、期待</p></section>' +
-      '<section class="life-decision-side-card"><h2>相关记忆</h2><div class="life-decision-memory-grid"><span class="life-photo photo-river"></span><span class="life-photo photo-night"></span><span class="life-photo photo-book"></span><span class="life-photo photo-cafe"></span></div><button class="life-card-link" data-action="back-timeline">全部记忆（4）→</button></section>' +
+      '<section class="life-decision-side-card"><h2>当时情绪 <span>（记录时）</span></h2><div class="life-decision-emotion">' + iconHtml('smile') + '<strong>' + escapeHtml(emotion.name) + '</strong><span>期待 ' + escapeHtml(emotion.expectation) + '%</span><span>焦虑 ' + escapeHtml(emotion.anxiety) + '%</span></div><p>关键词：' + escapeHtml(emotion.keywords.join('、')) + '</p></section>' +
       renderDecisionReviewCard(item);
   }
 
@@ -1923,11 +2558,53 @@
     return '<section class="life-decision-side-card"><h2>半年后复盘</h2><p>计划复盘日期：' + escapeHtml(item.reviewDate) + ' <span class="life-badge amber">待复盘</span></p><button class="life-primary-btn" style="width:100%" data-decision-action="start-review">开始复盘</button></section>';
   }
 
+  function normalizeDecisionOptionRow(row, defaultName) {
+    var option = Array.isArray(row) ? row : [];
+    return {
+      name: option[0] || defaultName,
+      role: option[1] || '-',
+      place: option[2] || '-',
+      cost: option[3] || '-',
+      growth: option[4] || '-'
+    };
+  }
+
+  function buildDecisionOptionRow(prefix, option) {
+    return '<label>方案 ' + prefix + '<input class="life-input" name="option' + prefix + '" value="' + escapeHtml(option.name) + '"></label>' +
+      '<label>' + prefix + ' 角色/内容<input class="life-input" name="option' + prefix + 'Role" value="' + escapeHtml(option.role) + '"></label>' +
+      '<label>' + prefix + ' 地点<input class="life-input" name="option' + prefix + 'Place" value="' + escapeHtml(option.place) + '"></label>' +
+      '<label>' + prefix + ' 成本<input class="life-input" name="option' + prefix + 'Cost" value="' + escapeHtml(option.cost) + '"></label>' +
+      '<label>' + prefix + ' 成长<input class="life-input" name="option' + prefix + 'Growth" value="' + escapeHtml(option.growth) + '"></label>';
+  }
+
+  function readDecisionOptionFromForm(form, prefix, fallbackName) {
+    function pick(name, fallback) {
+      return (form.elements[name] && form.elements[name].value.trim()) || fallback;
+    }
+    return [
+      pick('option' + prefix, fallbackName),
+      pick('option' + prefix + 'Role', '-'),
+      pick('option' + prefix + 'Place', '-'),
+      pick('option' + prefix + 'Cost', '-'),
+      pick('option' + prefix + 'Growth', '-')
+    ];
+  }
+
+  function readDecisionEmotionFromForm(form) {
+    return {
+      name: (form.elements.emotionName && form.elements.emotionName.value.trim()) || '偏紧张',
+      expectation: Math.max(0, Math.min(100, Number(form.elements.emotionExpectation && form.elements.emotionExpectation.value || 0))),
+      anxiety: Math.max(0, Math.min(100, Number(form.elements.emotionAnxiety && form.elements.emotionAnxiety.value || 0))),
+      keywords: splitLines(String((form.elements.emotionKeywords && form.elements.emotionKeywords.value) || '').replace(/[，,、]/g, '\n'), ['不确定'])
+    };
+  }
+
   function renderDecisionForm(item, mode) {
+    var baseDate = mode === 'create' ? todayISO() : selectedDecisionDateISO();
     var source = item || {
       status: '待复盘',
       title: '',
-      date: '2026-05-13',
+      date: baseDate,
       category: '人生规划',
       choice: '',
       confidence: 60,
@@ -1935,10 +2612,12 @@
       reason: [''],
       risks: [''],
       options: [['接受方案', '', '', '', ''], ['保留现状', '', '', '', '']],
-      reviewDate: '2026-11-13'
+      reviewDate: addMonthsToDate(baseDate, 6)
     };
-    var optionA = source.options && source.options[0] ? source.options[0] : ['', '', '', '', ''];
-    var optionB = source.options && source.options[1] ? source.options[1] : ['', '', '', '', ''];
+    var optionA = normalizeDecisionOptionRow(source.options && source.options[0], '接受方案');
+    var optionB = normalizeDecisionOptionRow(source.options && source.options[1], '保留现状');
+    var emotion = decisionEmotion(source);
+    var linkedMoment = mode === 'edit' ? linkedTimelineMoment('decision', source.id) : null;
     return '<article class="life-decision-detail life-decision-form-shell">' +
       '<div class="life-decision-detail-top"><button class="life-back-btn" type="button" data-decision-action="cancel-form">← 返回决定</button></div>' +
       '<form id="lifeDecisionForm" class="life-form life-decision-form">' +
@@ -1948,9 +2627,10 @@
         '<label>背景<textarea class="life-textarea" name="background" placeholder="为什么现在要做这个决定？">' + escapeHtml(source.background) + '</textarea></label>' +
         '<div class="life-decision-form-confidence"><div><strong>信心 <span data-confidence-value>' + source.confidence + '</span>/100</strong><p>拖动后保存到这条决定。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="confidence" value="' + source.confidence + '" data-form-confidence-range></div>' +
         '<div class="life-two-grid"><label>我的选择<input class="life-input" name="choice" value="' + escapeHtml(source.choice) + '" placeholder="最终选择或暂定方向"></label><label>主要结果<input class="life-input" name="result" value="' + escapeHtml(source.result || '尚未产生结果。') + '" placeholder="已有结果可先记录"></label></div>' +
-        '<section class="life-decision-form-section"><h3>可选方案</h3><div class="life-decision-options-grid"><label>方案 A<input class="life-input" name="optionA" value="' + escapeHtml(optionA[0]) + '"></label><label>A 角色/内容<input class="life-input" name="optionARole" value="' + escapeHtml(optionA[1]) + '"></label><label>A 地点<input class="life-input" name="optionAPlace" value="' + escapeHtml(optionA[2]) + '"></label><label>A 成本<input class="life-input" name="optionACost" value="' + escapeHtml(optionA[3]) + '"></label><label>A 成长<input class="life-input" name="optionAGrowth" value="' + escapeHtml(optionA[4]) + '"></label><label>方案 B<input class="life-input" name="optionB" value="' + escapeHtml(optionB[0]) + '"></label><label>B 角色/内容<input class="life-input" name="optionBRole" value="' + escapeHtml(optionB[1]) + '"></label><label>B 地点<input class="life-input" name="optionBPlace" value="' + escapeHtml(optionB[2]) + '"></label><label>B 成本<input class="life-input" name="optionBCost" value="' + escapeHtml(optionB[3]) + '"></label><label>B 成长<input class="life-input" name="optionBGrowth" value="' + escapeHtml(optionB[4]) + '"></label></div></section>' +
+        '<section class="life-decision-form-section"><h3>当时情绪</h3><div class="life-three-grid"><label>情绪状态<input class="life-input" name="emotionName" value="' + escapeHtml(emotion.name) + '" placeholder="例如：偏紧张"></label><label>期待比例<input class="life-input" type="number" min="0" max="100" name="emotionExpectation" value="' + escapeHtml(emotion.expectation) + '"></label><label>焦虑比例<input class="life-input" type="number" min="0" max="100" name="emotionAnxiety" value="' + escapeHtml(emotion.anxiety) + '"></label></div><label>关键词<input class="life-input" name="emotionKeywords" value="' + escapeHtml(emotion.keywords.join('、')) + '" placeholder="用顿号或逗号分隔"></label></section>' +
+        '<section class="life-decision-form-section"><h3>可选方案</h3><div class="life-decision-options-grid">' + buildDecisionOptionRow('A', optionA) + buildDecisionOptionRow('B', optionB) + '</div></section>' +
         '<div class="life-two-grid"><label>选择理由<textarea class="life-textarea" name="reason" placeholder="一行一个理由">' + escapeHtml((source.reason || []).join('\n')) + '</textarea></label><label>风险<textarea class="life-textarea" name="risks" placeholder="一行一个风险">' + escapeHtml((source.risks || []).join('\n')) + '</textarea></label></div>' +
-        renderTimelineLinkControls(true) +
+        renderTimelineLinkControls(mode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', mode === 'edit' && !!linkedMoment) +
         '<div class="life-decision-form-actions">' + (mode === 'edit' ? '<button class="life-danger-btn" type="button" data-decision-action="delete-decision">删除决定</button>' : '') + '<button class="life-secondary-btn" type="button" data-decision-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (mode === 'edit' ? '保存修改' : '保存决定') + '</button></div>' +
       '</form>' +
     '</article>';
@@ -1964,7 +2644,7 @@
       '<form id="lifeDecisionReviewForm" class="life-form life-decision-form life-decision-review-form">' +
         '<div class="life-form-title"><h2>复盘：' + escapeHtml(item.title) + '</h2><p>复盘完成后，这条决定会进入「已归档」，保留原始决定和结果记录。</p></div>' +
         '<label>实际结果<textarea class="life-textarea" name="result" placeholder="这个决定最终发生了什么？">' + escapeHtml(summary.result || item.result || '') + '</textarea></label>' +
-        '<div class="life-two-grid"><label>状态<select class="life-select" name="status"><option value="已复盘">已复盘</option><option value="已归档">仅归档</option></select></label><label>复盘日期<input class="life-input" type="date" name="reviewedAt" value="' + escapeHtml(summary.reviewedAt || '2026-05-13') + '"></label></div>' +
+        '<div class="life-two-grid"><label>状态<select class="life-select" name="status"><option value="已复盘">已复盘</option><option value="已归档">仅归档</option></select></label><label>复盘日期<input class="life-input" type="date" name="reviewedAt" value="' + escapeHtml(summary.reviewedAt || todayISO()) + '"></label></div>' +
         '<label>学到什么<textarea class="life-textarea" name="learning" placeholder="哪些判断是对的？哪些信息当时缺失？">' + escapeHtml(summary.learning || '') + '</textarea></label>' +
         '<label>下一次会怎么做<textarea class="life-textarea" name="next" placeholder="把经验转成下一次决策准则。">' + escapeHtml(summary.next || '') + '</textarea></label>' +
         '<div class="life-decision-form-actions"><button class="life-secondary-btn" type="button" data-decision-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">保存复盘</button></div>' +
@@ -1979,7 +2659,7 @@
   }
 
   function addMonthsToDate(value, months) {
-    var parts = String(value || '2026-05-13').split('-').map(Number);
+    var parts = String(value || todayISO()).split('-').map(Number);
     var sourceYear = parts[0] || 2026;
     var sourceMonth = (parts[1] || 5) - 1;
     var sourceDay = parts[2] || 13;
@@ -1992,7 +2672,7 @@
 
   function syncDecisionReviewDate(form) {
     if (!form || !form.elements.date || !form.elements.reviewDate) return '';
-    var date = form.elements.date.value || '2026-05-13';
+    var date = form.elements.date.value || todayISO();
     var reviewDate = addMonthsToDate(date, 6);
     form.elements.reviewDate.value = reviewDate;
     return reviewDate;
@@ -2009,6 +2689,7 @@
   }
 
   function upsertDecisionTimelineFromForm(form, item) {
+    var emotion = decisionEmotion(item);
     upsertLinkedTimelineMoment('decision', item.id, form.elements.linkTimeline && form.elements.linkTimeline.checked, {
       type: '决策',
       icon: '♎',
@@ -2018,7 +2699,7 @@
       copy: '我的选择：' + item.choice + '；信心 ' + item.confidence + '/100。',
       location: '决策档案馆',
       people: [],
-      mood: '期待',
+      mood: emotion.name,
       photos: [],
       tags: ['决定', item.category, item.status].filter(Boolean),
       linkedDecision: item.id,
@@ -2032,7 +2713,7 @@
     var category = form.elements.category.value.trim() || '人生规划';
     var choice = form.elements.choice.value.trim() || '暂未决定';
     var confidence = Number(form.elements.confidence.value || 50);
-    var date = form.elements.date.value || '2026-05-13';
+    var date = form.elements.date.value || selectedDecisionDateISO();
     var reviewDate = syncDecisionReviewDate(form) || addMonthsToDate(date, 6);
     var item = {
       id: 'd-local-' + Date.now(),
@@ -2045,9 +2726,10 @@
       background: form.elements.background.value.trim() || '暂无背景。',
       reason: splitLines(form.elements.reason.value, ['先补充背景信息。']),
       risks: splitLines(form.elements.risks.value, ['信息还不充分。']),
+      emotion: readDecisionEmotionFromForm(form),
       options: [
-        [form.elements.optionA.value || '方案 A', form.elements.optionARole.value || '-', form.elements.optionAPlace.value || '-', form.elements.optionACost.value || '-', form.elements.optionAGrowth.value || '-'],
-        [form.elements.optionB.value || '方案 B', form.elements.optionBRole.value || '-', form.elements.optionBPlace.value || '-', form.elements.optionBCost.value || '-', form.elements.optionBGrowth.value || '-']
+        readDecisionOptionFromForm(form, 'A', '方案 A'),
+        readDecisionOptionFromForm(form, 'B', '方案 B')
       ],
       reviewDate: reviewDate,
       result: form.elements.result.value.trim() || '尚未产生结果。'
@@ -2064,7 +2746,7 @@
 
   function saveDecisionEdit(form) {
     var meta = getDecisionMeta();
-    var date = form.elements.date.value || '2026-05-13';
+    var date = form.elements.date.value || selectedDecisionDateISO();
     var reviewDate = syncDecisionReviewDate(form) || addMonthsToDate(date, 6);
     meta.edits[state.selectedDecisionId] = {
       title: form.elements.title.value.trim() || '未命名决定',
@@ -2076,11 +2758,12 @@
       background: form.elements.background.value.trim() || '暂无背景。',
       reason: splitLines(form.elements.reason.value, ['先补充背景信息。']),
       risks: splitLines(form.elements.risks.value, ['信息还不充分。']),
+      emotion: readDecisionEmotionFromForm(form),
       reviewDate: reviewDate,
       result: form.elements.result.value.trim() || '尚未产生结果。',
       options: [
-        [form.elements.optionA.value || '方案 A', form.elements.optionARole.value || '-', form.elements.optionAPlace.value || '-', form.elements.optionACost.value || '-', form.elements.optionAGrowth.value || '-'],
-        [form.elements.optionB.value || '方案 B', form.elements.optionBRole.value || '-', form.elements.optionBPlace.value || '-', form.elements.optionBCost.value || '-', form.elements.optionBGrowth.value || '-']
+        readDecisionOptionFromForm(form, 'A', '方案 A'),
+        readDecisionOptionFromForm(form, 'B', '方案 B')
       ]
     };
     meta.confidence[state.selectedDecisionId] = meta.edits[state.selectedDecisionId].confidence;
@@ -2173,7 +2856,7 @@
     var status = form.elements.status.value;
     var summary = {
       status: status,
-      reviewedAt: form.elements.reviewedAt.value || '2026-05-13',
+      reviewedAt: form.elements.reviewedAt.value || todayISO(),
       result: form.elements.result.value.trim() || selected.result || '已完成复盘。',
       learning: form.elements.learning.value.trim() || '继续沉淀判断依据。',
       next: form.elements.next.value.trim() || '下一次决策前先补齐关键信息。'
@@ -2192,10 +2875,15 @@
 
   function renderMood() {
     els.content.innerHTML = mockNotice() + '<section class="life-mood-page">' +
-      '<div class="life-mood-page-head"><div><h2>情绪天气站</h2><p>理解情绪的天气，照顾当下的自己</p></div>' + renderMoodTabs() + '</div>' +
+      '<div class="life-mood-page-head">' + renderPageHead('情绪天气站') + renderMoodTabs() + '</div>' +
       renderMoodEditor() +
       renderMoodMainByTab() +
       '</section>';
+    els.aside.innerHTML = renderMoodAside();
+  }
+
+  function refreshMoodAside() {
+    if (state.view !== 'mood') return;
     els.aside.innerHTML = renderMoodAside();
   }
 
@@ -2219,7 +2907,7 @@
       return '<div class="life-mood-focus-grid">' + renderMoodTrendCard(true) + renderMoodDistributionCard() + '</div>';
     }
     if (state.moodTab === 'triggers') {
-      return '<div class="life-mood-focus-grid">' + renderMoodTriggersPanel() + renderMoodWeeklyCard() + '</div>';
+      return '<div class="life-mood-focus-grid">' + renderMoodTriggersPanel() + '</div>';
     }
     if (state.moodTab === 'body') {
       return '<div class="life-mood-focus-grid">' + renderMoodBodySignalsCard(true) + renderMoodSleepCard(true) + '</div>';
@@ -2229,8 +2917,15 @@
       '<div class="life-mood-bottom-row">' + renderMoodRecentCard() + renderMoodBodySignalsCard(false) + '</div>';
   }
 
-  function moodMonthTitle(year, month) {
-    return year + '年' + (month + 1) + '月';
+  function renderMoodMonthPicker() {
+    var years = [2023, 2024, 2025, 2026, 2027];
+    if (years.indexOf(Number(state.moodYear)) < 0) years.push(Number(state.moodYear));
+    years.sort();
+    return '<label class="life-mood-month-select"><select class="life-select" data-mood-year-select>' + years.map(function(year) {
+      return '<option value="' + year + '"' + (Number(state.moodYear) === year ? ' selected' : '') + '>' + year + '年</option>';
+    }).join('') + '</select></label><label class="life-mood-month-select"><select class="life-select" data-mood-month-select>' + Array.from({ length: 12 }, function(_, index) {
+      return '<option value="' + index + '"' + (Number(state.moodMonth) === index ? ' selected' : '') + '>' + (index + 1) + '月</option>';
+    }).join('') + '</select></label>';
   }
 
   function moodWeekdayText(year, month, day) {
@@ -2243,6 +2938,126 @@
 
   function moodRecordDisplayDate(item) {
     return moodRecordDateLabel(item) + ' ' + item.time + ' 记录';
+  }
+
+  function moodRangeLimit(label) {
+    var match = String(label || '').match(/\d+/);
+    return match ? Number(match[0]) : 14;
+  }
+
+  function moodActiveDraftRecord() {
+    var form = document.getElementById('lifeMoodForm');
+    return form ? moodRecordFromForm(form) : null;
+  }
+
+  function selectedMoodContextRecord() {
+    return moodActiveDraftRecord() || selectedMoodRecord();
+  }
+
+  function moodRecordsWithFocus(focusItem, rangeLabel) {
+    var limit = moodRangeLimit(rangeLabel);
+    var records = allMoodRecords();
+    if (focusItem) {
+      var replaceId = state.moodFormMode === 'edit' ? state.moodEditingId : focusItem.id;
+      records = records.filter(function(item) {
+        return item.id !== replaceId && item.id !== focusItem.id;
+      }).concat([focusItem]).sort(moodSortAsc);
+    }
+    return records.slice(-limit);
+  }
+
+  function moodSleepInsight(item) {
+    var sleep = Number(item && item.sleep);
+    if (!Number.isFinite(sleep)) sleep = 0;
+    var sleepText = sleep.toFixed(sleep % 1 ? 1 : 0) + ' 小时';
+    var level = moodSleepLevel(sleep);
+    if (level.tone === 'red') return '<strong>' + sleepText + '</strong><br>睡眠很差，情绪更容易晃；今晚先把觉补上。';
+    if (level.tone === 'pink') return '<strong>' + sleepText + '</strong><br>睡眠较差，状态可能偏紧；尽量往 7 小时靠近。';
+    if (level.tone === 'yellow') return '<strong>' + sleepText + '</strong><br>睡眠一般，情绪有支撑，但还可以更稳一点。';
+    if (level.tone === 'blue') return '<strong>' + sleepText + '</strong><br>睡眠良好，当前情绪更容易保持稳定。';
+    return '<strong>' + sleepText + '</strong><br>睡眠很好，身体恢复给情绪加了不少分。';
+  }
+
+  function metricLevel(label, tone) {
+    return { label: label, tone: tone };
+  }
+
+  function moodSleepLevel(value) {
+    var sleep = Number(value) || 0;
+    if (sleep <= 3) return metricLevel('很差', 'red');
+    if (sleep <= 5) return metricLevel('较差', 'pink');
+    if (sleep <= 7) return metricLevel('一般', 'yellow');
+    if (sleep <= 8) return metricLevel('良好', 'blue');
+    return metricLevel('很好', 'green');
+  }
+
+  function moodPressureLevel(value) {
+    var pressure = Number(value) || 0;
+    if (pressure >= 80) return metricLevel('很大', 'red');
+    if (pressure >= 60) return metricLevel('较大', 'pink');
+    if (pressure >= 40) return metricLevel('一般', 'yellow');
+    if (pressure >= 20) return metricLevel('较小', 'blue');
+    return metricLevel('很小', 'green');
+  }
+
+  function moodEnergyLevel(value) {
+    var energy = Number(value) || 0;
+    if (energy < 20) return metricLevel('无力', 'red');
+    if (energy < 40) return metricLevel('乏力', 'pink');
+    if (energy < 60) return metricLevel('一般', 'yellow');
+    if (energy < 80) return metricLevel('充沛', 'blue');
+    return metricLevel('满电', 'green');
+  }
+
+  function moodEnergyNote(value) {
+    var level = moodEnergyLevel(value);
+    if (level.tone === 'red') return '精力无力，先降低负荷。';
+    if (level.tone === 'pink') return '精力乏力，适合轻量处理。';
+    if (level.tone === 'yellow') return '精力一般，稳步推进就好。';
+    if (level.tone === 'blue') return '精力充沛，适合推进重要的事。';
+    return '精力满电，可以处理高优先级事项。';
+  }
+
+  function renderMoodMetricGrid(item) {
+    var metrics = [
+      { name: '睡眠', value: item.sleep + ' 小时', level: moodSleepLevel(item.sleep) },
+      { name: '压力', value: item.pressure + '/100', level: moodPressureLevel(item.pressure) },
+      { name: '精力', value: item.energy + '/100', level: moodEnergyLevel(item.energy) },
+      { name: '感受', value: item.feeling, level: metricLevel('', 'plain') }
+    ];
+    return '<div class="life-mood-metric-grid">' + metrics.map(function(metric) {
+      return '<div class="' + metric.level.tone + '"><span>' + escapeHtml(metric.name) + '</span><strong>' + escapeHtml(metric.value) + '</strong>' + (metric.level.label ? '<em>' + escapeHtml(metric.level.label) + '</em>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function moodSleepX(value) {
+    var sleep = Math.max(4, Math.min(10, Number(value) || 0));
+    return 45 + ((sleep - 4) / 6) * 475;
+  }
+
+  function moodScoreY(value) {
+    var score = Math.max(0, Math.min(100, Number(value) || 0));
+    return 142 - score;
+  }
+
+  function moodSleepTrendPath(records) {
+    var usable = records.filter(function(item) {
+      return Number.isFinite(Number(item.sleep)) && Number.isFinite(Number(item.score));
+    });
+    if (usable.length < 2) return 'M45 118 L520 52';
+    var meanSleep = usable.reduce(function(sum, item) { return sum + Number(item.sleep); }, 0) / usable.length;
+    var meanScore = usable.reduce(function(sum, item) { return sum + Number(item.score); }, 0) / usable.length;
+    var variance = usable.reduce(function(sum, item) {
+      return sum + Math.pow(Number(item.sleep) - meanSleep, 2);
+    }, 0);
+    var slope = variance ? usable.reduce(function(sum, item) {
+      return sum + (Number(item.sleep) - meanSleep) * (Number(item.score) - meanScore);
+    }, 0) / variance : 0;
+    var startSleep = 4.5;
+    var endSleep = 9.5;
+    var startScore = Math.max(0, Math.min(100, meanScore + slope * (startSleep - meanSleep)));
+    var endScore = Math.max(0, Math.min(100, meanScore + slope * (endSleep - meanSleep)));
+    return 'M' + moodSleepX(startSleep) + ' ' + moodScoreY(startScore) + ' L' + moodSleepX(endSleep) + ' ' + moodScoreY(endScore);
   }
 
   function findMoodRecordById(id) {
@@ -2262,14 +3077,18 @@
   function moodDraftRecord() {
     var source = state.moodFormMode === 'edit' ? findMoodRecordById(state.moodEditingId) : null;
     if (source) return source;
-    var day = nextAvailableMoodDay();
+    var now = todayISO();
+    var nowParts = now.split('-');
+    var year = Number(nowParts[0]) || state.moodYear;
+    var month = (Number(nowParts[1]) || (state.moodMonth + 1)) - 1;
+    var day = Number(nowParts[2]) || state.selectedMoodDay;
     return {
-      id: moodDateId(state.moodYear, state.moodMonth, day),
-      year: state.moodYear,
-      month: state.moodMonth,
+      id: moodDateId(year, month, day),
+      year: year,
+      month: month,
       day: day,
-      date: moodDateValue(state.moodYear, state.moodMonth, day),
-      weekday: moodWeekdayText(state.moodYear, state.moodMonth, day),
+      date: moodDateValue(year, month, day),
+      weekday: moodWeekdayText(year, month, day),
       time: '09:30',
       score: 70,
       weather: '微晴',
@@ -2285,16 +3104,18 @@
   function renderMoodEditor() {
     if (!state.moodFormMode) return '';
     var item = moodDraftRecord();
+    var moodState = moodStateByScore(item.score);
     var dateValue = item.date || moodDateValue(item.year, item.month, item.day);
+    var linkedMoment = state.moodFormMode === 'edit' ? linkedTimelineMoment('mood', item.id) : null;
     return '<section class="life-mood-card life-mood-editor-card">' +
       '<form id="lifeMoodForm" class="life-form life-mood-form">' +
         '<div class="life-form-title"><h2>' + (state.moodFormMode === 'edit' ? '编辑情绪记录' : '新增情绪记录') + '</h2><p>情绪天气站的记录在这里完成新增、修改和删除；添加一刻的跨模块新增稍后统一处理。</p></div>' +
-        '<div class="life-three-grid"><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(dateValue) + '"></label><label>记录时间<input class="life-input" type="time" name="time" value="' + escapeHtml(item.time || '09:30') + '"></label><label>天气<select class="life-select" name="weather">' + ['晴朗','微晴','多云','阴雨','低落'].map(function(weather) { return '<option value="' + weather + '"' + (item.weather === weather ? ' selected' : '') + '>' + weather + '</option>'; }).join('') + '</select></label></div>' +
+        '<div class="life-three-grid"><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(dateValue) + '"></label><label>记录时间<input class="life-input" type="time" name="time" value="' + escapeHtml(item.time || '09:30') + '"></label><label>状态（按分数自动）<select class="life-select" name="weather" data-mood-score-weather disabled>' + ['晴朗','微晴','多云','阴雨','低落'].map(function(weather) { return '<option value="' + weather + '"' + (moodState.label === weather ? ' selected' : '') + '>' + weather + '</option>'; }).join('') + '</select></label></div>' +
         '<div class="life-mood-form-score"><div><strong>情绪分数 <span data-mood-score-value>' + item.score + '</span>/100</strong><p>只有进入新增或编辑表单时才允许调整分数。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="score" value="' + item.score + '" data-mood-score-range></div>' +
         '<div class="life-four-grid"><label>睡眠（小时）<input class="life-input" type="number" step="0.1" min="0" max="16" name="sleep" value="' + escapeHtml(item.sleep) + '"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="pressure" value="' + escapeHtml(item.pressure) + '"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="energy" value="' + escapeHtml(item.energy) + '"></label><label>感受<input class="life-input" name="feeling" value="' + escapeHtml(item.feeling) + '"></label></div>' +
         '<label>记录内容<textarea class="life-textarea" name="note" placeholder="今天的情绪发生了什么？">' + escapeHtml(item.note) + '</textarea></label>' +
         '<label>标签<input class="life-input" name="tags" value="' + escapeHtml((item.tags || []).join('，')) + '" placeholder="用逗号分隔，例如：睡眠不足，工作压力"></label>' +
-        renderTimelineLinkControls(true) +
+        renderTimelineLinkControls(state.moodFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.moodFormMode === 'edit' && !!linkedMoment) +
         '<div class="life-mood-form-actions">' + (state.moodFormMode === 'edit' ? '<button class="life-danger-btn" type="button" data-mood-action="delete-record">删除记录</button>' : '') + '<button class="life-secondary-btn" type="button" data-mood-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (state.moodFormMode === 'edit' ? '保存修改' : '保存记录') + '</button></div>' +
       '</form>' +
     '</section>';
@@ -2308,22 +3129,25 @@
   }
 
   function moodIconByScore(score) {
-    if (score >= 75) return 'sun';
-    if (score >= 60) return 'mood';
-    if (score >= 40) return 'cloud';
-    return 'anxious';
+    return moodStateByScore(score).icon;
   }
 
   function moodToneClass(score) {
-    if (score >= 80) return 'sunny';
-    if (score >= 60) return 'soft';
-    if (score >= 40) return 'cloudy';
-    return 'low';
+    return moodStateByScore(score).tone;
+  }
+
+  function moodStateByScore(score) {
+    var value = Math.max(0, Math.min(100, Number(score) || 0));
+    if (value >= 80) return { label: '晴朗', tone: 'sunny', icon: 'sun', description: '状态明亮，适合推进高优先级事项。' };
+    if (value >= 60) return { label: '微晴', tone: 'soft', icon: 'mood', description: '状态不错，按计划稳步推进就好。' };
+    if (value >= 40) return { label: '多云', tone: 'cloudy', icon: 'cloud', description: '有些波动，先聚焦 1-2 个关键任务。' };
+    if (value >= 20) return { label: '阴雨', tone: 'rainy', icon: 'anxious', description: '状态偏低，先减负并留出恢复时间。' };
+    return { label: '低落', tone: 'low', icon: 'anxious', description: '能量较低，先休息，必要时主动寻求支持。' };
   }
 
   function renderMoodCalendarCard() {
     return '<section class="life-mood-card life-mood-calendar-card"><div class="life-mood-section-head"><div><h3>本月情绪</h3></div>' +
-      '<div class="life-mood-month-control"><strong>' + moodMonthTitle(state.moodYear, state.moodMonth) + '</strong><button type="button" data-mood-action="prev-month">‹</button><button type="button" data-mood-action="next-month">›</button><button type="button" data-mood-action="today">今天</button></div></div>' +
+      '<div class="life-mood-month-control">' + renderMoodMonthPicker() + '<button type="button" data-mood-action="prev-month">‹</button><button type="button" data-mood-action="next-month">›</button><button type="button" data-mood-action="today">今天</button></div></div>' +
       '<div class="life-scroll-x"><div class="life-mood-calendar">' + renderMoodCalendar() + '</div></div>' +
       '<div class="life-mood-legend">' + [
         ['sunny', '晴朗 80-100'],
@@ -2385,7 +3209,7 @@
     });
     var d = path.map(function(point, idx) { return (idx ? 'L' : 'M') + point.x + ' ' + point.y; }).join(' ');
     return '<section class="life-mood-card life-mood-trend-card ' + (expanded ? 'expanded' : '') + '"><div class="life-mood-section-head"><h3>最近情绪趋势</h3>' + renderMoodRangeControl('trend', state.moodRange, ['近 7 天', '近 14 天', '近 30 天']) + '</div>' +
-      '<div class="life-mood-line-wrap"><div class="life-mood-axis-labels"><span>晴朗 100</span><span>微晴 75</span><span>多云 50</span><span>阴雨 25</span><span>低落 0</span></div><svg class="life-mood-line" viewBox="0 0 640 150" role="img" aria-label="最近情绪趋势">' +
+      '<div class="life-mood-line-wrap"><div class="life-mood-axis-labels"><span>晴朗 80-100</span><span>微晴 60-79</span><span>多云 40-59</span><span>阴雨 20-39</span><span>低落 0-19</span></div><svg class="life-mood-line" viewBox="0 0 640 150" role="img" aria-label="最近情绪趋势">' +
       '<path d="M20 118H620" class="grid"/><path d="M20 96H620" class="grid"/><path d="M20 74H620" class="grid"/><path d="M20 52H620" class="grid"/><path d="' + d + '" class="trend"/>' +
       path.map(function(point) { return '<circle cx="' + point.x + '" cy="' + point.y + '" r="' + (point.item.day === state.selectedMoodDay && point.item.month === state.moodMonth && point.item.year === state.moodYear ? 5 : 4) + '" class="' + moodToneClass(point.item.score) + '"/>'; }).join('') +
       '</svg><div class="life-mood-date-row">' + points.map(function(item) { return '<span>' + moodRecordDateLabel(item) + '</span>'; }).join('') + '</div></div>' +
@@ -2410,16 +3234,18 @@
   }
 
   function renderMoodRecentCard() {
-    var recent = allMoodRecords().slice(-6).reverse();
+    var records = allMoodRecords().slice().reverse();
+    var recent = visibleItems('moodRecent', records);
     return '<section class="life-mood-card life-mood-recent-card"><div class="life-mood-section-head"><h3>最近记录</h3><button type="button" data-mood-action="all-records">全部记录 ›</button></div><div class="life-mood-record-list">' +
       recent.map(function(item) {
+        var moodState = moodStateByScore(item.score);
         return '<button type="button" class="life-mood-record-row ' + (item.day === state.selectedMoodDay && item.month === state.moodMonth && item.year === state.moodYear ? 'active' : '') + '" data-mood-date="' + escapeHtml(item.date) + '">' +
           '<span class="life-mood-record-date">' + moodRecordDateLabel(item) + '<small>' + item.time + '</small></span>' +
           '<span class="life-mood-record-icon">' + iconHtml(moodIconByScore(item.score)) + '</span>' +
-          '<span class="life-mood-record-main"><strong>' + item.weather + ' <em>' + item.score + ' 分</em></strong><p>' + escapeHtml(item.note) + '</p><b>' + item.tags.map(function(tag) { return '<em>' + escapeHtml(tag) + '</em>'; }).join('') + '</b></span>' +
+          '<span class="life-mood-record-main"><strong>' + moodState.label + ' <em>' + item.score + ' 分</em></strong><p>' + escapeHtml(item.note) + '</p><b>' + item.tags.map(function(tag) { return '<em>' + escapeHtml(tag) + '</em>'; }).join('') + '</b></span>' +
           '<span class="life-mood-record-meta"><strong>' + item.sleep + 'h</strong><small>睡眠</small><strong>' + item.pressure + '</strong><small>压力</small></span>' +
           '</button>';
-      }).join('') + (!recent.length ? '<div class="life-empty">还没有情绪记录</div>' : '') + '</div></section>';
+      }).join('') + (!recent.length ? '<div class="life-empty">还没有情绪记录</div>' : '') + '</div>' + renderLoadMore('moodRecent', recent.length, records.length) + '</section>';
   }
 
   function renderMoodBodySignalsCard(expanded) {
@@ -2433,43 +3259,37 @@
     }).join('') + '</div><button type="button" data-mood-action="more-body">更多记录 ›</button></section>';
   }
 
-  function renderMoodTriggersPanel() {
+  function renderMoodTriggersPanel(focusItem) {
+    var context = focusItem || selectedMoodContextRecord();
+    var tags = context && context.tags && context.tags.length ? context.tags : ['情绪记录'];
     return '<section class="life-mood-card life-mood-trigger-panel"><div class="life-mood-section-head"><h3>触发因素</h3>' + renderMoodRangeControl('trigger', state.moodTriggerRange, ['近 7 天', '近 14 天', '近 30 天']) + '</div><div class="life-mood-trigger-grid">' +
-      ['工作压力','信息过载','睡眠不足','熬夜','计划被打乱','与家人相处','运动','读书','阳光天气','独处时光','咖啡因','社交活动','财务担忧'].map(function(tag, idx) {
-        return '<button type="button" class="' + (idx < 5 ? 'warm' : idx < 10 ? 'cool' : '') + '" data-mood-action="trigger">' + tag + '</button>';
-      }).join('') + '<button type="button" data-mood-action="add-trigger">＋ 添加</button></div><p>点击标签可查看在情绪变化中的影响。</p></section>';
+      tags.map(function(tag, idx) {
+        return '<button type="button" class="' + (idx < 2 ? 'warm' : idx < 6 ? 'cool' : '') + '" data-mood-action="trigger">' + escapeHtml(tag) + '</button>';
+      }).join('') + '</div><p>触发因素来自这条记录的标签，改标签这里也会跟着变。</p></section>';
   }
 
-  function renderMoodSleepCard(expanded) {
-    var records = allMoodRecords().slice(-14);
-    var dots = records.map(function(item, idx) {
-      var x = 42 + idx * (records.length > 1 ? 460 / (records.length - 1) : 0);
-      var y = 142 - item.score;
-      return '<circle cx="' + x + '" cy="' + y + '" r="5"/>';
+  function renderMoodSleepCard(expanded, focusItem) {
+    var context = focusItem || selectedMoodContextRecord();
+    var records = moodRecordsWithFocus(context, state.moodSleepRange);
+    var dots = records.map(function(item) {
+      var isCurrent = context && item.id === context.id;
+      return '<circle cx="' + moodSleepX(item.sleep) + '" cy="' + moodScoreY(item.score) + '" r="' + (isCurrent ? 6 : 5) + '"' + (isCurrent ? ' class="current"' : '') + '/>';
     }).join('');
-    return '<section class="life-mood-card life-mood-sleep-card ' + (expanded ? 'expanded' : '') + '"><div class="life-mood-section-head"><h3>睡眠关联</h3>' + renderMoodRangeControl('sleep', state.moodSleepRange, ['近 7 天', '近 14 天', '近 30 天']) + '</div><div class="life-mood-sleep-grid"><p>睡眠时长越稳定，情绪评分越高。<br>尽量保持 7-8 小时的规律睡眠。</p><svg viewBox="0 0 560 170" role="img" aria-label="睡眠与情绪评分散点图"><path d="M30 140H540M30 100H540M30 60H540" class="grid"/><path d="M45 124 C180 92 330 76 520 48" class="line"/>' + dots + '<text x="28" y="34">情绪评分</text><text x="260" y="162">睡眠时长（小时）</text></svg></div></section>';
-  }
-
-  function renderMoodWeeklyCard() {
-    return '<section class="life-mood-card life-mood-weekly-card"><div class="life-mood-section-head"><h3>每周回看</h3>' + renderMoodRangeControl('week', state.moodWeekRange, ['04-27 ~ 05-03', '05-04 ~ 05-10', '05-11 ~ 05-17']) + '</div><p>这周整体不错，有几个高光时刻，也遇到了一些挑战。</p><div><article><strong>高光时刻</strong><span>周一完成了重要汇报</span><span>周二和朋友深度聊天</span><span>周五的运动让我很放松</span></article><article><strong>挑战与学习</strong><span>周四信息过载，效率下降</span><span>周末熬夜影响了睡眠</span><span>下周要更专注于优先级</span></article></div><footer><strong>下周关注</strong><span>睡眠质量</span><span>专注力</span><span>情绪稳定</span><button type="button" data-mood-action="edit-record">' + iconHtml('project') + '</button></footer></section>';
+    var insight = moodSleepInsight(context || records[records.length - 1]);
+    return '<section class="life-mood-card life-mood-sleep-card ' + (expanded ? 'expanded' : '') + '"><div class="life-mood-section-head"><h3>睡眠关联</h3>' + renderMoodRangeControl('sleep', state.moodSleepRange, ['近 7 天', '近 14 天', '近 30 天']) + '</div><div class="life-mood-sleep-grid"><p>' + insight + '</p><svg viewBox="0 0 560 170" role="img" aria-label="睡眠与情绪评分散点图"><path d="M30 140H540M30 100H540M30 60H540" class="grid"/><path d="' + moodSleepTrendPath(records) + '" class="line"/>' + dots + '<text x="28" y="34">情绪评分</text><text x="260" y="162">睡眠时长（小时）</text></svg></div></section>';
   }
 
   function renderMoodAside() {
-    var item = selectedMoodRecord();
+    var item = selectedMoodContextRecord();
     var selectedDate = moodDateValue(state.moodYear, state.moodMonth, state.selectedMoodDay);
     if (!item) {
       return '<section class="life-mood-side-card life-mood-today-card life-mood-empty-side"><div class="life-mood-section-head"><h3>当前日期</h3><span>' + escapeHtml(selectedDate) + '</span></div><div class="life-empty">这一天还没有情绪记录。</div><button class="life-primary-btn" type="button" data-mood-action="new-record">新增情绪记录</button></section>' +
-        renderMoodSleepCard(false) + renderMoodTriggersPanel() + renderMoodWeeklyCard();
+        renderMoodSleepCard(false) + renderMoodTriggersPanel();
     }
-    return '<section class="life-mood-side-card life-mood-today-card"><div class="life-mood-section-head"><h3>当前心情</h3><span>' + escapeHtml(moodRecordDisplayDate(item)) + '</span></div><div class="life-mood-today-main"><div class="life-mood-big-sun">' + iconHtml(moodIconByScore(item.score)) + '</div><div><strong>' + item.weather + ' <em>' + item.score + '</em><small>/100</small></strong><p>充满能量，适合推进重要的事。</p></div></div><div class="life-mood-metric-grid">' + [
-      ['睡眠', item.sleep + ' 小时', '良好'],
-      ['压力', item.pressure + '/100', '较低'],
-      ['精力', item.energy + '/100', '充沛'],
-      ['感受', item.feeling, '']
-    ].map(function(metric) {
-      return '<div><span>' + metric[0] + '</span><strong>' + metric[1] + '</strong><em>' + metric[2] + '</em></div>';
-    }).join('') + '</div><blockquote>' + escapeHtml(item.note) + '<button type="button" data-mood-action="edit-record">' + iconHtml('project') + '</button></blockquote><div class="life-mood-side-actions"><button class="life-secondary-btn" type="button" data-mood-action="edit-record">编辑记录</button><button class="life-danger-btn" type="button" data-mood-action="delete-record">删除记录</button></div></section>' +
-      renderMoodSleepCard(false) + renderMoodTriggersPanel() + renderMoodWeeklyCard();
+    var linkedBadge = renderTimelineLinkedBadge('mood', item.id);
+    var moodState = moodStateByScore(item.score);
+    return '<section class="life-mood-side-card life-mood-today-card"><div class="life-mood-section-head"><h3>当前心情</h3><span>' + escapeHtml(moodRecordDisplayDate(item)) + '</span></div>' + (linkedBadge ? '<div class="life-chip-row">' + linkedBadge + '</div>' : '') + '<div class="life-mood-today-main"><div class="life-mood-big-sun">' + iconHtml(moodState.icon) + '</div><div><strong>' + escapeHtml(moodState.label) + ' <em>' + item.score + '</em><small>/100</small></strong><p>' + escapeHtml(moodState.description) + '</p></div></div>' + renderMoodMetricGrid(item) + '<blockquote>' + escapeHtml(item.note) + '<button type="button" data-mood-action="edit-record">' + iconHtml('project') + '</button></blockquote><div class="life-mood-side-actions"><button class="life-secondary-btn" type="button" data-mood-action="edit-record">编辑记录</button><button class="life-danger-btn" type="button" data-mood-action="delete-record">删除记录</button></div></section>' +
+      renderMoodSleepCard(false, item) + renderMoodTriggersPanel(item);
   }
 
   function startMoodCreate() {
@@ -2515,7 +3335,7 @@
       weekday: moodWeekdayText(parsed.year, parsed.month, parsed.day),
       time: form.elements.time.value || '09:30',
       score: score,
-      weather: form.elements.weather.value,
+      weather: moodStateByScore(score).label,
       sleep: Number(form.elements.sleep.value || 0),
       pressure: Math.max(0, Math.min(100, Number(form.elements.pressure.value || 0))),
       energy: Math.max(0, Math.min(100, Number(form.elements.energy.value || 0))),
@@ -2533,12 +3353,13 @@
   }
 
   function upsertMoodTimelineFromForm(form, item) {
+    var moodState = moodStateByScore(item.score);
     upsertLinkedTimelineMoment('mood', item.id, form.elements.linkTimeline && form.elements.linkTimeline.checked, {
       type: '情绪',
       icon: '☀',
       time: item.time || '09:30',
       date: item.date,
-      title: '今日心情：' + item.weather + ' ' + item.score + '/100',
+      title: '今日心情：' + moodState.label + ' ' + item.score + '/100',
       copy: item.note || '记录了当下的情绪状态。',
       location: '情绪天气站',
       people: [],
@@ -2561,7 +3382,7 @@
       store.added = (store.added || []).filter(function(record) { return record.id !== editingId; });
       if (store.deleted.indexOf(editingId) < 0) store.deleted.push(editingId);
     }
-    var seedExists = moodRecords.map(normalizeMoodRecord).some(function(seed) {
+    var seedExists = !directApiMode && !mockMode && moodRecords.map(normalizeMoodRecord).some(function(seed) {
       return seed.id === item.id;
     });
     if (seedExists) {
@@ -2612,13 +3433,16 @@
 
   function renderRelationships() {
     var items = relationshipItems();
-    var selected = getSelectedRelationship(items);
+    var visibleRelationshipItems = visibleItems('relationship', items);
+    var selected = getSelectedRelationship(visibleRelationshipItems);
     if (selected && selected.id !== state.selectedRelationshipId) state.selectedRelationshipId = selected.id;
     els.content.innerHTML = mockNotice() + '<section class="life-relationship-page">' +
-      '<div class="life-relationship-head"><div><h2 class="life-panel-title">关系温度 <span class="life-info-dot">i</span></h2><p class="life-panel-sub">记录与重要之人的连接，关注彼此的距离与温度</p></div><div class="life-relationship-toolbar"><button class="life-secondary-btn" type="button" data-relationship-action="sort">排序：' + escapeHtml(state.relationshipSort) + '⌄</button><button class="life-secondary-btn" type="button" data-relationship-action="filter">筛选⌄</button><button class="life-primary-btn" type="button" data-relationship-action="add">添加关系</button></div></div>' +
+      '<div class="life-relationship-head"><div><h2 class="life-page-title">关系温度</h2></div><div class="life-relationship-toolbar"><button class="life-secondary-btn" type="button" data-relationship-action="sort">排序：' + escapeHtml(state.relationshipSort) + '⌄</button><button class="life-primary-btn" type="button" data-relationship-action="add">添加关系</button></div></div>' +
       renderRelationshipFilters() +
       renderRelationshipForm() +
-      renderRelationshipList(items, selected) +
+      (state.relationshipFormMode === 'edit' ? renderRelationshipInlineEditor(selected) : '') +
+      renderRelationshipList(visibleRelationshipItems, selected) +
+      renderLoadMore('relationship', visibleRelationshipItems.length, items.length) +
       '</section>';
     els.aside.innerHTML = renderRelationshipAside(selected);
   }
@@ -2629,10 +3453,33 @@
       return matchesFilter && queryMatch(item.name + item.role + item.group + item.channel + item.notes.join(' '));
     });
     return list.sort(function(a, b) {
-      if (state.relationshipSort === '下次联系') return relationshipDays(a.next) - relationshipDays(b.next);
+      if (state.relationshipSort === '预计下次联系') return relationshipNextOffset(a.nextDate) - relationshipNextOffset(b.nextDate);
       if (state.relationshipSort === '最近联系') return relationshipDays(a.last) - relationshipDays(b.last);
       return Number(b.score || 0) - Number(a.score || 0);
     });
+  }
+
+  function relationshipNextOffset(nextDate) {
+    var iso = normalizeISODate(nextDate, '');
+    if (!iso) return Number.POSITIVE_INFINITY;
+    var parts = iso.split('-').map(Number);
+    var today = todayISO().split('-').map(Number);
+    var nextTime = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+    var todayTime = Date.UTC(today[0], today[1] - 1, today[2]);
+    return Math.round((nextTime - todayTime) / 86400000);
+  }
+
+  function relationshipNextLabel(nextDate, fallback) {
+    var offset = relationshipNextOffset(nextDate);
+    if (!Number.isFinite(offset)) return fallback || '待定';
+    if (offset === 0) return '今天';
+    if (offset > 0) return offset + ' 天后';
+    return '已过 ' + Math.abs(offset) + ' 天';
+  }
+
+  function syncRelationshipNextFromDate(form) {
+    if (!form || !form.elements.nextDate || !form.elements.next) return;
+    form.elements.next.value = relationshipNextLabel(form.elements.nextDate.value, form.elements.next.value);
   }
 
   function relationshipDays(text) {
@@ -2643,7 +3490,7 @@
 
   function getSelectedRelationship(items) {
     var all = allRelationships();
-    return all.filter(function(item) { return item.id === state.selectedRelationshipId; })[0] || items[0] || all[0] || null;
+    return items.filter(function(item) { return item.id === state.selectedRelationshipId; })[0] || items[0] || all.filter(function(item) { return item.id === state.selectedRelationshipId; })[0] || all[0] || null;
   }
 
   function relationshipGroupCounts() {
@@ -2665,7 +3512,7 @@
     var blocks = groups.map(function(group) {
       var rows = items.filter(function(item) { return item.group === group; });
       if (!rows.length) return '';
-      return '<section class="life-relationship-group"><div class="life-relationship-list-head"><h3>' + group + '</h3><span>上次联系</span><span>亲密度</span><span>趋势</span><span>下次联系</span></div>' +
+      return '<section class="life-relationship-group"><div class="life-relationship-list-head"><h3>' + group + '</h3><span>上次联系</span><span>亲密度</span><span>趋势</span><span>预计下次联系</span></div>' +
         rows.map(function(item) { return renderRelationshipRow(item, selected && selected.id === item.id); }).join('') + '</section>';
     }).join('');
     return blocks || '<section class="life-panel"><div class="life-empty">没有匹配的关系记录</div></section>';
@@ -2688,10 +3535,54 @@
     return '一般';
   }
 
+  function relationshipTrendValues(item) {
+    var values = (item.trend || []).map(function(value) {
+      return Math.max(0, Math.min(100, Number(value)));
+    }).filter(function(value) {
+      return Number.isFinite(value);
+    });
+    if (!values.length) values = [Math.max(0, Math.min(100, Number(item.score || 0)))];
+    return values;
+  }
+
+  /**
+   * Derive relationship copy from the same series used by the sparkline, so
+   * the detail status cannot drift away from the visible trend.
+   */
+  function relationshipTrendAnalysis(item) {
+    var values = relationshipTrendValues(item);
+    var latest = values[values.length - 1];
+    var previous = values.length > 1 ? values[values.length - 2] : latest;
+    var delta = latest - previous;
+    var spread = Math.max.apply(null, values) - Math.min.apply(null, values);
+    var absDelta = Math.abs(delta);
+    var status = latest >= 85 ? '高亲密关系' : (latest >= 70 ? '关系稳定' : (latest >= 50 ? '需要轻量维护' : '需要主动靠近'));
+
+    if (delta >= 8) status = latest >= 70 ? '关系持续升温' : '关系正在回暖';
+    if (delta <= -8) status = '有疏远信号';
+    if (absDelta < 4 && spread <= 12) status = latest >= 70 ? '亲密稳定' : '趋势平稳';
+    if (spread >= 22 && absDelta < 8) status = '波动明显';
+
+    return {
+      status: status,
+      distance: -delta,
+      relation: delta > 0 ? '比上月更近了' : (delta < 0 ? '比上月更远了' : '与上月持平')
+    };
+  }
+
+  function renderRelationshipStatus(item) {
+    var analysis = relationshipTrendAnalysis(item);
+    var distance = analysis.distance > 0 ? '+' + analysis.distance : String(analysis.distance);
+    return '<h3>关系状态</h3>' +
+      '<p class="life-status-line">' + iconHtml('health') + ' ' + escapeHtml(analysis.status) + '</p>' +
+      '<p class="life-status-line">' + iconHtml('relationship') + ' 距离感 ' + escapeHtml(distance) + '，' + escapeHtml(analysis.relation) + '</p>';
+  }
+
   function relationshipSparkline(values, score) {
-    var max = Math.max.apply(null, values.concat([100]));
-    var step = values.length > 1 ? 86 / (values.length - 1) : 0;
-    var points = values.map(function(value, idx) {
+    var trendValues = relationshipTrendValues({ trend: values, score: score });
+    var max = Math.max.apply(null, trendValues.concat([100]));
+    var step = trendValues.length > 1 ? 86 / (trendValues.length - 1) : 0;
+    var points = trendValues.map(function(value, idx) {
       return { x: 2 + idx * step, y: 32 - value / max * 26 };
     });
     var path = points.map(function(point, idx) { return (idx ? 'L' : 'M') + point.x + ' ' + point.y; }).join(' ');
@@ -2700,12 +3591,12 @@
 
   function relationshipAvatarKey(item) {
     if (item.avatar === 'custom') return 'custom';
-    if (item.avatar && /^q[1-6]$/.test(item.avatar)) return item.avatar;
+    if (item.avatar && /^q[1-5]$/.test(item.avatar)) return item.avatar;
     if (item.name === '妈妈') return 'q1';
     if (item.name === '爸爸') return 'q2';
     if (item.group === '家人') return 'q3';
     if (item.group === '同事') return 'q5';
-    if (item.group === '重要联系人') return 'q6';
+    if (item.group === '重要联系人') return 'q5';
     return 'q4';
   }
 
@@ -2760,10 +3651,10 @@
     }).join('') + '</div>';
   }
 
-  function renderRelationshipMediaMini(items, kind, fallback) {
-    var media = normalizeRelationshipMedia(items && items.length ? items : fallback);
+  function renderRelationshipMediaMini(items, kind) {
+    var media = normalizeRelationshipMedia(items);
     if (!media.length) return '<p class="life-card-copy">暂无记录</p>';
-    return '<div class="life-media-mini-grid">' + media.slice(0, 4).map(function(item, idx) {
+    return '<div class="life-media-mini-grid">' + media.map(function(item, idx) {
       return '<article>' + relationshipMediaThumb(item, kind, idx) + '<span>' + escapeHtml(item.text || '未命名') + '</span></article>';
     }).join('') + '</div>';
   }
@@ -2771,15 +3662,16 @@
   function renderRelationshipMediaFormPreview(items, kind) {
     var media = normalizeRelationshipMedia(items);
     if (!media.length) return '';
-    return '<div class="life-media-form-preview">' + media.slice(0, 6).map(function(item, idx) {
+    return '<div class="life-media-form-preview">' + media.map(function(item, idx) {
       return '<article>' + relationshipMediaThumb(item, kind, idx) + '<span>' + escapeHtml(item.text || '未命名') + '</span></article>';
     }).join('') + '</div>';
   }
 
   function renderRelationshipMediaEditor(field, label, items, kind, placeholder) {
     var media = normalizeRelationshipMedia(items);
+    var addDisabled = media.length >= RELATIONSHIP_MEDIA_LIMIT ? ' disabled' : '';
     return '<section class="life-media-editor" data-relationship-media-field="' + field + '" data-relationship-media-kind="' + kind + '">' +
-      '<div class="life-section-title"><h3>' + label + '</h3><button type="button" data-relationship-action="add-media-item" data-media-field="' + field + '" data-media-kind="' + kind + '">＋ 添加</button></div>' +
+      '<div class="life-section-title"><h3>' + label + '</h3><button type="button" data-relationship-action="add-media-item" data-media-field="' + field + '" data-media-kind="' + kind + '"' + addDisabled + '>＋ 添加</button></div>' +
       '<div class="life-media-editor-list">' + (media.length ? media.map(function(item, idx) { return relationshipMediaEditorRow(field, kind, item, idx); }).join('') : relationshipMediaEditorRow(field, kind, { text: '', image: '' }, 0, placeholder)) + '</div>' +
     '</section>';
   }
@@ -2787,7 +3679,10 @@
   function renderRelationshipMediaSummary(label, items, kind, actionName) {
     var media = normalizeRelationshipMedia(items);
     var names = media.slice(0, 3).map(function(item) { return item.text || '未命名'; }).join('、') || '暂无记录';
-    return '<section class="life-media-summary compact"><div><h3>' + label + '</h3><p>' + media.length + ' 条图片记录 · ' + escapeHtml(names) + '</p></div><button type="button" data-relationship-action="' + actionName + '">到右侧管理</button></section>';
+    var button = actionName
+      ? '<button type="button" data-relationship-action="' + actionName + '">管理图片</button>'
+      : '<button type="button" disabled>保存后管理</button>';
+    return '<section class="life-media-summary compact"><div><h3>' + label + '</h3><p>' + media.length + ' 条图片记录 · ' + escapeHtml(names) + '</p></div>' + button + '</section>';
   }
 
   function relationshipMediaEditorRow(field, kind, item, idx, placeholder) {
@@ -2810,7 +3705,7 @@
         text: textInput ? textInput.value.trim() : '',
         image: imageInput ? imageInput.value.trim() : ''
       };
-    }).filter(function(item) { return item.text || item.image; });
+    }).filter(function(item) { return item.text || item.image; }).slice(0, RELATIONSHIP_MEDIA_LIMIT);
   }
 
   function refreshRelationshipMediaRowPreview(row) {
@@ -2824,45 +3719,54 @@
     if (preview) preview.innerHTML = relationshipMediaThumb({ text: text, image: image }, kind, 0);
   }
 
+  function syncRelationshipMediaAddButton(editor) {
+    var button = editor && editor.querySelector('[data-relationship-action="add-media-item"]');
+    var list = editor && editor.querySelector('.life-media-editor-list');
+    if (!button || !list) return;
+    button.disabled = list.querySelectorAll('[data-relationship-media-row]').length >= RELATIONSHIP_MEDIA_LIMIT;
+  }
+
   function renderRelationshipAvatarPicker(item) {
     var selected = relationshipAvatarKey(item);
-    return '<div class="life-avatar-picker">' + ['q1','q2','q3','q4','q5','q6'].map(function(key, idx) {
+    return '<div class="life-avatar-picker with-upload"><div class="life-avatar-options">' + ['q1','q2','q3','q4','q5'].map(function(key, idx) {
       return '<label class="' + (selected === key ? 'active' : '') + '" data-avatar-choice="' + key + '"><input type="radio" name="avatar" value="' + key + '"' + (selected === key ? ' checked' : '') + '><span class="life-avatar-token ' + key + '"><i></i></span><em>Q' + (idx + 1) + '</em></label>';
-    }).join('') + '<label class="' + (selected === 'custom' ? 'active' : '') + '" data-avatar-choice="custom"><input type="radio" name="avatar" value="custom"' + (selected === 'custom' ? ' checked' : '') + '><span class="life-avatar-token custom-option"><i></i></span><em>上传</em></label></div>';
+    }).join('') + '</div><label class="life-avatar-upload-choice ' + (selected === 'custom' ? 'active' : '') + '" data-avatar-choice="custom"><input type="radio" name="avatar" value="custom"' + (selected === 'custom' ? ' checked' : '') + '><span class="life-avatar-token custom-option"><i></i></span><em>上传自定义头像</em></label></div>';
   }
 
   function renderRelationshipForm() {
     if (!state.relationshipFormMode) return '';
     var source = state.relationshipFormMode === 'edit' ? getSelectedRelationship(allRelationships()) : null;
-    var item = source || normalizeRelationship({ id: 'r-local-' + Date.now(), name: '', role: '', group: '朋友', last: '今天', channel: '微信', score: 70, next: '7 天后', nextDate: '2026-05-20', dates: ['生日 1990-01-01'], notes: ['最近聊到：'], memories: ['第一次见面'], gifts: [], places: [], memo: '' });
+    var nextDateBase = addDateDays(todayISO(), 7);
+    var item = source || normalizeRelationship({ id: 'r-local-' + Date.now(), name: '', role: '', group: '朋友', last: '', channel: '', score: 70, nextDate: nextDateBase, dates: [], notes: [], memories: [], gifts: [], places: [], memo: '' });
+    var linkedMoment = state.relationshipFormMode === 'edit' ? linkedTimelineMoment('relationship', item.id) : null;
     return '<section class="life-relationship-form-card">' +
       '<form id="lifeRelationshipForm" class="life-form life-relationship-form">' +
         '<div class="life-form-title"><h2>' + (state.relationshipFormMode === 'edit' ? '编辑关系' : '添加关系') + '</h2><p>联系人资料、联系节奏、重要日期和备注都会保存到关系温度模块。</p></div>' +
         '<label>头像' + renderRelationshipAvatarPicker(item) + '</label><label data-avatar-url-field class="' + (relationshipAvatarKey(item) === 'custom' ? '' : 'is-hidden') + '">上传头像 / 图片地址<input class="life-input" name="avatarUrl" value="' + escapeHtml(item.avatar === 'custom' ? item.avatarUrl || '' : '') + '" placeholder="选择“上传”后粘贴头像图片地址"></label>' +
         '<div class="life-three-grid"><label>姓名<input class="life-input" name="name" value="' + escapeHtml(item.name) + '" placeholder="例如：妈妈"></label><label>身份<input class="life-input" name="role" value="' + escapeHtml(item.role) + '" placeholder="母亲 / 同学 / 同事"></label><label>分组<select class="life-select" name="group">' + ['家人','朋友','同事','重要联系人'].map(function(group) { return '<option value="' + group + '"' + (item.group === group ? ' selected' : '') + '>' + group + '</option>'; }).join('') + '</select></label></div>' +
-        '<div class="life-four-grid"><label>上次联系<input class="life-input" name="last" value="' + escapeHtml(item.last) + '"></label><label>渠道<input class="life-input" name="channel" value="' + escapeHtml(item.channel) + '"></label><label>下次联系<input class="life-input" name="next" value="' + escapeHtml(item.next) + '"></label><label>下次日期<input class="life-input" type="date" name="nextDate" value="' + escapeHtml(item.nextDate || '2026-05-20') + '"></label></div>' +
+        '<div class="life-four-grid"><label>上次联系<input class="life-input" name="last" value="' + escapeHtml(item.last) + '" placeholder="例如：今天 / 上周五"></label><label>渠道<input class="life-input" name="channel" value="' + escapeHtml(item.channel) + '" placeholder="微信 / 电话 / 见面"></label><label>预计下次联系<input class="life-input" name="next" value="' + escapeHtml(relationshipNextLabel(item.nextDate, item.next)) + '" readonly data-relationship-next-auto></label><label>预计下次日期<input class="life-input" type="date" name="nextDate" value="' + escapeHtml(item.nextDate || nextDateBase) + '"></label></div>' +
         '<div class="life-relationship-form-score"><div><strong>亲密度 <span data-relationship-score-value>' + item.score + '</span>/100</strong><p>编辑状态下调整，保存后列表和详情同步。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="score" value="' + item.score + '" data-relationship-score-range></div>' +
         '<div class="life-two-grid"><label>重要日期<textarea class="life-textarea" name="dates" placeholder="一行一个日期">' + escapeHtml((item.dates || []).join('\n')) + '</textarea></label><label>最近聊到<textarea class="life-textarea" name="notes" placeholder="一行一条最近记录">' + escapeHtml((item.notes || []).join('\n')) + '</textarea></label></div>' +
-        '<div class="life-two-grid life-media-main-grid">' + renderRelationshipMediaSummary('共同记忆', item.memories, 'memory', 'view-memories') + '<label class="life-memo-editor">我的备注<textarea class="life-textarea" name="memo">' + escapeHtml(item.memo || '') + '</textarea></label></div>' +
-        '<div class="life-two-grid life-media-pair-grid">' + renderRelationshipMediaSummary('送的礼物', item.gifts, 'gift', 'view-gifts') + renderRelationshipMediaSummary('一起去过的地方', item.places, 'place', 'view-places') + '</div>' +
-        renderTimelineLinkControls(true) +
+        '<div class="life-two-grid life-media-main-grid">' + renderRelationshipMediaSummary('共同记忆', item.memories, 'memory', state.relationshipFormMode === 'edit' ? 'view-memories' : '') + '<label class="life-memo-editor">我的备注<textarea class="life-textarea" name="memo" placeholder="写下真实的相处提醒、偏好或边界">' + escapeHtml(item.memo || '') + '</textarea></label></div>' +
+        '<div class="life-two-grid life-media-pair-grid">' + renderRelationshipMediaSummary('送的礼物', item.gifts, 'gift', state.relationshipFormMode === 'edit' ? 'view-gifts' : '') + renderRelationshipMediaSummary('一起去过的地方', item.places, 'place', state.relationshipFormMode === 'edit' ? 'view-places' : '') + '</div>' +
+        renderTimelineLinkControls(state.relationshipFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.relationshipFormMode === 'edit' && !!linkedMoment) +
         '<div class="life-relationship-form-actions">' + (state.relationshipFormMode === 'edit' ? '<button class="life-danger-btn" type="button" data-relationship-action="delete">删除关系</button>' : '') + '<button class="life-secondary-btn" type="button" data-relationship-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (state.relationshipFormMode === 'edit' ? '保存修改' : '保存关系') + '</button></div>' +
       '</form></section>';
   }
 
   function renderRelationshipAside(item) {
     if (!item) return '<section class="life-detail-card"><div class="life-empty">没有关系记录</div><button class="life-primary-btn" type="button" data-relationship-action="add">添加关系</button></section>';
-    return '<section class="life-relationship-detail"><div class="life-relationship-profile">' + relationshipAvatarHtml(item, 'large') + '<div><h2>' + escapeHtml(item.name) + ' <em>' + escapeHtml(item.group) + '</em></h2><p>' + escapeHtml(item.role) + '</p></div><div class="life-relationship-profile-actions"><button type="button" data-relationship-action="favorite">' + iconHtml('health') + '</button><button class="life-secondary-btn" type="button" data-relationship-action="remind">提醒联系</button><button type="button" data-relationship-action="edit">···</button></div></div>' +
-      '<div class="life-relationship-metrics"><div><span>亲密度</span><strong>' + item.score + '</strong><em>' + relationshipScoreLabel(item.score) + '</em>' + progress(item.score, item.score >= 75 ? 'var(--life-accent)' : 'var(--life-amber)') + '</div><div><span>上次联系</span><strong>' + escapeHtml(item.last) + '</strong><em>' + escapeHtml(item.channel) + '</em></div><div><span>下次联系</span><strong>' + escapeHtml(item.next) + '</strong><em>' + escapeHtml(item.nextDate || '待定') + '</em></div><div><span>关系趋势</span>' + relationshipSparkline(item.trend, item.score) + '</div></div>' +
-      renderRelationshipInlineEditor(item) +
-      '<div class="life-relationship-detail-grid"><section><div class="life-section-title"><h3>重要日期</h3><button type="button" data-relationship-action="add-date">＋ 添加日期</button></div>' + relationshipDateList(item) + '<h3>关系状态</h3><p class="life-status-line">' + iconHtml('health') + ' 亲密稳定</p><p class="life-status-line">' + iconHtml('relationship') + ' 距离感 -5，比上月更近了</p></section><section><div class="life-section-title"><h3>最近聊到</h3><button type="button" data-relationship-action="add-note">＋ 添加记录</button></div>' + relationshipNotesList(item) + '<button class="life-link-btn" type="button" data-relationship-action="view-notes">查看全部 →</button></section></div>' +
-      '<section class="life-relationship-memories"><div class="life-section-title"><h3>共同记忆</h3><button type="button" data-relationship-action="view-memories">查看全部（' + item.memories.length + '）</button></div>' + renderRelationshipMediaCards(item.memories, 'memory') + '</section>' +
-      '<div class="life-relationship-bottom-grid"><section><h3>送的礼物</h3>' + renderRelationshipMediaMini(item.gifts, 'gift', ['围巾 2026-01', '照片书 2025-05']) + '<button class="life-link-btn" type="button" data-relationship-action="view-gifts">查看全部</button></section><section><h3>一起去过的地方</h3>' + renderRelationshipMediaMini(item.places, 'place', ['杭州西湖 2024-04', '桂林 2023-10', '厦门鼓浪屿 2022-08']) + '<button class="life-link-btn" type="button" data-relationship-action="view-places">查看全部</button></section><section><h3>我的备注</h3><p>' + escapeHtml(item.memo || '她很在意我的工作和健康，多分享生活中的小确幸会让她更开心。') + '</p><button class="life-link-btn" type="button" data-relationship-action="edit-memo">编辑备注</button></section></div>' +
-      '<div class="life-relationship-lifecycle"><button class="life-secondary-btn" type="button" data-relationship-action="edit">编辑关系</button><button class="life-danger-btn" type="button" data-relationship-action="delete">删除关系</button></div></section>';
+    var linkedBadge = renderTimelineLinkedBadge('relationship', item.id);
+    return '<section class="life-relationship-detail"><div class="life-relationship-profile">' + relationshipAvatarHtml(item, 'large') + '<div><h2>' + escapeHtml(item.name) + ' <em>' + escapeHtml(item.group) + '</em></h2><p>' + escapeHtml(item.role || '未填写身份') + '</p>' + (linkedBadge ? '<div class="life-chip-row">' + linkedBadge + '</div>' : '') + '</div><div class="life-relationship-profile-actions"><button type="button" data-relationship-action="edit">···</button></div></div>' +
+      '<div class="life-relationship-metrics"><div><span>亲密度</span><strong>' + item.score + '</strong><em>' + relationshipScoreLabel(item.score) + '</em>' + progress(item.score, item.score >= 75 ? 'var(--life-accent)' : 'var(--life-amber)') + '</div><div><span>上次联系</span><strong>' + escapeHtml(item.last || '未记录') + '</strong><em>' + escapeHtml(item.channel || '未记录') + '</em></div><div><span>预计下次联系</span><strong>' + escapeHtml(item.next) + '</strong><em>' + escapeHtml(item.nextDate || '待定') + '</em></div><div><span>关系趋势</span>' + relationshipSparkline(item.trend, item.score) + '</div></div>' +
+      '<div class="life-relationship-detail-grid"><section><div class="life-section-title"><h3>重要日期</h3></div>' + relationshipDateList(item) + renderRelationshipStatus(item) + '</section><section><div class="life-section-title"><h3>最近聊到</h3></div>' + relationshipNotesList(item) + '</section></div>' +
+      '<section class="life-relationship-memories"><div class="life-section-title"><h3>共同记忆</h3></div>' + renderRelationshipMediaCards(item.memories, 'memory') + '</section>' +
+      '<div class="life-relationship-bottom-grid"><section><h3>送的礼物</h3>' + renderRelationshipMediaMini(item.gifts, 'gift') + '</section><section><h3>一起去过的地方</h3>' + renderRelationshipMediaMini(item.places, 'place') + '</section><section><h3>我的备注</h3><p>' + escapeHtml(item.memo || '暂无备注') + '</p></section></div>' +
+      '<div class="life-relationship-lifecycle"><button class="life-secondary-btn" type="button" data-relationship-action="edit">编辑关系</button></div></section>';
   }
 
   function renderRelationshipInlineEditor(item) {
-    if (!state.relationshipInlineEditor) return '';
+    if (!state.relationshipInlineEditor || !item) return '';
     var type = state.relationshipInlineEditor;
     var configs = {
       date: ['添加重要日期', 'dates', '例如：生日 1958-06-21'],
@@ -2880,9 +3784,9 @@
       ? ''
       : (mediaKind ? renderRelationshipMediaCards(values, mediaKind) : '<div class="life-inline-list">' + values.map(function(value) { return '<span>' + escapeHtml(value) + '</span>'; }).join('') + '</div>');
     var field = config[1] === 'memo'
-      ? '<textarea class="life-textarea" name="entry">' + escapeHtml(item.memo || '') + '</textarea>'
+      ? '<textarea class="life-textarea" name="entry" placeholder="' + escapeHtml(config[2]) + '">' + escapeHtml(item.memo || '') + '</textarea>'
       : (mediaKind ? renderRelationshipMediaEditor(config[1], config[0], values, mediaKind, config[2]) : '<input class="life-input" name="entry" placeholder="' + escapeHtml(config[2]) + '">');
-    return '<section class="life-relationship-inline-editor"><form id="lifeRelationshipInlineForm"><input type="hidden" name="type" value="' + type + '"><input type="hidden" name="field" value="' + config[1] + '"><div class="life-section-title"><h3>' + config[0] + '</h3><button type="button" data-relationship-action="close-inline">关闭</button></div>' + list + field + '<div class="life-inline-actions"><button class="life-secondary-btn" type="button" data-relationship-action="close-inline">取消</button><button class="life-primary-btn" type="submit">保存到关系档案</button></div></form></section>';
+    return '<div class="life-relationship-editor-popover"><section class="life-relationship-inline-editor"><form id="lifeRelationshipInlineForm"><input type="hidden" name="type" value="' + type + '"><input type="hidden" name="field" value="' + config[1] + '"><div class="life-section-title"><h3>' + config[0] + '</h3><button type="button" data-relationship-action="close-inline">关闭</button></div>' + list + field + '<div class="life-inline-actions"><button class="life-secondary-btn" type="button" data-relationship-action="close-inline">取消</button><button class="life-primary-btn" type="submit">保存到关系档案</button></div></form></section></div>';
   }
 
   function relationshipDateList(item) {
@@ -2923,18 +3827,19 @@
   function relationshipFromForm(form) {
     var current = state.relationshipFormMode === 'edit' ? getSelectedRelationship(allRelationships()) : null;
     var score = Math.max(0, Math.min(100, Number(form.elements.score.value || 0)));
+    var nextDate = form.elements.nextDate.value || todayISO();
     return normalizeRelationship(Object.assign({}, current || {}, {
       id: current ? current.id : 'r-local-' + Date.now(),
       name: form.elements.name.value.trim() || '未命名联系人',
-      role: form.elements.role.value.trim() || '重要的人',
+      role: form.elements.role.value.trim(),
       group: form.elements.group.value,
       avatar: relationshipFormAvatarValue(form, current),
       avatarUrl: relationshipFormAvatarValue(form, current) === 'custom' ? form.elements.avatarUrl.value.trim() : '',
-      last: form.elements.last.value.trim() || '今天',
-      channel: form.elements.channel.value.trim() || '微信',
+      last: form.elements.last.value.trim(),
+      channel: form.elements.channel.value.trim(),
       score: score,
-      next: form.elements.next.value.trim() || '7 天后',
-      nextDate: form.elements.nextDate.value || '2026-05-20',
+      next: relationshipNextLabel(nextDate, ''),
+      nextDate: nextDate,
       trend: (current && current.trend ? current.trend.slice(-5) : [60, 64, 68, 72, 70]).concat([score]),
       dates: splitLines(form.elements.dates.value, []),
       notes: splitLines(form.elements.notes.value, []),
@@ -2950,7 +3855,7 @@
       type: '关系',
       icon: '♟',
       time: '14:20',
-      date: '2026-05-13',
+      date: todayISO(),
       title: '关系温度：' + item.name,
       copy: '最近联系：' + item.last + ' · ' + item.channel + '；亲密度 ' + item.score + '/100。',
       location: '关系温度',
@@ -2966,7 +3871,7 @@
   function saveRelationshipForm(form) {
     var store = getRelationshipStore();
     var item = relationshipFromForm(form);
-    var seedExists = withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === item.id; });
+    var seedExists = !directApiMode && !mockMode && withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === item.id; });
     if (seedExists) {
       store.edits[item.id] = item;
       store.added = (store.added || []).filter(function(record) { return record.id !== item.id; });
@@ -2982,13 +3887,14 @@
     state.relationshipFilter = '全部';
     state.relationshipFormMode = null;
     state.relationshipEditingId = '';
+    state.relationshipInlineEditor = '';
     showToast('关系已保存');
     renderRelationships();
   }
 
   function persistRelationshipUpdate(item, toastMessage) {
     var store = getRelationshipStore();
-    var seedExists = withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === item.id; });
+    var seedExists = !directApiMode && !mockMode && withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === item.id; });
     if (seedExists) {
       store.edits[item.id] = item;
     } else {
@@ -3015,11 +3921,13 @@
     state.selectedRelationshipId = remaining[0] ? remaining[0].id : '';
     state.relationshipFormMode = null;
     state.relationshipEditingId = '';
+    state.relationshipInlineEditor = '';
     showToast('关系已删除');
     renderRelationships();
   }
 
   function openRelationshipInlineEditor(type) {
+    if (state.relationshipFormMode !== 'edit') return;
     state.relationshipInlineEditor = type;
     renderRelationships();
   }
@@ -3045,7 +3953,7 @@
       next[field] = field === 'notes' ? [value].concat(current) : current.concat([value]);
     }
     persistRelationshipUpdate(normalizeRelationship(next), field === 'memo' ? '备注已保存' : '关系档案已更新');
-    state.relationshipInlineEditor = type === 'notes' || type === 'gift' || type === 'place' || type === 'memory' ? type : '';
+    state.relationshipInlineEditor = '';
     renderRelationships();
   }
 
@@ -3087,12 +3995,18 @@
     var editor = button.closest('[data-relationship-media-field]');
     var list = editor && editor.querySelector('.life-media-editor-list');
     if (!list) return;
+    if (list.querySelectorAll('[data-relationship-media-row]').length >= RELATIONSHIP_MEDIA_LIMIT) {
+      showToast('图片最多 2 张');
+      return;
+    }
     list.insertAdjacentHTML('beforeend', relationshipMediaEditorRow(field, kind, { text: '', image: '' }, list.querySelectorAll('[data-relationship-media-row]').length));
+    syncRelationshipMediaAddButton(editor);
   }
 
   function deleteRelationshipMediaEditorRow(button) {
     var row = button.closest('[data-relationship-media-row]');
     var list = row && row.parentNode;
+    var editor = row && row.closest('[data-relationship-media-field]');
     if (!row || !list) return;
     if (list.querySelectorAll('[data-relationship-media-row]').length <= 1) {
       var textInput = row.querySelector('[data-relationship-media-text]');
@@ -3100,9 +4014,11 @@
       if (textInput) textInput.value = '';
       if (imageInput) imageInput.value = '';
       refreshRelationshipMediaRowPreview(row);
+      syncRelationshipMediaAddButton(editor);
       return;
     }
     row.remove();
+    syncRelationshipMediaAddButton(editor);
   }
 
   function wishCategories(items) {
@@ -3129,17 +4045,20 @@
   }
 
   function wishSortValue(item) {
-    if (state.wishSort === '按想要程度排序') return -item.desire;
-    if (state.wishSort === '按价格排序') return Number(String(item.price).replace(/[^\d.]/g, '') || 0);
-    return item.status === '愿望冷却中' ? item.days : 999 + item.desire;
+    return Math.max(0, Number(item.days || 0));
   }
 
   function sortedWishes(items) {
+    var direction = state.wishSort === 'desc' ? -1 : 1;
     return items.slice().sort(function(a, b) {
       var delta = wishSortValue(a) - wishSortValue(b);
-      if (delta !== 0) return delta;
+      if (delta !== 0) return delta * direction;
       return a.name.localeCompare(b.name);
     });
+  }
+
+  function wishSortLabel() {
+    return state.wishSort === 'desc' ? '按剩余天数倒序' : '按剩余天数正序';
   }
 
   function selectedWish(items) {
@@ -3184,15 +4103,21 @@
     '</section>';
   }
 
+  function wishDesireColor(value) {
+    var desire = Math.max(0, Math.min(100, Number(value || 0)));
+    if (desire <= 30) return 'var(--life-green)';
+    if (desire <= 70) return 'var(--life-amber)';
+    return 'var(--life-red)';
+  }
+
   function wishProgressColor(item) {
-    if (item.status === '已放弃') return 'var(--life-red)';
-    if (item.status === '已实现' || item.status === '可以决定') return 'var(--life-green)';
-    return item.desire >= 70 ? 'var(--life-red)' : 'var(--life-amber)';
+    return wishDesireColor(item && item.desire);
   }
 
   function addDateDays(value, days) {
-    var parts = String(value || '2026-05-13').split('-').map(Number);
-    var date = new Date(parts[0] || 2026, (parts[1] || 5) - 1, parts[2] || 13);
+    var normalized = normalizeISODate(value, todayISO());
+    var parts = String(normalized).split('-').map(Number);
+    var date = new Date(parts[0], parts[1] - 1, parts[2]);
     date.setDate(date.getDate() + days);
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
   }
@@ -3243,7 +4168,8 @@
   }
 
   function cycleWishSort() {
-    state.wishSort = state.wishSort === '按剩余天数排序' ? '按想要程度排序' : (state.wishSort === '按想要程度排序' ? '按价格排序' : '按剩余天数排序');
+    state.wishSort = state.wishSort === 'desc' ? 'asc' : 'desc';
+    resetPage('wish');
     renderWishes();
   }
 
@@ -3253,7 +4179,8 @@
     var next = normalizeWish(Object.assign({}, current));
     if (actionName === 'extend') {
       next.days += 7;
-      next.due = addDateDays(next.due, 7);
+      next.due = addDateDays(todayISO(), next.days);
+      next.coolStart = todayISO();
       next.status = '愿望冷却中';
       persistWishUpdate(next, '冷却期已延长 7 天');
       return;
@@ -3282,19 +4209,20 @@
   function renderWishes() {
     var items = sortedWishes(allWishes());
     var filtered = items.filter(wishMatchesFilters);
-    var selected = state.wishFormMode === 'create' ? null : selectedWish(items);
+    var visibleWishes = visibleItems('wish', filtered);
+    var selected = state.wishFormMode === 'create' ? null : selectedWish(visibleWishes.length ? visibleWishes : items);
     if (selected && state.wishFormMode !== 'edit' && !filtered.some(function(item) { return item.id === selected.id; })) selected = filtered[0] || selected;
     if (selected) state.selectedWishId = selected.id;
     var groups = ['愿望冷却中', '可以决定', '已放弃', '已实现'];
     els.content.innerHTML = mockNotice() + '<section class="life-wishes-page">' +
-      '<div class="life-wish-titlebar"><div><h2 class="life-page-title">愿望冷却箱</h2><p>给冲动一点时间，让重要决定更清醒。</p></div></div>' +
+      '<div class="life-wish-titlebar"><div><h2 class="life-page-title">愿望冷却箱</h2></div></div>' +
       '<div class="life-wish-category-tabs">' + wishCategories(items).map(function(category) { return '<button type="button" class="' + (state.wishCategory === category ? 'active' : '') + '" data-wish-category="' + escapeHtml(category) + '">' + escapeHtml(category) + '</button>'; }).join('') + '</div>' +
-      '<div class="life-wish-statusbar"><div class="life-wish-status-tabs">' + wishStatusTabs(items).map(function(tab) { return '<button type="button" class="' + (state.wishFilter === tab.status ? 'active' : '') + '" data-wish-filter="' + escapeHtml(tab.status) + '">' + escapeHtml(tab.status) + ' <span>(' + tab.count + ')</span></button>'; }).join('') + '</div><div class="life-wish-tools"><button type="button" class="life-secondary-btn" data-wish-action="sort">' + escapeHtml(state.wishSort) + '⌄</button><button type="button" class="life-icon-btn" data-wish-action="toggle-view">' + iconHtml('resources') + '</button></div></div>' +
+      '<div class="life-wish-statusbar"><div class="life-wish-status-tabs">' + wishStatusTabs(items).map(function(tab) { return '<button type="button" class="' + (state.wishFilter === tab.status ? 'active' : '') + '" data-wish-filter="' + escapeHtml(tab.status) + '">' + escapeHtml(tab.status) + ' <span>(' + tab.count + ')</span></button>'; }).join('') + '</div><div class="life-wish-tools"><button type="button" class="life-secondary-btn" data-wish-action="sort">' + escapeHtml(wishSortLabel()) + '⌄</button><button type="button" class="life-icon-btn" data-wish-action="toggle-view">' + iconHtml('resources') + '</button></div></div>' +
       '<div class="life-wish-list">' + groups.map(function(status) {
-        var groupItems = filtered.filter(function(item) { return item.status === status; });
+        var groupItems = visibleWishes.filter(function(item) { return item.status === status; });
         if (!groupItems.length) return '';
         return '<section class="life-wish-group"><h3>' + escapeHtml(status) + '</h3>' + groupItems.map(function(item) { return renderWishRow(item, selected && selected.id === item.id); }).join('') + '</section>';
-      }).join('') + (!filtered.length ? '<section class="life-empty">没有符合条件的愿望。</section>' : '') + '</div></section>';
+      }).join('') + (!filtered.length ? '<section class="life-empty">没有符合条件的愿望。</section>' : '') + '</div>' + renderLoadMore('wish', visibleWishes.length, filtered.length) + '</section>';
     els.aside.innerHTML = state.wishFormMode ? renderWishForm(state.wishFormMode === 'create' ? null : selected) : (selected ? renderWishDetail(selected) : '');
   }
 
@@ -3306,57 +4234,74 @@
   }
 
   function renderWishDetail(item) {
-    return '<article class="life-wish-detail"><div class="life-wish-detail-head">' + wishPhotoHtml(item) + '<div><h2>' + escapeHtml(item.name) + '</h2><p>添加于 ' + escapeHtml(item.addedAt) + '<span>' + escapeHtml(item.category) + '</span></p></div><span class="life-badge ' + wishTone(item.status) + '">' + escapeHtml(item.status) + '</span><button class="life-mini-btn" type="button" data-wish-action="edit">编辑</button></div>' +
+    var linkedBadge = renderTimelineLinkedBadge('wish', item.id);
+    return '<article class="life-wish-detail"><div class="life-wish-detail-head">' + wishPhotoHtml(item) + '<div><h2>' + escapeHtml(item.name) + '</h2><p>添加于 ' + escapeHtml(item.addedAt) + '<span>' + escapeHtml(item.category) + '</span></p>' + (linkedBadge ? '<div class="life-chip-row">' + linkedBadge + '</div>' : '') + '</div><span class="life-badge ' + wishTone(item.status) + '">' + escapeHtml(item.status) + '</span><button class="life-mini-btn" type="button" data-wish-action="edit">编辑</button></div>' +
       '<section class="life-wish-hero"><div><span>剩余</span><strong>' + item.days + '</strong><em>天</em></div><div><h3>仍然想要吗？ <b>' + item.desire + '%</b></h3>' + progress(item.desire, wishProgressColor(item)) + '</div></section>' +
+      '<div class="life-wish-facts"><div><span>价格</span><strong>' + escapeHtml(item.price) + '</strong></div><div><span>冷却期</span><strong>' + escapeHtml(item.coolStart) + ' ~ ' + escapeHtml(item.due) + '</strong><button type="button" data-wish-action="adjust-cooling">调整冷却期</button></div></div>' +
       '<section class="life-wish-section"><h3>原始理由</h3><p>' + escapeHtml(item.reason) + '</p></section>' +
       '<div class="life-wish-reason-grid"><section><h3>补充说明</h3><p>' + escapeHtml(item.notes || '暂时没有更多补充。') + '</p></section><section><h3>可能的反对理由</h3>' + (item.counterReasons.length ? item.counterReasons : ['还需要更多信息']).map(function(text) { return '<p>• ' + escapeHtml(text) + '</p>'; }).join('') + '</section></div>' +
-      '<div class="life-wish-facts"><div><span>价格</span><strong>' + escapeHtml(item.price) + '</strong><button type="button" data-wish-action="price-history">价格历史</button><small>' + escapeHtml(item.priceHistory) + '</small></div><div><span>冷却期</span><strong>' + escapeHtml(item.coolStart) + ' ~ ' + escapeHtml(item.due) + '</strong><button type="button" data-wish-action="adjust-cooling">调整冷却期</button></div></div>' +
       '<section class="life-wish-section"><h3>替代方案</h3><div class="life-wish-options">' + (item.alternatives.length ? item.alternatives : ['暂无替代方案']).map(function(text, idx) { return '<div><span>' + (idx + 1) + '</span><p>' + escapeHtml(text) + '</p><button type="button" data-wish-action="view-option">查看方案</button></div>'; }).join('') + '</div></section>' +
       '<section class="life-wish-section"><h3>想象拥有后的生活</h3><p>' + escapeHtml(item.future) + '</p></section>' +
       '<section class="life-wish-section"><h3>下一步计划</h3><div class="life-wish-plan">' + (item.plan.length ? item.plan : ['补充下一步计划']).map(function(text, idx) { return '<label><input type="checkbox" data-wish-plan-index="' + idx + '"' + (item.completedPlan.indexOf(String(idx)) >= 0 ? ' checked' : '') + '> ' + escapeHtml(text) + '</label>'; }).join('') + '</div></section>' +
       '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-wish-action="extend">延长冷却期</button>' + (item.status === '已放弃' ? '<button class="life-secondary-btn" type="button" data-wish-action="decide">重新考虑</button>' : '<button class="life-secondary-btn" type="button" data-wish-action="drop">放入放弃区</button>') + (item.status === '已实现' ? '' : '<button class="life-primary-btn" type="button" data-wish-action="decide">可以决定了</button><button class="life-primary-btn amber" type="button" data-wish-action="realize">已实现</button>') + '</footer></article>';
   }
 
+  function syncWishDueFromDays(form) {
+    if (!form || !form.elements.days || !form.elements.due) return;
+    var days = Math.max(0, Number(form.elements.days.value || 0));
+    form.elements.days.value = days;
+    if (!form.elements.status || form.elements.status.value === '愿望冷却中') {
+      form.elements.due.value = addDateDays(todayISO(), days);
+    }
+  }
+
   function renderWishForm(item) {
+    var defaultDays = 21;
     var source = item || normalizeWish({
       id: 'w-local-' + Date.now(),
       name: '',
       category: state.wishCategory === '全部' ? '生活' : state.wishCategory,
       reason: '',
       price: '',
-      days: 21,
-      due: '2026-06-03',
+      days: defaultDays,
+      due: addDateDays(todayISO(), defaultDays),
       desire: 50,
-      alternatives: [''],
-      plan: ['']
+      alternatives: [],
+      plan: [],
+      coolStart: todayISO(),
+      future: ''
     });
     var title = state.wishFormMode === 'edit' ? '编辑愿望' : '添加愿望';
+    var linkedMoment = state.wishFormMode === 'edit' ? linkedTimelineMoment('wish', source.id) : null;
     return '<form id="lifeWishForm" class="life-wish-detail life-wish-form"><div class="life-form-title"><h2>' + title + '</h2><p>记录想要的原因、冷却期、替代方案和下一步计划，保存后进入对应状态栏。</p></div>' +
       '<input type="hidden" name="id" value="' + escapeHtml(source.id) + '">' +
-      '<div class="life-two-grid"><label>愿望名称<input class="life-input" name="name" value="' + escapeHtml(source.name) + '" required></label><label>分类<select class="life-select" name="category">' + ['数码','旅行','学习','生活','关系','职业','健康'].map(function(category) { return '<option value="' + category + '"' + (source.category === category ? ' selected' : '') + '>' + category + '</option>'; }).join('') + '</select></label></div>' +
+      '<div class="life-two-grid"><label>愿望名称<input class="life-input" name="name" value="' + escapeHtml(source.name) + '" placeholder="例如：主机电脑" required></label><label>分类<select class="life-select" name="category">' + ['数码','旅行','学习','生活','关系','职业','健康'].map(function(category) { return '<option value="' + category + '"' + (source.category === category ? ' selected' : '') + '>' + category + '</option>'; }).join('') + '</select></label></div>' +
       '<div class="life-three-grid"><label>状态<select class="life-select" name="status">' + ['愿望冷却中','可以决定','已放弃','已实现'].map(function(status) { return '<option value="' + status + '"' + (source.status === status ? ' selected' : '') + '>' + status + '</option>'; }).join('') + '</select></label><label>剩余天数<input class="life-input" type="number" min="0" name="days" value="' + escapeHtml(source.days) + '"></label><label>冷却到<input class="life-input" type="date" name="due" value="' + escapeHtml(source.due) + '"></label></div>' +
-      '<label>价格<input class="life-input" name="price" value="' + escapeHtml(source.price) + '"></label>' +
+      '<label>价格<input class="life-input" name="price" value="' + escapeHtml(source.price) + '" placeholder="例如：9000"></label>' +
       renderWishProductImageEditor(source) +
-      '<label class="life-wish-range">当前想要程度 <strong><span data-wish-desire-value>' + source.desire + '</span>/100</strong><input type="range" min="0" max="100" name="desire" value="' + escapeHtml(source.desire) + '" data-wish-desire-range></label>' +
-      '<label>原始理由<textarea class="life-textarea" name="reason" required>' + escapeHtml(source.reason) + '</textarea></label>' +
-      '<label>补充说明<textarea class="life-textarea" name="notes">' + escapeHtml(source.notes || '') + '</textarea></label>' +
+      '<label class="life-wish-range">当前想要程度 <strong><span data-wish-desire-value>' + source.desire + '</span>/100</strong><input type="range" min="0" max="100" name="desire" value="' + escapeHtml(source.desire) + '" style="accent-color:' + wishDesireColor(source.desire) + '" data-wish-desire-range></label>' +
+      '<label>原始理由<textarea class="life-textarea" name="reason" placeholder="写下真正想要它的原因" required>' + escapeHtml(source.reason) + '</textarea></label>' +
+      '<label>补充说明<textarea class="life-textarea" name="notes" placeholder="可选：记录背景、限制或观察">' + escapeHtml(source.notes || '') + '</textarea></label>' +
       '<label>可能的反对理由<textarea class="life-textarea" name="counterReasons" placeholder="一行一个反对理由">' + escapeHtml((source.counterReasons || []).join('\n')) + '</textarea></label>' +
       '<label>替代方案<textarea class="life-textarea" name="alternatives" placeholder="一行一个替代方案">' + escapeHtml((source.alternatives || []).join('\n')) + '</textarea></label>' +
       '<label>下一步计划<textarea class="life-textarea" name="plan" placeholder="一行一个计划">' + escapeHtml((source.plan || []).join('\n')) + '</textarea></label>' +
-      '<label>想象拥有后的生活<textarea class="life-textarea" name="future">' + escapeHtml(source.future || '') + '</textarea></label>' +
-      renderTimelineLinkControls(true) +
+      '<label>想象拥有后的生活<textarea class="life-textarea" name="future" placeholder="可选：写下拥有后的真实使用场景">' + escapeHtml(source.future || '') + '</textarea></label>' +
+      renderTimelineLinkControls(state.wishFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.wishFormMode === 'edit' && !!linkedMoment) +
       '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-wish-action="cancel-form">取消</button>' + (state.wishFormMode === 'edit' ? '<button class="life-secondary-btn danger" type="button" data-wish-action="delete">删除愿望</button>' : '') + '<button class="life-primary-btn" type="submit">保存愿望</button></footer></form>';
   }
 
   function wishFromForm(form) {
     var existing = state.wishFormMode === 'edit' ? selectedWish(allWishes()) : null;
+    var status = form.elements.status.value;
+    var days = Math.max(0, Number(form.elements.days.value || 0));
+    var due = status === '愿望冷却中' ? addDateDays(todayISO(), days) : (form.elements.due.value || todayISO());
     var item = normalizeWish(Object.assign({}, existing || {}, {
       id: form.elements.id.value || 'w-local-' + Date.now(),
       name: form.elements.name.value.trim() || '未命名愿望',
       category: form.elements.category.value,
-      status: form.elements.status.value,
-      days: Number(form.elements.days.value || 0),
-      due: form.elements.due.value || '2026-06-03',
+      status: status,
+      days: days,
+      due: due,
       desire: Number(form.elements.desire.value || 0),
       price: form.elements.price.value.trim() || '待定',
       photo: form.elements.photo ? form.elements.photo.value : wishPhoto(existing || {}),
@@ -3366,9 +4311,9 @@
       counterReasons: splitLines(form.elements.counterReasons.value, []),
       alternatives: splitLines(form.elements.alternatives.value, []),
       plan: splitLines(form.elements.plan.value, []),
-      future: form.elements.future.value.trim() || '可以更自由地记录和表达，让生活更有仪式感。',
-      addedAt: (existing && existing.addedAt) || '2026-05-13',
-      coolStart: (existing && existing.coolStart) || '2026-05-01',
+      future: form.elements.future.value.trim(),
+      addedAt: (existing && existing.addedAt) || todayISO(),
+      coolStart: status === '愿望冷却中' ? todayISO() : ((existing && existing.coolStart) || todayISO()),
       completedPlan: existing && existing.id === form.elements.id.value ? existing.completedPlan : []
     }));
     if (item.status !== '愿望冷却中') item.days = 0;
@@ -3380,7 +4325,7 @@
       type: '愿望',
       icon: '❄',
       time: '16:40',
-      date: item.addedAt || '2026-05-13',
+      date: item.addedAt || todayISO(),
       title: '愿望冷却：' + item.name,
       copy: '当前状态：' + item.status + '；想要程度 ' + item.desire + '%；价格 ' + item.price + '。',
       location: '愿望冷却箱',
@@ -3422,6 +4367,10 @@
     return String(state.monthlyMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
+  function defaultMonthlySummary() {
+    return '这个月是充实又温柔的一个月。\n\n工作上有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要：健康的身体、真诚的关系、持续成长，以及自由的时间。\n\n下个月，希望继续保持这份节奏，也给自己更多的耐心和信任。';
+  }
+
   function getMonthlyMeta() {
     var store = getMonthlyStore();
     var key = monthlyKey();
@@ -3434,7 +4383,8 @@
         title: '写给 3 个月后的自己',
         date: '2026-05-13 写下',
         body: '希望那时的你，还记得今天想要的生活是什么样子。也希望你依然在勇敢地选择自己。'
-      }
+      },
+      summary: store.summaries[key] || defaultMonthlySummary()
     };
   }
 
@@ -3446,6 +4396,7 @@
     if (key === 'archived') store.archived[month] = value;
     if (key === 'letter') store.letters[month] = value;
     if (key === 'quote') store.quotes[month] = value;
+    if (key === 'summary') store.summaries[month] = value;
     saveMonthlyStore(store);
     if (message) showToast(message);
     renderMonthly();
@@ -3463,6 +4414,7 @@
     }
     state.monthlyLetterMode = false;
     state.monthlyQuoteMode = false;
+    state.monthlySummaryMode = false;
     renderMonthly();
   }
 
@@ -3472,8 +4424,24 @@
     return Number(match[2] || 1);
   }
 
+  function isRealImageSource(value) {
+    var text = String(value || '').trim();
+    return /^(data:image\/|blob:|https?:\/\/|\.\/|\/|assets\/|uploads\/)/.test(text) || /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(text);
+  }
+
+  function safeCssImageUrl(value) {
+    return String(value || '').replace(/['"\\\n\r]/g, '');
+  }
+
+  function monthlyHighlightImageSource(item) {
+    if (!item) return '';
+    if (isRealImageSource(item.image)) return item.image;
+    if (isRealImageSource(item.photo)) return item.photo;
+    return '';
+  }
+
   function monthlyMediaImageHtml(item) {
-    if (item.image) return '<span class="life-photo life-uploaded-photo"><img src="' + escapeHtml(item.image) + '" alt=""></span>';
+    if (monthlyHighlightImageSource(item)) return '';
     return '<span class="life-photo ' + escapeHtml(item.photo || 'photo-book') + '"></span>';
   }
 
@@ -3583,7 +4551,10 @@
   }
 
   function renderMonthlyHighlightCard(item, idx) {
-    return '<article class="life-monthly-highlight ' + (idx === 0 ? 'featured' : '') + '" data-view="' + escapeHtml(item.view || 'timeline') + '">' + monthlyMediaImageHtml(item) + '<div><small>' + monthlyDateText(item.day) + ' · 来自' + escapeHtml(item.source || '时间河流') + '</small><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.copy) + '</p><footer><span class="life-badge ' + (idx === 0 ? 'amber' : idx === 1 ? 'green' : idx === 2 ? 'red' : 'blue') + '">' + escapeHtml(item.tag) + '</span><span>❤ ' + item.likes + '</span></footer></div></article>';
+    var image = monthlyHighlightImageSource(item);
+    var backgroundClass = image ? ' has-background' : '';
+    var style = image ? ' style="background-image:url(\'' + escapeHtml(safeCssImageUrl(image)) + '\')"' : '';
+    return '<article class="life-monthly-highlight ' + (idx === 0 ? 'featured' : '') + backgroundClass + '"' + style + '>' + monthlyMediaImageHtml(item) + '<div><small>' + monthlyDateText(item.day) + ' · 来自' + escapeHtml(item.source || '时间河流') + '</small><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.copy) + '</p><footer><span class="life-badge ' + (idx === 0 ? 'amber' : idx === 1 ? 'green' : idx === 2 ? 'red' : 'blue') + '">' + escapeHtml(item.tag) + '</span><span>❤ ' + item.likes + '</span></footer></div></article>';
   }
 
   function renderMonthlyDecisionRows() {
@@ -3599,15 +4570,30 @@
     }).join('');
   }
 
-  function renderMonthlyPlaces() {
-    return [
-      ['苏州 · 拙政园', 'photo-garden'],
-      ['上海 · 外滩', 'photo-river'],
-      ['杭州 · 西湖', 'photo-mountain'],
-      ['南京 · 先锋书店', 'photo-cafe'],
-      ['家附近的公园', 'photo-book']
-    ].map(function(item) {
-      return '<article class="life-monthly-place"><span class="life-photo ' + item[1] + '"></span><strong>' + item[0] + '</strong></article>';
+  function monthlyWatchItems() {
+    var watched = allWatchEntries().filter(function(item) {
+      return item.watchState !== 'want';
+    }).sort(function(a, b) {
+      return b.date.localeCompare(a.date) || b.rating - a.rating;
+    });
+    var picked = watched.filter(function(item) {
+      return Number(item.year) === Number(state.monthlyYear) && Number(item.month) === Number(state.monthlyMonth);
+    });
+    var used = {};
+    picked.forEach(function(item) { used[item.id] = true; });
+    watched.forEach(function(item) {
+      if (picked.length < 5 && !used[item.id]) {
+        used[item.id] = true;
+        picked.push(item);
+      }
+    });
+    return picked.slice(0, 5);
+  }
+
+  function renderMonthlyWatchItems(items) {
+    if (!items.length) return '<p class="life-empty">暂无观影记录。</p>';
+    return items.map(function(item) {
+      return '<article class="life-monthly-place life-monthly-watch-item">' + watchCoverHtml(item, '') + '<strong>' + escapeHtml(item.title) + '</strong><small>' + watchKindLabel(item.kind) + ' · ' + item.rating.toFixed(1) + '</small></article>';
     }).join('');
   }
 
@@ -3619,20 +4605,25 @@
     }).join('');
   }
 
-  function renderMonthlyLearned() {
-    return ['睡眠比我想象中更影响情绪，早睡真的有用。', '把大目标拆成小任务，行动会更轻松。', '真诚地沟通，可以减少很多误解和内耗。', '给自己留出独处的时间，才能听见内心的声音。', '慢慢来，比匆忙赶路更重要。'].map(function(text, idx) {
-      return '<button type="button" class="life-monthly-learning-row" data-monthly-action="view-learnings"><span class="life-monthly-learn-icon">' + ['❤', '💡', '👤', '★', '☘'][idx] + '</span><strong>' + escapeHtml(text) + '</strong></button>';
-    }).join('');
+  function renderMonthlySummary(summary) {
+    return '<div class="life-monthly-summary">' + String(summary || defaultMonthlySummary()).split(/\n+/).map(function(text) {
+      return text.trim() ? '<p>' + escapeHtml(text.trim()) + '</p>' : '';
+    }).join('') + '</div>';
+  }
+
+  function renderMonthlySummaryForm(summary) {
+    return '<form id="lifeMonthlySummaryForm" class="life-monthly-summary-form"><textarea class="life-textarea" name="summary">' + escapeHtml(summary || defaultMonthlySummary()) + '</textarea><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-summary">取消</button><button class="life-primary-btn" type="submit">保存总结</button></div></form>';
   }
 
   function renderMonthly() {
     var meta = getMonthlyMeta();
     var scores = monthlyMoodScores();
-    els.content.innerHTML = mockNotice() + '<section class="life-monthly-page"><header class="life-monthly-header"><div><h2>本月值得记住 <button type="button" class="life-monthly-bookmark ' + (meta.bookmarked ? 'active' : '') + '" data-monthly-action="bookmark">' + iconHtml('monthly') + '</button></h2></div><div class="life-monthly-month"><button type="button" data-monthly-action="prev-month">‹</button><strong>' + monthlyTitle() + '</strong><button type="button" data-monthly-action="next-month">›</button></div></header>' +
+    var monthlyWatch = monthlyWatchItems();
+    els.content.innerHTML = mockNotice() + '<section class="life-monthly-page"><header class="life-monthly-header"><div><h2 class="life-page-title">本月值得记住 <button type="button" class="life-monthly-bookmark ' + (meta.bookmarked ? 'active' : '') + '" data-monthly-action="bookmark">' + iconHtml('monthly') + '</button></h2></div><div class="life-monthly-month"><button type="button" data-monthly-action="prev-month">‹</button><strong>' + monthlyTitle() + '</strong><button type="button" data-monthly-action="next-month">›</button></div></header>' +
       '<section class="life-monthly-highlights">' + monthlyHighlights().map(renderMonthlyHighlightCard).join('') + '</section>' +
-      '<section class="life-monthly-grid two"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>做过的决定</h3><span>4 个决定</span><button type="button" data-monthly-action="view-decisions">查看全部 →</button></div><div class="life-monthly-lines">' + renderMonthlyDecisionRows() + '</div></article><article class="life-monthly-card life-monthly-mood-card"><div class="life-monthly-card-head"><h3>情绪模式</h3><span>整体感受：<b>良好</b></span><button type="button" data-monthly-action="view-mood">查看情绪 →</button></div><p class="life-monthly-sub">本月情绪曲线</p><div class="life-monthly-mood-wrap"><div class="life-monthly-mood-scale"><span>晴朗</span><span>微笑</span><span>平静</span><span>低落</span></div>' + monthlyMoodSvg(scores) + '</div></article></section>' +
-      '<section class="life-monthly-grid two compact"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>见过的人</h3><span>' + allRelationships().length + ' 位</span></div><div class="life-monthly-people">' + renderMonthlyPeople() + '</div></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>去过的地方</h3><span>5 个地点</span><button type="button" data-monthly-action="view-map">查看地图 →</button></div><div class="life-monthly-places">' + renderMonthlyPlaces() + '</div></article></section>' +
-      '<section class="life-monthly-grid three"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>愿望结果</h3><span>3 个结果</span></div>' + renderMonthlyWishResults() + '<button class="life-link-btn" type="button" data-view="wishes">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>学到的事</h3><span>5 条</span></div><div class="life-monthly-learned">' + renderMonthlyLearned() + '</div><button class="life-link-btn" type="button" data-monthly-action="view-learnings">查看全部 →</button></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>总结感受</h3></div><div class="life-monthly-summary"><p>这个月是充实又温柔的一个月。</p><p>工作上有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要：健康的身体、真诚的关系、持续成长，以及自由的时间。</p><p>下个月，希望继续保持这份节奏，也给自己更多的耐心和信任。</p></div></article></section></section>';
+      '<section class="life-monthly-grid two"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>做过的决定</h3><span>4 个决定</span></div><div class="life-monthly-lines">' + renderMonthlyDecisionRows() + '</div></article><article class="life-monthly-card life-monthly-mood-card"><div class="life-monthly-card-head"><h3>情绪模式</h3><span>整体感受：<b>良好</b></span></div><p class="life-monthly-sub">本月情绪曲线</p><div class="life-monthly-mood-wrap"><div class="life-monthly-mood-scale"><span>晴朗</span><span>微笑</span><span>平静</span><span>低落</span></div>' + monthlyMoodSvg(scores) + '</div></article></section>' +
+      '<section class="life-monthly-grid two compact"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>见过的人</h3><span>' + allRelationships().length + ' 位</span></div><div class="life-monthly-people">' + renderMonthlyPeople() + '</div></article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>观影墙</h3><span>' + monthlyWatch.length + ' 部影片</span></div><div class="life-monthly-places">' + renderMonthlyWatchItems(monthlyWatch) + '</div></article></section>' +
+      '<section class="life-monthly-grid two"><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>愿望结果</h3><span>3 个结果</span></div>' + renderMonthlyWishResults() + '</article><article class="life-monthly-card"><div class="life-monthly-card-head"><h3>总结感受</h3>' + (state.monthlySummaryMode ? '<span>编辑中</span>' : '<button type="button" data-monthly-action="edit-summary">修改</button>') + '</div>' + (state.monthlySummaryMode ? renderMonthlySummaryForm(meta.summary) : renderMonthlySummary(meta.summary)) + '</article></section></section>';
     els.aside.innerHTML = renderMonthlyAside(meta);
   }
 
@@ -3646,29 +4637,17 @@
   }
 
   function renderMonthlyQuoteForm(quote) {
-    return '<form id="lifeMonthlyQuoteForm" class="life-monthly-quote-form"><label>一句话<textarea class="life-textarea" name="quote" maxlength="80">' + escapeHtml(quote) + '</textarea></label>' + renderTimelineLinkControls(true) + '<div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-quote">取消</button><button class="life-primary-btn" type="submit">保存一句话</button></div></form>';
+    return '<form id="lifeMonthlyQuoteForm" class="life-monthly-quote-form"><label>一句话<textarea class="life-textarea" name="quote" maxlength="80">' + escapeHtml(quote) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-quote">取消</button><button class="life-primary-btn" type="submit">保存一句话</button></div></form>';
   }
 
   function renderMonthlyLetterForm(letter) {
-    return '<form id="lifeMonthlyLetterForm" class="life-monthly-letter-form"><label>标题<input class="life-input" name="title" value="' + escapeHtml(letter.title) + '"></label><label>内容<textarea class="life-textarea" name="body">' + escapeHtml(letter.body) + '</textarea></label>' + renderTimelineLinkControls(true) + '<div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-letter">取消</button><button class="life-primary-btn" type="submit">保存信件</button></div></form>';
+    return '<form id="lifeMonthlyLetterForm" class="life-monthly-letter-form"><label>标题<input class="life-input" name="title" value="' + escapeHtml(letter.title) + '"></label><label>内容<textarea class="life-textarea" name="body">' + escapeHtml(letter.body) + '</textarea></label><div><button class="life-secondary-btn" type="button" data-monthly-action="cancel-letter">取消</button><button class="life-primary-btn" type="submit">保存信件</button></div></form>';
   }
 
   function saveMonthlyQuote(form) {
     var quote = form.elements.quote.value.trim() || '在探索与连接中，我更靠近自己想要的生活。';
     state.monthlyQuoteMode = false;
-    upsertLinkedTimelineMoment('monthly', monthlyKey() + '-quote', form.elements.linkTimeline && form.elements.linkTimeline.checked, {
-      type: '记忆',
-      icon: '▣',
-      time: '20:15',
-      date: state.monthlyYear + '-' + String(state.monthlyMonth + 1).padStart(2, '0') + '-13',
-      title: '本月一句话',
-      copy: quote,
-      location: '本月值得记住',
-      photos: ['photo-book'],
-      tags: ['本月值得记住', '月度回顾'],
-      linkedView: 'monthly',
-      privacy: form.elements.timelinePrivacy ? form.elements.timelinePrivacy.value : '仅自己可见'
-    });
+    removeLinkedTimelineMoment('monthly', monthlyKey() + '-quote');
     monthlySet('quote', quote, '本月一句话已保存');
   }
 
@@ -3679,20 +4658,14 @@
       body: form.elements.body.value.trim() || '希望那时的你，还记得今天想要的生活是什么样子。'
     };
     state.monthlyLetterMode = false;
-    upsertLinkedTimelineMoment('monthly', monthlyKey() + '-letter', form.elements.linkTimeline && form.elements.linkTimeline.checked, {
-      type: '记忆',
-      icon: '▣',
-      time: '20:15',
-      date: '2026-05-13',
-      title: letter.title,
-      copy: letter.body,
-      location: '本月值得记住',
-      photos: ['photo-book'],
-      tags: ['本月值得记住', '写给未来'],
-      linkedView: 'monthly',
-      privacy: form.elements.timelinePrivacy ? form.elements.timelinePrivacy.value : '仅自己可见'
-    });
+    removeLinkedTimelineMoment('monthly', monthlyKey() + '-letter');
     monthlySet('letter', letter, '信件已保存');
+  }
+
+  function saveMonthlySummary(form) {
+    var summary = form.elements.summary.value.trim() || defaultMonthlySummary();
+    state.monthlySummaryMode = false;
+    monthlySet('summary', summary, '总结感受已保存');
   }
 
   function handleMonthlyAction(actionName) {
@@ -3703,6 +4676,7 @@
     if (actionName === 'edit-quote') {
       state.monthlyQuoteMode = true;
       state.monthlyLetterMode = false;
+      state.monthlySummaryMode = false;
       renderMonthly();
     }
     if (actionName === 'cancel-quote') {
@@ -3712,10 +4686,21 @@
     if (actionName === 'write-letter') {
       state.monthlyQuoteMode = false;
       state.monthlyLetterMode = true;
+      state.monthlySummaryMode = false;
       renderMonthly();
     }
     if (actionName === 'cancel-letter') {
       state.monthlyLetterMode = false;
+      renderMonthly();
+    }
+    if (actionName === 'edit-summary') {
+      state.monthlyQuoteMode = false;
+      state.monthlyLetterMode = false;
+      state.monthlySummaryMode = true;
+      renderMonthly();
+    }
+    if (actionName === 'cancel-summary') {
+      state.monthlySummaryMode = false;
       renderMonthly();
     }
     if (actionName === 'generate-report') monthlySet('report', { createdAt: '2026-05-13 09:30', records: allMoments().length, moodAverage: 64 }, '月报已生成');
@@ -3723,10 +4708,6 @@
       if (!meta.archived && !window.confirm('确认归档本月回顾吗？归档后仍可继续查看。')) return;
       monthlySet('archived', true, '本月已归档');
     }
-    if (actionName === 'view-decisions') setView('decisions');
-    if (actionName === 'view-map') showToast('地图视图已筛选本月地点');
-    if (actionName === 'view-mood') setView('mood');
-    if (actionName === 'view-learnings') setView('review');
   }
 
   function addTypeList() {
@@ -3743,9 +4724,9 @@
   }
 
   function addDateParts(form) {
-    var date = addValue(form, 'date', '2026-05-13');
+    var date = addValue(form, 'date', todayISO());
     var time = addValue(form, 'time', '15:30');
-    return { date: date, time: time, day: Number(date.split('-')[2] || 13) };
+    return { date: date, time: time, day: Number(date.split('-')[2] || Number(todayISO().slice(8, 10))) };
   }
 
   function addSelectedMood(form) {
@@ -3770,8 +4751,11 @@
   function addTitleForType(type, form) {
     if (type === '决定') return addValue(form, 'decisionTitle', '是否接受新的 Offer？');
     if (type === '情绪') return addSelectedMood(form) + ' ' + addValue(form, 'moodScore', '78') + ' 分';
-    if (type === '关系') return '和 ' + addValue(form, 'relationshipName', addValue(form, 'people', '张敏')) + ' 的互动';
-    if (type === '愿望') return addValue(form, 'wishName', '相机 Sony A7C II');
+    if (type === '关系') {
+      var person = addValue(form, 'relationshipName', addValue(form, 'people', ''));
+      return person ? '和 ' + person + ' 的互动' : '未命名关系互动';
+    }
+    if (type === '愿望') return addValue(form, 'wishName', '未命名愿望');
     if (type === '健康') return addValue(form, 'healthSignal', '身体状态记录');
     if (type === '项目') return addValue(form, 'projectName', '个人网站改版');
     return addValue(form, 'memoryTitle', '今天在江边散步');
@@ -3817,13 +4801,17 @@
   }
 
   function renderAdd() {
-    els.content.innerHTML = mockNotice() + '<section class="life-add-workbench-page"><div class="life-add-workbench-head"><h2>添加一刻</h2><p>记录此刻的生活片段，丰富你的时间河流</p></div><form class="life-add-workbench" id="lifeAddForm">' +
+    var baseDate = todayISO();
+    var decisionReviewDefault = addMonthsToDate(baseDate, 6);
+    var relationshipNextDefault = addDateDays(baseDate, 7);
+    var healthReminderDefault = baseDate;
+    els.content.innerHTML = mockNotice() + '<section class="life-add-workbench-page"><div class="life-add-workbench-head"><h2 class="life-page-title">添加一刻</h2></div><form class="life-add-workbench" id="lifeAddForm">' +
       '<section class="life-add-editor-card">' + renderAddTypeButtons('life-add-primary-tabs') +
       '<div class="life-add-section"><label class="life-add-body-label">今天发生了什么？<textarea class="life-textarea life-add-body" name="body" data-add-body-source maxlength="2000" placeholder="记录这一刻的想法、经历或感受...">下午在江边散步，阳光很好，江风很舒服。路过一家咖啡馆，坐下来写了会儿笔记，感觉很治愈。</textarea><span data-add-count>126/2000</span></label>' + renderAddToolbar() + '</div>' +
       '<div class="life-add-section life-add-module-shell">' + renderAddWorkbenchPanels() + '</div>' +
       '<div class="life-add-section"><div class="life-two-grid"><label>添加人物<input class="life-input" name="people" placeholder="选择或搜索人物..." value="张敏, Emma"></label><label>添加地点<input class="life-input" name="location" placeholder="选择或搜索地点..." value="上海 · 徐汇滨江"></label></div></div>' +
       '<div class="life-add-section"><label>上传图片 / 附件' + renderAddPhotoRail() + '</label></div>' +
-      '<div class="life-add-section"><div class="life-two-grid"><div class="life-two-grid"><label>日期<input class="life-input" type="date" name="date" value="2026-05-13"></label><label>时间<input class="life-input" type="time" name="time" value="15:30"></label></div><label>标签<input class="life-input" name="tags" value="日常, 散步, 咖啡馆, 笔记"></label></div></div>' +
+      '<div class="life-add-section"><div class="life-two-grid"><div class="life-two-grid"><label>日期<input class="life-input" type="date" name="date" value="' + escapeHtml(baseDate) + '"></label><label>时间<input class="life-input" type="time" name="time" value="15:30"></label></div><label>标签<input class="life-input" name="tags" value="日常, 散步, 咖啡馆, 笔记"></label></div></div>' +
       '<div class="life-add-footer-row"><label><input type="checkbox" name="linkTimeline" checked> 关联到时间河流</label><label><select class="life-select" name="privacy"><option>仅自己可见</option><option>可进入月度回顾</option></select></label><button class="life-secondary-btn" type="button" data-action="preview-add">预览</button><button class="life-primary-btn" type="submit">保存这一刻</button></div></section>' +
       '<aside class="life-add-side-rail"><section class="life-detail-card life-add-preview-panel"><h2 class="life-detail-title">预览</h2><p class="life-panel-sub">在时间河流中的样子</p><div id="lifeAddPreview"></div></section><section class="life-detail-card life-association-card"><h2 class="life-detail-title">智能关联建议</h2><div class="life-association-list" id="lifeAssociationList"></div></section><section class="life-detail-card life-add-tip"><h2 class="life-detail-title">小贴士</h2><p class="life-card-copy">切换类型后，只填写当前模块需要的内容。保存后会同步写入时间河流和对应功能页。</p></section></aside>' +
       '</form></section>';
@@ -3834,11 +4822,11 @@
 
   function renderAddWorkbenchPanels() {
     return '<section class="life-add-module-panel life-add-memory-panel" data-add-module="记忆"><label>选择心情' + renderAddMoodPicker(false) + '</label><input type="hidden" name="memoryTitle" value="今天在江边散步"></section>' +
-      '<section class="life-add-module-panel life-add-theme-orange is-hidden" data-add-module="决定"><div class="life-add-inline-title">' + addTypeIcon('决定') + '<strong>决策信息</strong><span>记录选择、信心和复盘计划</span></div><label>决定背景（可选）<input class="life-input" name="decisionTitle" value="是否接受新工作的 Offer？"></label>' + renderDecisionOptionEditor() + '<div class="life-two-grid"><label>我的倾向<select class="life-select" name="decisionChoice"><option>A. 接受 Offer</option><option>B. 暂不接受</option><option>C. 继续观望</option></select></label><label>复盘计划<input class="life-input" type="date" name="decisionReviewDate" value="2026-11-13"></label></div><label class="life-range-line">信心<input type="range" min="0" max="100" name="decisionConfidence" value="70"><b>70/100</b></label><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-orange is-hidden" data-add-module="决定"><div class="life-add-inline-title">' + addTypeIcon('决定') + '<strong>决策信息</strong><span>记录选择、信心和复盘计划</span></div><label>决定背景（可选）<input class="life-input" name="decisionTitle" value="是否接受新工作的 Offer？"></label>' + renderDecisionOptionEditor() + '<div class="life-two-grid"><label>我的倾向<select class="life-select" name="decisionChoice"><option>A. 接受 Offer</option><option>B. 暂不接受</option><option>C. 继续观望</option></select></label><label>复盘计划<input class="life-input" type="date" name="decisionReviewDate" value="' + escapeHtml(decisionReviewDefault) + '"></label></div><label class="life-range-line">信心<input type="range" min="0" max="100" name="decisionConfidence" value="70"><b>70/100</b></label><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label></section>' +
       '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="情绪"><label>选择心情' + renderAddMoodPicker(false) + '</label><label class="life-range-line">强度<input type="range" min="0" max="100" name="moodScore" value="78"><b>78/100</b></label><div class="life-three-grid"><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label></div><div class="life-add-chip-group"><span>身体信号</span><button type="button">精力充沛</button><button type="button">肩颈酸痛</button><button type="button">睡眠不足</button><button type="button">专注良好</button></div></section>' +
-      '<section class="life-add-module-panel life-add-theme-purple is-hidden" data-add-module="关系"><div class="life-add-inline-title">' + addTypeIcon('关系') + '<strong>关系信息</strong><span>更新联系人互动、温度和下次提醒</span></div><div class="life-two-grid"><label>选择 / 搜索人物<input class="life-input" name="relationshipName" value="张敏（大学同学）"></label><label>上次联系<input class="life-input" name="relationshipLast" value="2026-05-10（微信）"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" value="聊到各自的工作近况和下次聚会时间。"></label><div class="life-two-grid"><label>下次联系提醒<input class="life-input" type="date" name="relationshipNextDate" value="2026-05-24"></label><label class="life-heart-line">关系温度<input type="range" min="0" max="100" name="relationshipScore" value="80"><span>4/5</span></label></div></section>' +
-      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="愿望"><div class="life-add-inline-title">' + addTypeIcon('愿望') + '<strong>愿望信息</strong><span>记录想要程度和冷却计划</span></div><div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" value="相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" value="¥12,999"></label></div><label class="life-range-line">当前想要程度<input type="range" min="0" max="100" name="wishDesire" value="65"><b>65%</b></label><div class="life-add-radio-box"><label><input type="radio" name="wishStatus" value="愿望冷却中" checked> 继续冷却</label><label><input type="radio" name="wishStatus" value="可以决定"> 可以决定了</label></div><label>替代方案<input class="life-input" name="wishAlternatives" value="先用手机练习；租借体验；观望新品"></label></section>' +
-      '<section class="life-add-module-panel life-add-theme-green is-hidden" data-add-module="健康"><div class="life-add-inline-title">' + addTypeIcon('健康') + '<strong>健康信息</strong><span>记录身体状态和后续提醒</span></div><div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="2026-05-15"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-purple is-hidden" data-add-module="关系"><div class="life-add-inline-title">' + addTypeIcon('关系') + '<strong>关系信息</strong><span>更新联系人互动、温度和预计提醒</span></div><div class="life-two-grid"><label>选择 / 搜索人物<input class="life-input" name="relationshipName" placeholder="例如：张敏（大学同学）"></label><label>上次联系<input class="life-input" name="relationshipLast" placeholder="' + escapeHtml(baseDate) + '（微信）"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" placeholder="写下真实聊到的内容"></label><div class="life-two-grid"><label>预计下次日期<input class="life-input" type="date" name="relationshipNextDate" value="' + escapeHtml(relationshipNextDefault) + '"></label><label class="life-heart-line">关系温度<input type="range" min="0" max="100" name="relationshipScore" value="80"><span>4/5</span></label></div></section>' +
+      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="愿望"><div class="life-add-inline-title">' + addTypeIcon('愿望') + '<strong>愿望信息</strong><span>记录想要程度和冷却计划</span></div><div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" placeholder="例如：相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" placeholder="例如：¥12,999"></label></div><label class="life-range-line">当前想要程度<input type="range" min="0" max="100" name="wishDesire" value="65" style="accent-color:' + wishDesireColor(65) + '" data-add-wish-desire-range><b>65%</b></label><div class="life-add-radio-box"><label><input type="radio" name="wishStatus" value="愿望冷却中" checked> 继续冷却</label><label><input type="radio" name="wishStatus" value="可以决定"> 可以决定了</label></div><label>替代方案<input class="life-input" name="wishAlternatives" placeholder="一行或分号分隔多个替代方案"></label></section>' +
+      '<section class="life-add-module-panel life-add-theme-green is-hidden" data-add-module="健康"><div class="life-add-inline-title">' + addTypeIcon('健康') + '<strong>健康信息</strong><span>记录身体状态和后续提醒</span></div><div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="' + escapeHtml(healthReminderDefault) + '"></label></section>' +
       '<section class="life-add-module-panel life-add-theme-blue is-hidden" data-add-module="项目"><div class="life-add-inline-title">' + addTypeIcon('项目') + '<strong>项目信息</strong><span>更新进度和下一步</span></div><div class="life-two-grid"><label>项目 / 任务<input class="life-input" name="projectName" value="个人网站改版"></label><label class="life-range-line">进度<input type="range" min="0" max="100" name="projectProgress" value="60"><b>60%</b></label></div><label>当前阻碍<input class="life-input" name="projectBlocker" value="设计稿还未最终确定"></label><label>下一步行动<input class="life-input" name="projectNext" value="完成首页视觉稿"></label><div class="life-file-chip">' + iconHtml('file') + ' 首页设计稿 v2.fig</div></section>';
   }
 
@@ -3906,14 +4894,15 @@
   }
 
   function renderAddTypePanel(type, idx) {
+    var baseDate = todayISO();
     var hidden = idx ? ' is-hidden' : '';
     var body = {
       '记忆': '<div class="life-two-grid"><label>记忆标题<input class="life-input" name="memoryTitle" value="今天在江边散步"></label><label>归档到<select class="life-select" name="memoryBucket"><option>时间河流（默认）</option><option>本月值得记住</option></select></label></div>',
-      '决定': '<div class="life-two-grid"><label>决定标题<input class="life-input" name="decisionTitle" value="是否接受新的 Offer？"></label><label>我的倾向<select class="life-select" name="decisionChoice"><option>接受 Offer</option><option>暂不接受</option><option>继续观望</option></select></label></div><div class="life-two-grid"><label>信心 <input class="life-input" type="number" min="0" max="100" name="decisionConfidence" value="70"></label><label>复盘日期<input class="life-input" type="date" name="decisionReviewDate" value="2026-11-13"></label></div><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label>',
+      '决定': '<div class="life-two-grid"><label>决定标题<input class="life-input" name="decisionTitle" value="是否接受新的 Offer？"></label><label>我的倾向<select class="life-select" name="decisionChoice"><option>接受 Offer</option><option>暂不接受</option><option>继续观望</option></select></label></div><div class="life-two-grid"><label>信心 <input class="life-input" type="number" min="0" max="100" name="decisionConfidence" value="70"></label><label>复盘日期<input class="life-input" type="date" name="decisionReviewDate" value="' + escapeHtml(addMonthsToDate(baseDate, 6)) + '"></label></div><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label>',
       '情绪': '<div class="life-three-grid"><label>心情评分<input class="life-input" type="number" min="0" max="100" name="moodScore" value="78"></label><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label></div><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label>',
-      '关系': '<div class="life-two-grid"><label>人物<input class="life-input" name="relationshipName" value="张敏"></label><label>关系温度<input class="life-input" type="number" min="0" max="100" name="relationshipScore" value="80"></label></div><div class="life-two-grid"><label>上次联系<input class="life-input" name="relationshipLast" value="今天"></label><label>下次提醒<input class="life-input" type="date" name="relationshipNextDate" value="2026-05-24"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" value="聊到各自的工作近况和下次聚会时间。"></label>',
-      '愿望': '<div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" value="相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" min="0" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" value="¥12,999"></label></div><div class="life-two-grid"><label>当前想要程度<input class="life-input" type="number" min="0" max="100" name="wishDesire" value="65"></label><label>状态<select class="life-select" name="wishStatus"><option>愿望冷却中</option><option>可以决定</option></select></label></div><label>替代方案<input class="life-input" name="wishAlternatives" value="先租手机练习；租借体验；观望新品"></label>',
-      '健康': '<div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="2026-05-15"></label>',
+      '关系': '<div class="life-two-grid"><label>人物<input class="life-input" name="relationshipName" placeholder="例如：张敏"></label><label>关系温度<input class="life-input" type="number" min="0" max="100" name="relationshipScore" value="80"></label></div><div class="life-two-grid"><label>上次联系<input class="life-input" name="relationshipLast" placeholder="例如：今天"></label><label>预计下次日期<input class="life-input" type="date" name="relationshipNextDate" value="' + escapeHtml(addDateDays(baseDate, 7)) + '"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" placeholder="写下真实聊到的内容"></label>',
+      '愿望': '<div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" placeholder="例如：相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" min="0" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" placeholder="例如：¥12,999"></label></div><div class="life-two-grid"><label>当前想要程度<input class="life-input" type="number" min="0" max="100" name="wishDesire" value="65"></label><label>状态<select class="life-select" name="wishStatus"><option>愿望冷却中</option><option>可以决定</option></select></label></div><label>替代方案<input class="life-input" name="wishAlternatives" placeholder="一行或分号分隔多个替代方案"></label>',
+      '健康': '<div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="' + escapeHtml(baseDate) + '"></label>',
       '项目': '<div class="life-two-grid"><label>项目 / 任务<input class="life-input" name="projectName" value="个人网站改版"></label><label>进度<input class="life-input" type="number" min="0" max="100" name="projectProgress" value="60"></label></div><label>当前阻碍<input class="life-input" name="projectBlocker" value="设计稿还未最终确定"></label><label>下一步行动<input class="life-input" name="projectNext" value="完成首页视觉稿"></label>'
     }[type];
     return '<section class="life-add-module-panel' + hidden + '" data-add-panel="' + type + '"><div class="life-section-title"><h3>' + type + '子组件</h3><span>保存时同步写入对应模块</span></div>' + body + '</section>';
@@ -4020,9 +5009,9 @@
   function saveAddModuleRecord(type, form, moment, dateParts) {
     if (type === '决定') saveAddDecision(form, moment, dateParts);
     if (type === '情绪') saveAddMood(form, moment, dateParts);
-    if (type === '关系') saveAddRelationship(form, moment);
+    if (type === '关系') saveAddRelationship(form, moment, dateParts);
     if (type === '愿望') saveAddWish(form, moment, dateParts);
-    if (type === '健康') saveAddHealth(form, moment);
+    if (type === '健康') saveAddHealth(form, moment, dateParts);
     if (type === '项目') saveAddProject(form, moment);
   }
 
@@ -4043,7 +5032,7 @@
         [addValue(form, 'decisionChoice', '接受'), '当前倾向', moment.location, '待评估', '信心 ' + addValue(form, 'decisionConfidence', '70') + '/100'],
         ['暂缓', '继续观察', moment.location, '机会成本', '信息更充分']
       ],
-      reviewDate: addValue(form, 'decisionReviewDate', '2026-11-13'),
+      reviewDate: addValue(form, 'decisionReviewDate', addMonthsToDate(dateParts.date, 6)),
       result: '由“添加一刻”创建，等待后续复盘。'
     });
     saveStoredDecisions(stored);
@@ -4072,10 +5061,11 @@
     saveMoodStore(store);
   }
 
-  function saveAddRelationship(form, moment) {
+  function saveAddRelationship(form, moment, dateParts) {
     var name = addValue(form, 'relationshipName', (moment.people[0] || '未命名联系人'));
     var current = allRelationships().filter(function(item) { return item.name === name; })[0];
     var note = addValue(form, 'relationshipNote', moment.copy);
+    var nextDate = addValue(form, 'relationshipNextDate', addDateDays(dateParts.date, 7));
     var next = normalizeRelationship(Object.assign({}, current || {}, {
       id: current ? current.id : 'r-local-' + Date.now(),
       name: name,
@@ -4084,13 +5074,13 @@
       last: addValue(form, 'relationshipLast', '今天'),
       channel: '微信',
       score: Number(addValue(form, 'relationshipScore', '80')),
-      next: '待提醒',
-      nextDate: addValue(form, 'relationshipNextDate', '2026-05-24'),
+      next: relationshipNextLabel(nextDate, ''),
+      nextDate: nextDate,
       notes: [note].concat(current && current.notes ? current.notes : []),
       memories: current ? current.memories : [{ text: moment.title, image: '' }]
     }));
     var store = getRelationshipStore();
-    var seedExists = withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === next.id; });
+    var seedExists = !directApiMode && !mockMode && withMockData(relationships, mockRelationships).some(function(seed) { return seed.id === next.id; });
     if (seedExists) store.edits[next.id] = next;
     else {
       store.added = (store.added || []).filter(function(item) { return item.id !== next.id; });
@@ -4124,12 +5114,12 @@
     state.selectedWishId = item.id;
   }
 
-  function saveAddHealth(form, moment) {
+  function saveAddHealth(form, moment, dateParts) {
     var stored = getSimpleStore(healthStorageKey());
     stored.unshift({
       name: addValue(form, 'healthSignal', '身体状态记录'),
       value: addValue(form, 'healthSleep', '7.2 小时') + ' · 精力 ' + addValue(form, 'healthEnergy', '80') + '/100',
-      note: moment.copy + ' 运动：' + addValue(form, 'healthExercise', '散步 40 分钟') + '。提醒：' + addValue(form, 'healthReminder', '2026-05-15') + '。'
+      note: moment.copy + ' 运动：' + addValue(form, 'healthExercise', '散步 40 分钟') + '。提醒：' + addValue(form, 'healthReminder', addDateDays(dateParts.date, 2)) + '。'
     });
     saveSimpleStore(healthStorageKey(), stored);
   }
@@ -4156,12 +5146,12 @@
     return '<section class="life-account-card"><div class="life-account-head">' +
       relationshipAvatarHtml({ avatar: accountAvatarKey(session) }, 'large') +
       '<div><span>当前账号 · ' + accountRoleText(session) + '</span><h3>' + escapeHtml(session.name) + '</h3><p>' + escapeHtml(session.email) + '</p></div><em>active</em></div>' +
-      '<form id="lifeAccountForm" class="life-account-form"><div class="life-two-grid"><label>昵称<input class="life-input" name="name" value="' + escapeHtml(session.name) + '"></label><label>邮箱<input class="life-input" name="email" value="' + escapeHtml(session.email) + '"></label></div>' +
-      '<div class="life-avatar-picker">' + ['Q1','Q2','Q3','Q4','Q5','Q6'].map(function(item) {
+      '<form id="lifeAccountForm" class="life-account-form"><div class="life-two-grid"><label>昵称<input class="life-input" name="name" value="' + escapeHtml(session.name) + '"></label><label>账号<input class="life-input" name="email" value="' + escapeHtml(session.email) + '"></label></div>' +
+      '<div class="life-avatar-picker"><div class="life-avatar-options">' + ['Q1','Q2','Q3','Q4','Q5'].map(function(item) {
         var key = item.toLowerCase();
         return '<label class="' + (accountAvatarKey(session) === key ? 'active' : '') + '"><input type="radio" name="avatar" value="' + item + '" ' + (accountAvatarKey(session) === key ? 'checked' : '') + '>' + relationshipAvatarHtml({ avatar: key }, '') + '<em>' + item + '</em></label>';
-      }).join('') + '</div>' +
-      '<label class="life-account-toggle"><input type="checkbox" name="reminder" ' + (session.preferences && session.preferences.reminder ? 'checked' : '') + '> 开启重要复盘提醒</label>' +
+      }).join('') + '</div></div>' +
+      (isUserHiddenProfileControl('reminder') ? '' : '<label class="life-account-toggle"><input type="checkbox" name="reminder" ' + (session.preferences && session.preferences.reminder ? 'checked' : '') + '> 开启重要复盘提醒</label>') +
       '<div class="life-account-actions"><button class="life-secondary-btn" type="button" data-account-action="logout">退出登录</button><button class="life-primary-btn" type="submit">保存资料</button></div></form>' +
       '<div class="life-account-log-summary"><span>操作日志</span><strong>' + lifecycleCount + ' 条</strong><small>最近：' + escapeHtml(lastLifecycle ? lastLifecycle.date : '暂无') + '</small></div></section>' + accountAdminPanel(session);
   }
@@ -4173,7 +5163,7 @@
     var adminCount = accounts.filter(function(account) { return account.role === 'admin'; }).length;
     var createForm = state.accountAdminCreateOpen ? '<form id="lifeAccountAdminCreateForm" class="life-account-admin-create">' +
       '<label>昵称<input class="life-input" name="name" placeholder="例如 Alex" required></label>' +
-      '<label>邮箱<input class="life-input" type="email" name="email" placeholder="user@example.com" required></label>' +
+      '<label>账号<input class="life-input" type="text" name="email" placeholder="例如 xyc" required></label>' +
       '<label>初始密码<input class="life-input" type="password" name="password" placeholder="至少 6 位" required></label>' +
       '<label>角色<select class="life-input" name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label>' +
       '<div class="life-account-admin-actions"><button class="life-secondary-btn" type="button" data-account-action="admin-create-cancel">取消</button><button class="life-primary-btn" type="submit">创建账号</button></div>' +
@@ -4183,7 +5173,14 @@
       createForm +
       '<div class="life-account-admin-list">' + accounts.map(function(account) {
         var self = account.id === session.accountId;
-        return '<article class="life-account-admin-row"><div>' + relationshipAvatarHtml({ avatar: accountAvatarKey(account) }, '') + '<span><strong>' + escapeHtml(account.name) + '</strong><small>' + escapeHtml(account.email) + ' · ' + accountRoleText(account) + ' · ' + escapeHtml(account.status || 'active') + '</small></span></div><button type="button" data-account-action="admin-delete" data-account-id="' + escapeHtml(account.id) + '" ' + (self ? 'disabled' : '') + '>' + (self ? '当前账号' : '删除') + '</button></article>';
+        var resetBtn = (!self && account.role !== 'admin')
+          ? '<button type="button" data-account-action="admin-reset-password" data-account-id="' + escapeHtml(account.id) + '">重置密码</button>'
+          : '';
+        var statusBtn = (!self && account.role !== 'admin')
+          ? '<button type="button" data-account-action="admin-set-status" data-account-id="' + escapeHtml(account.id) + '" data-account-status="' + (account.status === 'inactive' ? 'active' : 'inactive') + '">' + (account.status === 'inactive' ? '启用' : '停用') + '</button>'
+          : '';
+        var deleteBtn = '<button type="button" data-account-action="admin-delete" data-account-id="' + escapeHtml(account.id) + '" ' + (self ? 'disabled' : '') + '>' + (self ? '当前账号' : '删除') + '</button>';
+        return '<article class="life-account-admin-row ' + (account.status === 'inactive' ? 'inactive' : '') + '"><div>' + relationshipAvatarHtml({ avatar: accountAvatarKey(account) }, '') + '<span><strong>' + escapeHtml(account.name) + '</strong><small>' + escapeHtml(account.email) + ' · ' + accountRoleText(account) + ' · ' + escapeHtml(accountStatusText(account)) + '</small></span></div><div class="life-account-admin-row-actions">' + resetBtn + statusBtn + deleteBtn + '</div></article>';
       }).join('') + '</div></section>';
   }
 
@@ -4191,55 +5188,52 @@
     var session = accountSession();
     if (!session) return '<section class="life-detail-card"><h2 class="life-detail-title">账号生命周期</h2><p class="life-card-copy">注册、登录、资料维护、重置密码、停用和删除均由生活航迹独立管理。</p></section>';
     var adminEntry = session.role === 'admin' ? '<section class="life-detail-card life-account-side life-account-admin-entry"><h2 class="life-detail-title">账号管理</h2><p class="life-card-copy">你当前是管理员，可创建普通用户或管理员账号，也可删除其他账号。</p><a class="life-primary-btn" href="#lifeAccountAdminPanel">打开账号管理</a></section>' : '';
-    return adminEntry + '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">账号安全</h2><form id="lifeAccountPasswordForm" class="life-account-password-form"><label>当前密码<input class="life-input" type="password" name="currentPassword" placeholder="当前密码"></label><label>新密码<input class="life-input" type="password" name="nextPassword" placeholder="至少 6 位"></label><button class="life-primary-btn" type="submit">修改密码</button></form></section>' +
-      '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">生命周期操作</h2><p class="life-card-copy">停用会退出登录；删除会从本机可登录账号中移除。</p><div class="life-account-danger"><button type="button" data-account-action="deactivate">停用账号</button><button type="button" data-account-action="delete">删除账号</button></div></section>';
+    var danger = isUserHiddenProfileControl('danger') ? '' : '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">生命周期操作</h2><p class="life-card-copy">停用会退出登录；删除会从本机可登录账号中移除。</p><div class="life-account-danger"><button type="button" data-account-action="deactivate">停用账号</button><button type="button" data-account-action="delete">删除账号</button></div></section>';
+    return adminEntry + '<section class="life-detail-card life-account-side"><h2 class="life-detail-title">账号安全</h2><form id="lifeAccountPasswordForm" class="life-account-password-form"><label>当前密码<input class="life-input" type="password" name="currentPassword" placeholder="当前密码"></label><label>新密码<input class="life-input" type="password" name="nextPassword" placeholder="至少 6 位"></label><button class="life-primary-btn" type="submit">修改密码</button></form></section>' + danger;
   }
 
   function saveAccountProfile(form) {
     if (!lifeAccount()) return;
     var selected = form.querySelector('input[name="avatar"]:checked');
-    try {
-      lifeAccount().updateProfile({
-        name: form.elements.name.value,
-        email: form.elements.email.value,
-        avatar: selected ? selected.value : 'Q1',
-        preferences: { reminder: !!form.elements.reminder.checked }
-      });
+    lifeAccount().updateProfile({
+      name: form.elements.name.value,
+      email: form.elements.email.value,
+      avatar: selected ? selected.value : 'Q1',
+      preferences: { reminder: !!(form.elements.reminder && form.elements.reminder.checked) }
+    }).then(function() {
       showToast('账号资料已保存');
       render();
-    } catch (err) {
+    }).catch(function(err) {
       showToast(err.message || '保存失败');
-    }
+    });
   }
 
   function saveAccountPassword(form) {
     if (!lifeAccount()) return;
-    try {
-      lifeAccount().changePassword(form.elements.currentPassword.value, form.elements.nextPassword.value);
+    lifeAccount().changePassword(form.elements.currentPassword.value, form.elements.nextPassword.value).then(function() {
       showToast('密码已修改');
       render();
-    } catch (err) {
+    }).catch(function(err) {
       showToast(err.message || '修改失败');
-    }
+    });
   }
 
   function saveAdminAccount(form) {
     if (!lifeAccount()) return;
-    try {
-      lifeAccount().adminCreateAccount({
-        name: form.elements.name.value,
-        email: form.elements.email.value,
-        password: form.elements.password.value,
-        role: form.elements.role.value,
-        adminCode: 'LIFE-ADMIN',
-        avatar: form.elements.role.value === 'admin' ? 'Q1' : 'Q2'
-      });
+    lifeAccount().adminCreateAccount({
+      name: form.elements.name.value,
+      email: form.elements.email.value,
+      password: form.elements.password.value,
+      role: form.elements.role.value,
+      adminCode: 'LIFE-ADMIN',
+      avatar: form.elements.role.value === 'admin' ? 'Q1' : 'Q2'
+    }).then(function() {
       state.accountAdminCreateOpen = false;
       showToast('账号已创建');
       render();
-    } catch (err) {
+    }).catch(function(err) {
       showToast(err.message || '创建失败');
-    }
+    });
   }
 
   function handleAccountAction(action, actionBtn) {
@@ -4253,10 +5247,17 @@
       return;
     }
     if (!lifeAccount()) return;
+    if (action === 'logout-top') {
+      lifeAccount().signOut().finally(function() {
+        window.location.href = 'login.html';
+      });
+      return;
+    }
     if (action === 'logout') {
-      lifeAccount().signOut();
-      showToast('已退出登录');
-      render();
+      lifeAccount().signOut().finally(function() {
+        showToast('已退出登录');
+        render();
+      });
       return;
     }
     if (action === 'admin-create-toggle') {
@@ -4273,28 +5274,517 @@
       var target = actionBtn && actionBtn.getAttribute('data-account-id');
       if (!target) return;
       if (!window.confirm('确认删除这个账号？删除后该账号无法再登录。')) return;
-      try {
-        lifeAccount().adminDeleteAccount(target);
+      lifeAccount().adminDeleteAccount(target).then(function() {
         showToast('账号已删除');
         render();
-      } catch (err) {
+      }).catch(function(err) {
         showToast(err.message || '删除失败');
+      });
+      return;
+    }
+    if (action === 'admin-set-status') {
+      var statusTarget = actionBtn && actionBtn.getAttribute('data-account-id');
+      var nextStatus = actionBtn && actionBtn.getAttribute('data-account-status');
+      if (!statusTarget || (nextStatus !== 'active' && nextStatus !== 'inactive')) return;
+      var confirmText = nextStatus === 'inactive'
+        ? '确认停用这个普通用户？停用后会立刻退出该账号已登录会话。'
+        : '确认启用这个普通用户？启用后该账号可以重新登录。';
+      if (!window.confirm(confirmText)) return;
+      lifeAccount().adminSetAccountStatus(statusTarget, nextStatus).then(function() {
+        showToast(nextStatus === 'inactive' ? '账号已停用' : '账号已启用');
+        render();
+      }).catch(function(err) {
+        showToast(err.message || '状态更新失败');
+      });
+      return;
+    }
+    if (action === 'admin-reset-password') {
+      var resetTarget = actionBtn && actionBtn.getAttribute('data-account-id');
+      if (!resetTarget) return;
+      var nextPassword = window.prompt('请输入新密码（至少 6 位）');
+      if (nextPassword === null) return;
+      nextPassword = String(nextPassword || '').trim();
+      if (nextPassword.length < 6) {
+        showToast('新密码至少需要 6 位');
+        return;
       }
+      lifeAccount().adminResetPassword(resetTarget, nextPassword).then(function() {
+        showToast('密码已重置');
+      }).catch(function(err) {
+        showToast(err.message || '重置失败');
+      });
       return;
     }
     if (action === 'deactivate') {
       if (!window.confirm('确认停用当前账号？停用后会退出登录。')) return;
-      lifeAccount().deactivateAccount();
-      showToast('账号已停用');
-      render();
+      lifeAccount().deactivateAccount().then(function() {
+        showToast('账号已停用');
+        render();
+      }).catch(function(err) {
+        showToast(err.message || '停用失败');
+      });
       return;
     }
     if (action === 'delete') {
       if (!window.confirm('确认删除当前账号？此操作会退出登录，并从可登录账号中移除。')) return;
-      lifeAccount().deleteAccount();
-      showToast('账号已删除');
-      render();
+      lifeAccount().deleteAccount().then(function() {
+        showToast('账号已删除');
+        render();
+      }).catch(function(err) {
+        showToast(err.message || '删除失败');
+      });
     }
+  }
+
+  function watchKindLabel(kind) {
+    return kind === 'series' ? '剧集' : '电影';
+  }
+
+  function watchStateLabel(value) {
+    return value === 'want' ? '想看' : '已看';
+  }
+
+  function watchKindColor(kind) {
+    return kind === 'series' ? 'blue' : 'amber';
+  }
+
+  function watchMonthLabel(month) {
+    return (Number(month) + 1) + '月';
+  }
+
+  function watchCreateDateFromYearMonth(year, month) {
+    var today = new Date();
+    var day = today.getDate();
+    var y = Number(year) || today.getFullYear();
+    var m = Math.max(0, Math.min(11, Number(month)));
+    var maxDay = new Date(y, m + 1, 0).getDate();
+    var safeDay = Math.min(day, maxDay);
+    return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(safeDay).padStart(2, '0');
+  }
+
+  function watchDisplayTitle(title) {
+    var text = String(title || '');
+    return text.length > 5 ? (text.slice(0, 4) + '...') : text;
+  }
+
+  function watchCoverHtml(item, extraClass) {
+    var cls = extraClass ? ' ' + extraClass : '';
+    if (item && item.image) {
+      return '<span class="life-photo life-photo-upload' + cls + '"><img src="' + escapeHtml(item.image) + '" alt=""></span>';
+    }
+    return '<span class="life-photo ' + escapeHtml(item.cover || 'photo-river') + cls + '"></span>';
+  }
+
+  function watchStars(score) {
+    var full = Math.floor(Number(score || 0) / 2);
+    var half = Number(score || 0) / 2 - full >= 0.5;
+    var html = '';
+    for (var i = 0; i < 5; i += 1) {
+      html += '<span class="life-watch-star ' + (i < full ? 'on' : (i === full && half ? 'half' : 'off')) + '">★</span>';
+    }
+    return html;
+  }
+
+  function watchSortEntries(items) {
+    return items.slice().sort(function(a, b) {
+      if (state.watchSort === '按评分') return b.rating - a.rating || b.date.localeCompare(a.date);
+      if (state.watchSort === '按片名') return a.title.localeCompare(b.title, 'zh-Hans-CN');
+      return b.date.localeCompare(a.date) || b.rating - a.rating;
+    });
+  }
+
+  function watchStateEntries(items) {
+    return (items || allWatchEntries()).filter(function(item) {
+      return state.watchStatus === 'want' ? item.watchState === 'want' : item.watchState !== 'want';
+    });
+  }
+
+  function watchFilteredEntries() {
+    var scopedItems = watchStateEntries(allWatchEntries());
+    var recentYears = watchYears().slice(0, 2);
+    return scopedItems.filter(function(item) {
+      var kindMatch = state.watchKind === 'all' || item.kind === state.watchKind;
+      var yearMatch = state.watchStatus === 'want'
+        ? true
+        : (state.watchYear === 'all'
+          || (state.watchYear === 'recent2' ? recentYears.indexOf(Number(item.year)) >= 0 : Number(item.year) === Number(state.watchYear)));
+      var text = [item.title, item.review, item.tags.join(' '), item.progress].join(' ');
+      return kindMatch && yearMatch && queryMatch(text);
+    });
+  }
+
+  function watchYears(entries) {
+    var all = watchStateEntries(entries || allWatchEntries()).map(function(item) { return Number(item.year); });
+    var unique = Array.from(new Set(all));
+    return unique.sort(function(a, b) { return b - a; });
+  }
+
+  function selectedWatch(entries) {
+    var list = entries || watchFilteredEntries();
+    return findById(list, state.selectedWatchId) || list[0] || null;
+  }
+
+  function ensureWatchSelection(entries) {
+    var selected = selectedWatch(entries);
+    state.selectedWatchId = selected ? selected.id : '';
+    return selected;
+  }
+
+  function watchMonthEntries(year, month, sourceItems) {
+    return (sourceItems || watchFilteredEntries()).filter(function(item) {
+      return Number(item.year) === Number(year) && Number(item.month) === Number(month);
+    });
+  }
+
+  function watchMonthTop(year, month, sourceItems) {
+    var items = watchMonthEntries(year, month, sourceItems);
+    if (!items.length) return null;
+    // 月格封面始终取该月评分最高的记录，不受当前列表排序方式影响。
+    return items.slice().sort(function(a, b) {
+      return b.rating - a.rating || b.date.localeCompare(a.date);
+    })[0];
+  }
+
+  function watchMonthlySummaryItems(entries) {
+    var map = {};
+    entries.forEach(function(item) {
+      var key = item.year + '-' + String(item.month);
+      map[key] = map[key] || { year: item.year, month: item.month, count: 0, top: item };
+      map[key].count += 1;
+      if (item.rating > map[key].top.rating) map[key].top = item;
+    });
+    return Object.keys(map).map(function(key) { return map[key]; });
+  }
+
+  function openWatchMonth(year, month, preferredKind) {
+    state.watchYear = Number(year);
+    state.watchMonth = Number(month);
+    if (preferredKind === 'movie' || preferredKind === 'series' || preferredKind === 'all') {
+      state.watchKind = preferredKind;
+    } else if (!(state.watchKind === 'movie' || state.watchKind === 'series' || state.watchKind === 'all')) {
+      state.watchKind = 'all';
+    }
+    state.watchMode = 'month';
+    var monthItems = watchMonthEntries(state.watchYear, state.watchMonth, watchStateEntries(allWatchEntries()));
+    if (monthItems.length) {
+      var scoped = monthItems.filter(function(item) {
+        return state.watchKind === 'all' || item.kind === state.watchKind;
+      });
+      var forPick = scoped.length ? scoped : monthItems;
+      state.selectedWatchId = watchSortEntries(forPick)[0].id;
+    }
+    state.watchFormMode = null;
+    renderWatch();
+  }
+
+  function startWatchCreate() {
+    state.watchFormMode = 'create';
+    state.watchEditingId = '';
+    if (!state.watchCreatePreset) state.watchCreatePreset = null;
+    renderWatch();
+  }
+
+  function startWatchCreateAt(year, month) {
+    state.watchMode = 'wall';
+    state.watchYear = Number(year);
+    state.watchMonth = Number(month);
+    state.watchCreatePreset = {
+      year: Number(year),
+      month: Number(month)
+    };
+    state.watchFormMode = 'create';
+    state.watchEditingId = '';
+    renderWatch();
+  }
+
+  function startWatchEdit() {
+    var selected = selectedWatch();
+    if (!selected) return;
+    state.watchCreatePreset = null;
+    state.watchFormMode = 'edit';
+    state.watchEditingId = selected.id;
+    renderWatch();
+  }
+
+  function deleteSelectedWatch() {
+    var selected = selectedWatch();
+    if (!selected) return;
+    if (!window.confirm('确认删除这条观影记录吗？')) return;
+    var store = getWatchStore();
+    store.added = (store.added || []).filter(function(item) { return item.id !== selected.id; });
+    if (store.edits) delete store.edits[selected.id];
+    if (selected.id.indexOf('watch-local-') !== 0 && (store.deleted || []).indexOf(selected.id) < 0) store.deleted.push(selected.id);
+    removeLinkedTimelineMoment('watch', selected.id);
+    saveWatchStore(store);
+    var left = watchFilteredEntries().filter(function(item) { return item.id !== selected.id; });
+    state.selectedWatchId = left[0] ? left[0].id : '';
+    state.watchFormMode = null;
+    showToast('观影记录已删除');
+    renderWatch();
+  }
+
+  function renderWatchImageEditor(source) {
+    return '<section class="life-wish-product-image">' +
+      '<div class="life-wish-image-head"><div><strong>影片图片</strong><span>可上传封面图片，未上传时使用默认占位图</span></div></div>' +
+      '<input type="hidden" name="image" value="' + escapeHtml(source.image || '') + '" data-watch-uploaded-image>' +
+      '<div class="life-wish-image-preview" data-watch-image-preview>' + watchCoverHtml(source, '') + '<em>' + (source.image ? '已上传影片图片' : '当前占位图') + '</em></div>' +
+      '<label class="life-wish-upload-button">上传影片图片<input type="file" accept="image/*" data-watch-image-upload></label>' +
+    '</section>';
+  }
+
+  function watchFromForm(form) {
+    var selected = state.watchFormMode === 'edit' ? selectedWatch(allWatchEntries()) : null;
+    var kind = form.elements.kind.value === 'series' ? 'series' : 'movie';
+    var watchState = form.elements.watchState && form.elements.watchState.value === 'want' ? 'want' : 'watched';
+    var dateInput = form.elements.date ? form.elements.date.value : '';
+    var date = normalizeISODate(dateInput, todayISO());
+    if (watchState === 'want') date = todayISO();
+    var rating = Math.max(1, Math.min(10, Number(form.elements.rating.value || 1)));
+    var finished = form.elements.finished ? form.elements.finished.value === 'finished' : true;
+    var cover = (form.elements.cover && form.elements.cover.value) || (selected ? selected.cover : 'photo-river');
+    return normalizeWatchEntry(Object.assign({}, selected || {}, {
+      id: (selected && selected.id) || ('watch-local-' + Date.now()),
+      kind: kind,
+      watchState: watchState,
+      title: form.elements.title.value.trim() || '未命名观影',
+      date: date,
+      year: Number(date.slice(0, 4)),
+      month: Number(date.slice(5, 7)) - 1,
+      rating: rating,
+      review: watchState === 'want' ? '' : ((form.elements.review && form.elements.review.value.trim()) || ''),
+      tags: watchState === 'want' ? ['想看'] : splitLines((form.elements.tags && form.elements.tags.value) || '', []).slice(0, 6),
+      finished: watchState === 'want' ? false : (kind === 'series' ? finished : true),
+      progress: watchState === 'want' ? '' : (kind === 'series' && !finished ? ((form.elements.progress && form.elements.progress.value.trim()) || '') : ''),
+      cover: cover,
+      image: form.elements.image ? form.elements.image.value : '',
+      linkTimeline: watchState === 'want' ? false : (!form.elements.linkTimeline || !!form.elements.linkTimeline.checked),
+      timelinePrivacy: form.elements.timelinePrivacy ? form.elements.timelinePrivacy.value : '仅自己可见'
+    }));
+  }
+
+  function upsertWatchTimelineFromForm(form, item) {
+    upsertLinkedTimelineMoment('watch', item.id, form.elements.linkTimeline && form.elements.linkTimeline.checked, {
+      type: item.watchState === 'want' ? '想看' : '观影',
+      icon: item.watchState === 'want' ? '🍿' : (item.kind === 'series' ? '🎬' : '🎞'),
+      time: '20:30',
+      date: item.date || todayISO(),
+      title: item.title,
+      copy: item.watchState === 'want'
+        ? (item.review || ('想看评分预估 ' + Number(item.rating || 0).toFixed(1) + '/10'))
+        : (item.review || ('评分 ' + Number(item.rating || 0).toFixed(1) + '/10')),
+      location: '观影墙',
+      people: [],
+      mood: '',
+      photos: [item.image || item.cover].filter(Boolean),
+      tags: [item.watchState === 'want' ? '想看' : '观影', watchKindLabel(item.kind), '评分 ' + Number(item.rating || 0).toFixed(1)].concat(item.tags || []),
+      linkedView: 'watch',
+      privacy: form.elements.timelinePrivacy ? form.elements.timelinePrivacy.value : '仅自己可见'
+    });
+  }
+
+  function saveWatchForm(form) {
+    var item = watchFromForm(form);
+    upsertWatchTimelineFromForm(form, item);
+    var store = getWatchStore();
+    var seedExists = !directApiMode && !mockMode && withMockData(watchEntries, mockWatchEntries).some(function(seed) { return seed.id === item.id; });
+    if (seedExists) {
+      store.edits[item.id] = item;
+      store.added = (store.added || []).filter(function(record) { return record.id !== item.id; });
+      store.deleted = (store.deleted || []).filter(function(id) { return id !== item.id; });
+    } else {
+      delete store.edits[item.id];
+      store.added = (store.added || []).filter(function(record) { return record.id !== item.id; });
+      store.added.unshift(item);
+    }
+    saveWatchStore(store);
+    state.selectedWatchId = item.id;
+    state.watchStatus = item.watchState === 'want' ? 'want' : 'watched';
+    state.watchYear = item.year;
+    state.watchMonth = item.month;
+    state.watchCreatePreset = null;
+    state.watchMode = 'month';
+    state.watchFormMode = null;
+    showToast('观影记录已保存');
+    renderWatch();
+  }
+
+  function renderWatchWall(entries) {
+    var years = watchYears(entries);
+    var shownYears = state.watchYear === 'recent2'
+      ? years.slice(0, 2)
+      : (state.watchYear === 'all' ? years : years.filter(function(year) { return year === Number(state.watchYear); }));
+    return '<section class="life-watch-wall">' + shownYears.map(function(year) {
+      var yearItems = entries.filter(function(item) { return Number(item.year) === Number(year); });
+      var yearCount = yearItems.length;
+      return '<section class="life-watch-year-block"><aside class="life-watch-year-side"><strong>' + year + '</strong><span>本年' + watchStateLabel(state.watchStatus) + '</span><em>' + yearCount + ' 部</em></aside><div class="life-watch-year-grid">' +
+        Array.from({ length: 12 }).map(function(_, month) {
+          var top = watchMonthTop(year, month, yearItems);
+          var items = watchMonthEntries(year, month, yearItems);
+          if (!top) {
+            return '<article class="life-watch-month-cell empty"><header><strong>' + watchMonthLabel(month) + '</strong></header><button type="button" class="life-watch-add-cell" data-watch-action="open-create" data-watch-open-year="' + year + '" data-watch-open-month="' + month + '" data-watch-open-kind="' + state.watchKind + '">+ 添加</button></article>';
+          }
+          return '<article class="life-watch-month-cell ' + (state.selectedWatchId === top.id ? 'active' : '') + '" data-watch-item-id="' + escapeHtml(top.id) + '"><header><strong>' + watchMonthLabel(month) + '</strong></header><div class="life-watch-month-body">' +
+            watchCoverHtml(top, 'life-watch-cover') +
+            '<h4 title="' + escapeHtml(top.title) + '">' + escapeHtml(watchDisplayTitle(top.title)) + '</h4><p class="life-watch-rate"><span>★</span> ' + Number(top.rating).toFixed(1) + '</p><p class="life-watch-date">' + escapeHtml(top.date.slice(5)) + '</p>' +
+            '<button type="button" class="life-watch-count" data-watch-action="open-month" data-watch-open-year="' + year + '" data-watch-open-month="' + month + '" data-watch-open-kind="' + state.watchKind + '">' + items.length + '部 <span>›</span></button></div>' +
+          '</article>';
+        }).join('') + '</div></section>';
+    }).join('') + '</section>';
+  }
+
+  function renderWatchMonth(allEntries) {
+    var monthBase = watchStateEntries(allEntries).filter(function(item) {
+      return Number(item.year) === Number(state.watchYear) && Number(item.month) === Number(state.watchMonth);
+    });
+    var monthItems = watchSortEntries(monthBase.filter(function(item) {
+      return state.watchKind === 'all' || item.kind === state.watchKind;
+    }));
+    var movieCount = monthBase.filter(function(item) { return item.kind === 'movie'; }).length;
+    var seriesCount = monthBase.filter(function(item) { return item.kind === 'series'; }).length;
+    var average = monthBase.length ? (monthBase.reduce(function(sum, item) { return sum + Number(item.rating || 0); }, 0) / monthBase.length).toFixed(1) : '0.0';
+    return '<section class="life-watch-month-page"><header class="life-watch-month-head"><button type="button" class="life-back-btn" data-watch-action="back-wall">← 返回观影墙</button><h2>' + state.watchYear + '年' + (state.watchMonth + 1) + '月 · 全部' + watchStateLabel(state.watchStatus) + '</h2><p>共 ' + monthItems.length + ' 部</p></header>' +
+      '<div class="life-watch-month-stats"><article><span>' + iconHtml('watch') + ' 电影</span><strong>' + movieCount + ' 部</strong></article><article><span>' + iconHtml('monthly') + ' 剧集</span><strong>' + seriesCount + ' 部</strong></article><article><span>★ 平均</span><strong>' + average + ' 分</strong></article></div>' +
+      '<div class="life-watch-month-toolbar"><div class="life-watch-kind-tabs">' +
+      '<button type="button" class="' + (state.watchKind === 'all' ? 'active' : '') + '" data-watch-kind="all">全部</button>' +
+      '<button type="button" class="' + (state.watchKind === 'movie' ? 'active' : '') + '" data-watch-kind="movie">电影</button>' +
+      '<button type="button" class="' + (state.watchKind === 'series' ? 'active' : '') + '" data-watch-kind="series">剧集</button>' +
+      '</div><button type="button" class="life-secondary-btn" data-watch-action="toggle-sort">' + escapeHtml(state.watchSort) + '</button></div>' +
+      '<div class="life-watch-month-list">' + (monthItems.length ? monthItems.map(function(item) {
+        return '<article class="life-watch-list-row ' + (state.selectedWatchId === item.id ? 'active' : '') + '" data-watch-item-id="' + escapeHtml(item.id) + '">' +
+          watchCoverHtml(item, 'life-watch-list-cover') +
+          '<div class="life-watch-list-main"><h3><span class="life-badge ' + watchKindColor(item.kind) + '">' + watchKindLabel(item.kind) + '</span> <span class="life-badge ' + (item.watchState === 'want' ? 'gray' : 'green') + '">' + (item.watchState === 'want' ? '想看' : '已看') + '</span> ' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.date) + (item.watchState === 'want' ? ' 想看' : ' 观看') + '</p>' +
+          (item.kind === 'series' ? '<p><span class="life-badge ' + (item.finished ? 'green' : 'red') + '">' + (item.finished ? '已看完' : '未看完') + '</span>' + (item.finished ? '' : '<span class="life-watch-progress-text">' + escapeHtml(item.progress || '进度待补充') + '</span>') + '</p>' : '') +
+          '<div class="life-chip-row">' + (item.tags || []).map(function(tag) { return '<span class="life-chip">' + escapeHtml(tag) + '</span>'; }).join('') + '</div></div>' +
+          '<div class="life-watch-list-score"><strong>' + Number(item.rating).toFixed(1) + '<em>/10</em></strong><div>' + watchStars(item.rating) + '</div></div>' +
+        '</article>';
+      }).join('') : '<div class="life-empty">这个月还没有' + watchStateLabel(state.watchStatus) + '记录</div>') + '</div></section>';
+  }
+
+  function renderWatchWantList(entries) {
+    return '<section class="life-watch-want-list"><header class="life-watch-want-head"><h3>想看清单</h3><button type="button" class="life-secondary-btn" data-watch-action="toggle-sort">' + escapeHtml(state.watchSort) + '</button></header>' +
+      '<div class="life-watch-want-rows">' + (entries.length ? entries.map(function(item) {
+        return '<article class="life-watch-want-row ' + (state.selectedWatchId === item.id ? 'active' : '') + '" data-watch-item-id="' + escapeHtml(item.id) + '">' +
+          '<div class="life-watch-want-main"><h3><span class="life-badge ' + watchKindColor(item.kind) + '">' + watchKindLabel(item.kind) + '</span> ' + escapeHtml(item.title) + '</h3><p>想看日期：' + escapeHtml(item.date || todayISO()) + '</p></div>' +
+          '<div class="life-watch-want-score"><span>想看指数</span><strong>' + Number(item.rating || 0).toFixed(1) + '<em>/10</em></strong><div>' + watchStars(item.rating || 0) + '</div></div>' +
+        '</article>';
+      }).join('') : '<div class="life-empty">还没有想看记录，点击右上角“+ 添加想看”开始。</div>') + '</div></section>';
+  }
+
+  function renderWatchForm(item) {
+    var presetDate = state.watchCreatePreset
+      ? watchCreateDateFromYearMonth(state.watchCreatePreset.year, state.watchCreatePreset.month)
+      : todayISO();
+    var source = item || normalizeWatchEntry({
+      id: 'watch-local-' + Date.now(),
+      watchState: state.watchStatus,
+      kind: 'movie',
+      title: '',
+      date: presetDate,
+      rating: 8,
+      review: '',
+      tags: [],
+      finished: true,
+      progress: '',
+      cover: 'photo-river'
+    });
+    if (!source.date) source.date = todayISO();
+    var linkedMoment = state.watchFormMode === 'edit' ? linkedTimelineMoment('watch', source.id) : null;
+    return '<form id="lifeWatchForm" class="life-watch-detail life-watch-form"><div class="life-form-title"><h2>' + (state.watchFormMode === 'edit' ? '编辑观影' : ('新增' + watchStateLabel(state.watchStatus))) + '</h2></div>' +
+      '<input type="hidden" name="id" value="' + escapeHtml(source.id) + '">' +
+      '<div class="life-two-grid"><label>片名 / 剧名<input class="life-input" name="title" value="' + escapeHtml(source.title) + '" required></label><label>类型<select class="life-select" name="kind"><option value="movie"' + (source.kind === 'movie' ? ' selected' : '') + '>电影</option><option value="series"' + (source.kind === 'series' ? ' selected' : '') + '>剧集</option></select></label></div>' +
+      '<label>记录状态<select class="life-select" name="watchState"><option value="watched"' + (source.watchState !== 'want' ? ' selected' : '') + '>已看</option><option value="want"' + (source.watchState === 'want' ? ' selected' : '') + '>想看</option></select></label>' +
+      '<label data-watch-watched-only><span data-watch-date-label>观看日期</span><input class="life-input" type="date" name="date" value="' + escapeHtml(source.date || todayISO()) + '" required></label>' +
+      '<div class="life-two-grid"><label data-watch-rating-row>评分<input class="life-input" type="number" min="1" max="10" step="0.1" name="rating" value="' + Number(source.rating).toFixed(1) + '" required></label></div>' +
+      '<label class="life-watch-range" data-watch-range-row>评分预览 <strong><span data-watch-rating-value>' + Number(source.rating).toFixed(1) + '</span>/10</strong><input class="life-confidence-slider" type="range" min="1" max="10" step="0.1" name="ratingRange" value="' + Number(source.rating).toFixed(1) + '" data-watch-rating-range></label>' +
+      '<section class="life-watch-desire-stars" data-watch-desire-row><h3>想看指数 <strong><span data-watch-rating-value>' + Number(source.rating).toFixed(1) + '</span>/10</strong></h3><div class="life-watch-desire-buttons">' + [1,2,3,4,5].map(function(star) { return '<button type="button" class="life-watch-desire-star" data-watch-desire-star="' + star + '">★</button>'; }).join('') + '</div></section>' +
+      '<div class="life-two-grid" data-watch-watched-only><label>状态<select class="life-select" name="finished"><option value="finished"' + (source.finished ? ' selected' : '') + '>已看完</option><option value="unfinished"' + (!source.finished ? ' selected' : '') + '>未看完</option></select></label><label data-watch-progress-row>看到位置<input class="life-input" name="progress" value="' + escapeHtml(source.progress || '') + '" placeholder="未看完时填写，例如：S02E06"></label></div>' +
+      '<label data-watch-watched-only>个人评价<textarea class="life-textarea" name="review" maxlength="300">' + escapeHtml(source.review || '') + '</textarea></label>' +
+      '<label data-watch-watched-only>标签<textarea class="life-textarea" name="tags" placeholder="一行一个标签">' + escapeHtml((source.tags || []).join('\n')) + '</textarea></label>' +
+      '<label data-watch-watched-only>封面样式<select class="life-select" name="cover">' + ['photo-camera','photo-river','photo-mountain','photo-garden','photo-night','photo-cafe','photo-book','photo-office'].map(function(cover) { return '<option value="' + cover + '"' + (source.cover === cover ? ' selected' : '') + '>' + cover.replace('photo-', '') + '</option>'; }).join('') + '</select></label>' +
+      '<div data-watch-watched-only>' + renderWatchImageEditor(source) + '</div>' +
+      '<div data-watch-watched-only>' + renderTimelineLinkControls(state.watchFormMode === 'edit' ? !!linkedMoment : (source.linkTimeline !== false), linkedMoment ? linkedMoment.privacy : (source.timelinePrivacy || '仅自己可见'), state.watchFormMode === 'edit' && !!linkedMoment) + '</div>' +
+      '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-watch-action="cancel-form">取消</button>' + (state.watchFormMode === 'edit' ? '<button class="life-secondary-btn danger" type="button" data-watch-action="delete">删除</button>' : '') + '<button class="life-primary-btn" type="submit">保存</button></footer></form>';
+  }
+
+  function renderWatchDetail(item) {
+    if (!item) return '<section class="life-watch-detail"><div class="life-empty">当前筛选下暂无' + watchStateLabel(state.watchStatus) + '记录</div></section>';
+    var linkedBadge = renderTimelineLinkedBadge('watch', item.id);
+    var progressLine = item.watchState !== 'want' && item.kind === 'series' && !item.finished
+      ? '<p>进度 ' + escapeHtml(item.progress || '待补充') + '</p>'
+      : '';
+    var reviewPanel = item.watchState === 'want'
+      ? ''
+      : '<section class="life-watch-review-panel"><h3>个人评价</h3><p>' + escapeHtml(item.review || '暂无评价') + '</p></section>';
+    return '<section class="life-watch-detail"><header class="life-watch-detail-head">' + watchCoverHtml(item, 'life-watch-detail-cover') + '<div><h2>' + escapeHtml(item.title) + '</h2>' + (item.watchState === 'want' ? '<p>想看日期 ' + escapeHtml(item.date) + '</p>' : '<p><span class="life-badge ' + watchKindColor(item.kind) + '">' + watchKindLabel(item.kind) + '</span> <span class="life-badge green">已看</span> ' + escapeHtml(item.date) + ' 观看</p>') + progressLine + (linkedBadge ? '<div class="life-chip-row">' + linkedBadge + '</div>' : '') + '</div></header>' +
+      '<section class="life-watch-score-panel"><h3>' + (item.watchState === 'want' ? '想看指数' : '评分') + ' <strong>' + Number(item.rating).toFixed(1) + '<span>/10</span></strong></h3><div class="life-watch-stars">' + watchStars(item.rating) + '</div><input class="life-confidence-slider" type="range" min="1" max="10" step="0.1" value="' + Number(item.rating).toFixed(1) + '" disabled></section>' +
+      reviewPanel +
+      '<section class="life-watch-review-panel"><h3>标签</h3><div class="life-chip-row">' + (item.tags || []).map(function(tag) { return '<span class="life-chip">' + escapeHtml(tag) + '</span>'; }).join('') + '</div></section>' +
+      '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-watch-action="edit">编辑</button><button class="life-danger-btn" type="button" data-watch-action="delete">删除</button></footer></section>';
+  }
+
+  function syncWatchDesireStars(form) {
+    if (!form) return;
+    var rating = Number((form.elements.rating && form.elements.rating.value) || 0);
+    var activeStars = Math.max(1, Math.min(5, Math.round(rating / 2)));
+    Array.prototype.forEach.call(form.querySelectorAll('[data-watch-desire-star]'), function(btn) {
+      var star = Number(btn.getAttribute('data-watch-desire-star'));
+      btn.classList.toggle('active', star <= activeStars);
+    });
+  }
+
+  function syncWatchFormVisibility(form) {
+    if (!form) return;
+    var kind = form.elements.kind ? form.elements.kind.value : 'movie';
+    var watchState = form.elements.watchState ? form.elements.watchState.value : 'watched';
+    var finished = form.elements.finished ? form.elements.finished.value : 'finished';
+    var watchedOnlyNodes = form.querySelectorAll('[data-watch-watched-only]');
+    var isWant = watchState === 'want';
+    Array.prototype.forEach.call(watchedOnlyNodes, function(node) {
+      node.style.display = isWant ? 'none' : '';
+    });
+    var dateLabel = form.querySelector('[data-watch-date-label]');
+    if (dateLabel) dateLabel.textContent = '观看日期';
+    var progressRow = form.querySelector('[data-watch-progress-row]');
+    if (progressRow) {
+      var showProgress = !isWant && kind === 'series' && finished === 'unfinished';
+      progressRow.style.display = showProgress ? '' : 'none';
+      if (!showProgress && form.elements.progress) form.elements.progress.value = '';
+    }
+    var ratingRow = form.querySelector('[data-watch-rating-row]');
+    var rangeRow = form.querySelector('[data-watch-range-row]');
+    var desireRow = form.querySelector('[data-watch-desire-row]');
+    if (ratingRow) ratingRow.style.display = watchState === 'want' ? 'none' : '';
+    if (rangeRow) rangeRow.style.display = watchState === 'want' ? 'none' : '';
+    if (desireRow) desireRow.style.display = watchState === 'want' ? '' : 'none';
+    syncWatchDesireStars(form);
+    var finishedSelect = form.elements.finished ? form.elements.finished.closest('label') : null;
+    if (finishedSelect) finishedSelect.style.display = (!isWant && kind === 'series') ? '' : 'none';
+  }
+
+  function renderWatch() {
+    if (state.watchStatus !== 'want' && state.watchMode === 'wall' && state.watchKind === 'all') state.watchKind = 'movie';
+    var allEntries = allWatchEntries();
+    var entries = watchSortEntries(watchFilteredEntries());
+    var years = watchYears(allEntries);
+    if (state.watchStatus !== 'want') {
+      if (state.watchYear !== 'all' && state.watchYear !== 'recent2' && years.indexOf(Number(state.watchYear)) < 0) state.watchYear = 'recent2';
+    } else {
+      state.watchMode = 'want';
+      state.watchYear = 'all';
+    }
+    var yearOptions = ['recent2', 'all'].concat(years);
+    var selected = ensureWatchSelection(entries);
+    var showTopFilters = state.watchMode !== 'month';
+    els.content.innerHTML = mockNotice() + '<section class="life-watch-page"><header class="life-watch-head"><div><h2 class="life-page-title">观影墙</h2></div>' +
+      (showTopFilters ? '<div class="life-watch-status-tabs"><button type="button" class="' + (state.watchStatus === 'watched' ? 'active' : '') + '" data-watch-status="watched">已看</button><button type="button" class="' + (state.watchStatus === 'want' ? 'active' : '') + '" data-watch-status="want">想看</button></div>' : '') +
+      (showTopFilters ? '<div class="life-watch-kind-tabs"><button type="button" class="' + (state.watchKind === 'movie' ? 'active' : '') + '" data-watch-kind="movie">电影</button><button type="button" class="' + (state.watchKind === 'series' ? 'active' : '') + '" data-watch-kind="series">剧集</button></div>' : '') +
+      (showTopFilters && state.watchStatus !== 'want'
+        ? '<div class="life-watch-toolbar"><select class="life-select life-watch-year-dropdown" data-watch-action="set-year">' + yearOptions.map(function(option) { var value = String(option); var label = option === 'recent2' ? '近两年' : (option === 'all' ? '全部年度' : (option + '')); return '<option value="' + escapeHtml(value) + '"' + (String(state.watchYear) === value ? ' selected' : '') + '>' + escapeHtml(label) + '</option>'; }).join('') + '</select><div class="life-chip-row">' + years.map(function(year) { return '<button type="button" class="life-chip ' + (Number(state.watchYear) === Number(year) ? 'active' : '') + '" data-watch-year="' + year + '">' + year + '</button>'; }).join('') + '</div></div>'
+        : '') + '</header>' +
+      (state.watchStatus === 'want' ? renderWatchWantList(entries) : (state.watchMode === 'month' ? renderWatchMonth(allEntries) : renderWatchWall(entries))) +
+    '</section>';
+    els.aside.innerHTML = state.watchFormMode ? renderWatchForm(state.watchFormMode === 'edit' ? selected : null) : renderWatchDetail(selected);
+    syncWatchFormVisibility(document.getElementById('lifeWatchForm'));
   }
 
   function renderSimpleView(kind) {
@@ -4309,11 +5799,20 @@
       resources: ['资源库', simpleResources.map(function(item) { return '<article class="life-row"><div class="life-row-head"><div><h3 class="life-row-title">' + item.name + ' · ' + item.value + '</h3><p class="life-card-copy">' + item.meta + '</p></div><button class="life-mini-btn">查看</button></div></article>'; }).join('')],
       profile: ['个人档案', '<div class="life-wide-grid">' + [['记录总数','628 条'],['走过天数','9,862 天'],['城市','28 个'],['关系联系人','23 位'],['愿望完成','12 个'],['月度回顾','18 份']].map(function(item) { return '<div class="life-kpi"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join('') + '</div>' + accountStatusPanel()]
     }[kind];
-    els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-panel-title">' + config[0] + '</h2><p class="life-panel-sub">精简视图，保持与主应用一致的记录结构。</p></div><button class="life-secondary-btn">筛选</button></div><div class="life-list">' + config[1] + '</div></section>';
+    els.content.innerHTML = mockNotice() + '<section class="life-panel"><div class="life-panel-head"><div><h2 class="life-page-title">' + config[0] + '</h2></div><button class="life-secondary-btn">筛选</button></div><div class="life-list">' + config[1] + '</div></section>';
     els.aside.innerHTML = kind === 'profile' ? accountSecurityPanel() : '<section class="life-detail-card"><h2 class="life-detail-title">关联洞察</h2><p class="life-card-copy">这些内容会被时间河流、月度回顾和个人档案统一引用，避免记录散落在不同页面里。</p></section><section class="life-detail-card"><h2 class="life-detail-title">本周关注</h2><div class="life-chip-row"><span class="life-chip active">睡眠质量</span><span class="life-chip">专注力</span><span class="life-chip">情绪稳定</span></div></section>';
   }
 
   function render() {
+    if (!accountSession()) {
+      redirectToLogin();
+      return;
+    }
+    if (!canAccessView(state.view)) {
+      state.view = 'timeline';
+      state.timelineFilter = '全部';
+      resetPage('timeline');
+    }
     updateChrome();
     if (state.view === 'timeline') renderTimeline();
     else if (state.view === 'life-axis') renderLifeAxis();
@@ -4322,24 +5821,16 @@
     else if (state.view === 'relationships') renderRelationships();
     else if (state.view === 'wishes') renderWishes();
     else if (state.view === 'monthly') renderMonthly();
+    else if (state.view === 'watch') renderWatch();
     else if (state.view === 'add') renderAdd();
     else renderSimpleView(state.view);
   }
 
   document.addEventListener('click', function(event) {
+    if (blockLoggedOutInteraction(event)) return;
     var accountAction = event.target.closest('[data-account-action]');
     if (accountAction) {
       handleAccountAction(accountAction.getAttribute('data-account-action'), accountAction);
-      return;
-    }
-    if (event.target.closest('#mockModeBtn')) {
-      var url = new URL(window.location.href);
-      if (mockMode) {
-        url.searchParams.delete('mock');
-      } else {
-        url.searchParams.set('mock', '1');
-      }
-      window.location.href = url.toString();
       return;
     }
     var nav = event.target.closest('[data-view]');
@@ -4347,15 +5838,44 @@
       setView(nav.getAttribute('data-view'));
       return;
     }
+    var loadMoreButton = event.target.closest('[data-load-more]');
+    if (loadMoreButton) {
+      loadMore(loadMoreButton.getAttribute('data-load-more'));
+      return;
+    }
     var action = event.target.closest('[data-action]');
     if (action) {
       var actionName = action.getAttribute('data-action');
+      if (actionName === 'choose-quick-add') {
+        var target = action.getAttribute('data-quick-add') || 'mood';
+        state.timelineQuickAdd = target;
+        renderTimeline();
+        return;
+      }
+      if (actionName === 'open-quick-add-target') {
+        openQuickAddTargetFromTimeline();
+        return;
+      }
       if (actionName === 'go-add') {
         if (state.view === 'life-axis') addAxisMilestone();
         else if (state.view === 'decisions') addDecision();
         else if (state.view === 'mood') startMoodCreate();
+        else if (state.view === 'relationships') startRelationshipCreate();
         else if (state.view === 'wishes') startWishCreate();
+        else if (state.view === 'watch') startWatchCreate();
         else setView('add');
+        return;
+      }
+      if (actionName === 'toggle-mock-mode') {
+        var url = new URL(window.location.href);
+        if (mockMode) {
+          url.searchParams.delete('mock');
+        } else {
+          url.searchParams.set('mock', '1');
+        }
+        url.hash = '';
+        window.location.href = url.toString();
+        return;
       }
       if (actionName === 'view-decisions') setView('decisions');
       if (actionName === 'view-monthly') setView('monthly');
@@ -4382,12 +5902,8 @@
         state.axisStage = '全部';
         state.query = '';
         if (els.search) els.search.value = '';
+        resetPage('axis');
         renderLifeAxis();
-      }
-      if (axisActionName === 'add-near') {
-        var nearId = axisAction.closest('[data-axis-id]');
-        var near = axisMilestones().filter(function(item) { return nearId && item.id === nearId.getAttribute('data-axis-id'); })[0];
-        addAxisMilestone(near);
       }
       if (axisActionName === 'edit') {
         state.axisEditing = true;
@@ -4404,6 +5920,7 @@
     if (axisCategory) {
       state.axisCategory = axisCategory.getAttribute('data-axis-category');
       state.axisEditing = false;
+      resetPage('axis');
       renderLifeAxis();
       return;
     }
@@ -4412,6 +5929,7 @@
       state.axisYear = axisYear.getAttribute('data-axis-year');
       state.axisStage = '全部';
       state.axisEditing = false;
+      resetPage('axis');
       renderLifeAxis();
       return;
     }
@@ -4421,12 +5939,26 @@
       state.axisStage = state.axisStage === stage ? '全部' : stage;
       state.axisYear = '全部';
       state.axisEditing = false;
+      resetPage('axis');
       renderLifeAxis();
+      return;
+    }
+    var axisImageDelete = event.target.closest('[data-axis-image-delete]');
+    if (axisImageDelete) {
+      var deleteForm = axisImageDelete.closest('#lifeAxisEditForm');
+      var deleteIndex = Number(axisImageDelete.getAttribute('data-axis-image-delete'));
+      var deleteHidden = deleteForm && deleteForm.elements.photos;
+      if (deleteHidden && deleteIndex >= 0) {
+        var deletePhotos = splitAxisList(deleteHidden.value).slice(0, 3);
+        deletePhotos.splice(deleteIndex, 1);
+        setAxisFormPhotos(deleteForm, deletePhotos);
+      }
       return;
     }
     var timelineFilter = event.target.closest('[data-timeline-filter]');
     if (timelineFilter) {
       state.timelineFilter = timelineFilter.getAttribute('data-timeline-filter');
+      resetPage('timeline');
       renderTimeline();
       return;
     }
@@ -4435,6 +5967,7 @@
       state.decisionFilter = decisionFilter.getAttribute('data-decision-filter');
       state.decisionFormMode = null;
       state.decisionMoreOpen = false;
+      resetPage('decision');
       renderDecisions();
       return;
     }
@@ -4442,15 +5975,13 @@
     if (moodTab) {
       state.moodTab = moodTab.getAttribute('data-mood-tab');
       state.moodFormMode = null;
+      resetPage('moodRecent');
       renderMood();
       return;
     }
     var moodDate = event.target.closest('[data-mood-date]');
     if (moodDate) {
-      var parsedMoodDate = parseMoodDate(moodDate.getAttribute('data-mood-date'));
-      state.moodYear = parsedMoodDate.year;
-      state.moodMonth = parsedMoodDate.month;
-      state.selectedMoodDay = parsedMoodDate.day;
+      selectMoodDate(moodDate.getAttribute('data-mood-date'));
       state.moodFormMode = null;
       state.moodEditingId = '';
       state.moodRangeMenu = null;
@@ -4479,7 +6010,6 @@
       if (rangeParts[0] === 'trend') state.moodRange = rangeParts[1];
       if (rangeParts[0] === 'sleep') state.moodSleepRange = rangeParts[1];
       if (rangeParts[0] === 'trigger') state.moodTriggerRange = rangeParts[1];
-      if (rangeParts[0] === 'week') state.moodWeekRange = rangeParts[1];
       state.moodRangeMenu = null;
       renderMood();
       return;
@@ -4489,9 +6019,7 @@
       var moodActionName = moodAction.getAttribute('data-mood-action');
       state.moodRangeMenu = null;
       if (moodActionName === 'today') {
-        state.moodYear = 2026;
-        state.moodMonth = 4;
-        state.selectedMoodDay = 13;
+        selectMoodDate(todayISO());
       }
       if (moodActionName === 'prev-month') {
         state.moodMonth -= 1;
@@ -4564,6 +6092,7 @@
     if (wishFilter) {
       state.wishFilter = wishFilter.getAttribute('data-wish-filter');
       state.wishFormMode = null;
+      resetPage('wish');
       renderWishes();
       return;
     }
@@ -4571,6 +6100,7 @@
     if (wishCategory) {
       state.wishCategory = wishCategory.getAttribute('data-wish-category');
       state.wishFormMode = null;
+      resetPage('wish');
       renderWishes();
       return;
     }
@@ -4608,6 +6138,7 @@
     if (relationshipFilter) {
       state.relationshipFilter = relationshipFilter.getAttribute('data-relationship-filter');
       state.relationshipFormMode = null;
+      resetPage('relationship');
       renderRelationships();
       return;
     }
@@ -4631,14 +6162,12 @@
       if (relationshipActionName === 'cancel-form') {
         state.relationshipFormMode = null;
         state.relationshipEditingId = '';
+        state.relationshipInlineEditor = '';
         renderRelationships();
       }
       if (relationshipActionName === 'sort') {
-        state.relationshipSort = state.relationshipSort === '亲密度' ? '下次联系' : (state.relationshipSort === '下次联系' ? '最近联系' : '亲密度');
-        renderRelationships();
-      }
-      if (relationshipActionName === 'filter') {
-        state.relationshipFilter = state.relationshipFilter === '全部' ? '家人' : '全部';
+        state.relationshipSort = state.relationshipSort === '亲密度' ? '预计下次联系' : (state.relationshipSort === '预计下次联系' ? '最近联系' : '亲密度');
+        resetPage('relationship');
         renderRelationships();
       }
       if (relationshipActionName === 'remind') remindRelationship();
@@ -4673,10 +6202,109 @@
       }
       if (wishActionName === 'sort') cycleWishSort();
       if (wishActionName === 'toggle-view') showToast('当前为列表视图，已按原型保留高密度展示');
-      if (wishActionName === 'price-history') showToast('价格历史已在详情中展示');
       if (wishActionName === 'adjust-cooling') applyWishAction('extend');
       if (wishActionName === 'view-option') showToast('替代方案已加入对比清单');
       if (['extend', 'drop', 'decide', 'realize'].indexOf(wishActionName) >= 0) applyWishAction(wishActionName);
+      return;
+    }
+    var watchStatus = event.target.closest('[data-watch-status]');
+    if (watchStatus) {
+      state.watchStatus = watchStatus.getAttribute('data-watch-status') === 'want' ? 'want' : 'watched';
+      state.watchMode = state.watchStatus === 'want' ? 'want' : 'wall';
+      if (state.watchStatus === 'want') state.watchYear = 'all';
+      state.watchFormMode = null;
+      renderWatch();
+      return;
+    }
+    var watchKind = event.target.closest('[data-watch-kind]');
+    if (watchKind) {
+      state.watchKind = watchKind.getAttribute('data-watch-kind');
+      state.watchFormMode = null;
+      renderWatch();
+      return;
+    }
+    var watchYear = event.target.closest('[data-watch-year]');
+    if (watchYear) {
+      state.watchYear = Number(watchYear.getAttribute('data-watch-year'));
+      state.watchMode = 'wall';
+      state.watchFormMode = null;
+      renderWatch();
+      return;
+    }
+    var watchItem = event.target.closest('[data-watch-item-id]');
+    if (watchItem) {
+      if (event.target.closest('[data-watch-action]')) {
+        // 让子按钮（如“x部 >”）优先走动作逻辑，而不是仅选中卡片
+      } else {
+        state.selectedWatchId = watchItem.getAttribute('data-watch-item-id');
+        state.watchFormMode = null;
+        renderWatch();
+        return;
+      }
+    }
+    var watchAction = event.target.closest('[data-watch-action]');
+    if (watchAction) {
+      var watchActionName = watchAction.getAttribute('data-watch-action');
+      if (watchActionName === 'open-month') {
+        state.watchCreatePreset = null;
+        openWatchMonth(
+          Number(watchAction.getAttribute('data-watch-open-year')),
+          Number(watchAction.getAttribute('data-watch-open-month')),
+          watchAction.getAttribute('data-watch-open-kind')
+        );
+      }
+      if (watchActionName === 'open-create') {
+        var createKind = watchAction.getAttribute('data-watch-open-kind');
+        if (createKind === 'movie' || createKind === 'series') state.watchKind = createKind;
+        startWatchCreateAt(Number(watchAction.getAttribute('data-watch-open-year')), Number(watchAction.getAttribute('data-watch-open-month')));
+      }
+      if (watchActionName === 'back-wall') {
+        state.watchMode = 'wall';
+        state.watchCreatePreset = null;
+        state.watchFormMode = null;
+        renderWatch();
+      }
+      if (watchActionName === 'toggle-year') {
+        var allYears = watchYears(allWatchEntries());
+        if (!allYears.length) return;
+        if (state.watchYear === 'recent2') state.watchYear = 'all';
+        else if (state.watchYear === 'all') state.watchYear = allYears[0];
+        else {
+          var idx = allYears.indexOf(Number(state.watchYear));
+          state.watchYear = idx < 0 || idx === allYears.length - 1 ? 'recent2' : allYears[idx + 1];
+        }
+        state.watchMode = 'wall';
+        renderWatch();
+      }
+      if (watchActionName === 'toggle-sort') {
+        state.watchSort = state.watchSort === '按观看日期' ? '按评分' : (state.watchSort === '按评分' ? '按片名' : '按观看日期');
+        renderWatch();
+      }
+      if (watchActionName === 'edit') startWatchEdit();
+      if (watchActionName === 'add') {
+        state.watchCreatePreset = null;
+        startWatchCreate();
+      }
+      if (watchActionName === 'cancel-form') {
+        state.watchCreatePreset = null;
+        state.watchFormMode = null;
+        renderWatch();
+      }
+      if (watchActionName === 'delete') deleteSelectedWatch();
+      return;
+    }
+    var watchStar = event.target.closest('[data-watch-desire-star]');
+    if (watchStar) {
+      var watchFormStar = watchStar.closest('#lifeWatchForm');
+      if (!watchFormStar) return;
+      var starValue = Math.max(1, Math.min(5, Number(watchStar.getAttribute('data-watch-desire-star') || 1)));
+      var ratingValue = (starValue * 2).toFixed(1);
+      if (watchFormStar.elements.rating) watchFormStar.elements.rating.value = ratingValue;
+      if (watchFormStar.elements.ratingRange) watchFormStar.elements.ratingRange.value = ratingValue;
+      Array.prototype.forEach.call(watchFormStar.querySelectorAll('[data-watch-rating-value]'), function(node) {
+        node.textContent = ratingValue;
+      });
+      syncWatchDesireStars(watchFormStar);
       return;
     }
     var wishPlan = event.target.closest('[data-wish-plan-index]');
@@ -4711,6 +6339,7 @@
   });
 
   document.addEventListener('input', function(event) {
+    if (blockLoggedOutInteraction(event)) return;
     if (event.target.matches('[data-form-confidence-range]')) {
       var formValue = Number(event.target.value || 0);
       var formShell = event.target.closest('.life-decision-form');
@@ -4723,6 +6352,13 @@
       var moodForm = event.target.closest('.life-mood-form');
       var moodValueNode = moodForm && moodForm.querySelector('[data-mood-score-value]');
       if (moodValueNode) moodValueNode.textContent = moodValue;
+      var moodWeatherNode = moodForm && moodForm.querySelector('[data-mood-score-weather]');
+      if (moodWeatherNode) moodWeatherNode.value = moodStateByScore(moodValue).label;
+      refreshMoodAside();
+      return;
+    }
+    if (event.target.closest('#lifeMoodForm')) {
+      refreshMoodAside();
       return;
     }
     if (event.target.matches('[data-relationship-score-range]')) {
@@ -4732,16 +6368,58 @@
       if (relationshipValueNode) relationshipValueNode.textContent = relationshipValue;
       return;
     }
+    if (event.target.matches('#lifeRelationshipForm input[name="nextDate"]')) {
+      syncRelationshipNextFromDate(event.target.closest('#lifeRelationshipForm'));
+      return;
+    }
     if (event.target.matches('[data-wish-desire-range]')) {
       var wishValue = Number(event.target.value || 0);
       var wishForm = event.target.closest('.life-wish-form');
       var wishValueNode = wishForm && wishForm.querySelector('[data-wish-desire-value]');
       if (wishValueNode) wishValueNode.textContent = wishValue;
+      event.target.style.accentColor = wishDesireColor(wishValue);
+      return;
+    }
+    if (event.target.matches('#lifeWishForm input[name="days"], #lifeWishForm select[name="status"]')) {
+      syncWishDueFromDays(event.target.closest('#lifeWishForm'));
+      return;
+    }
+    if (event.target.matches('[data-add-wish-desire-range]')) {
+      var addWishValue = Number(event.target.value || 0);
+      var addWishLabel = event.target.closest('.life-range-line') && event.target.closest('.life-range-line').querySelector('b');
+      if (addWishLabel) addWishLabel.textContent = addWishValue + '%';
+      event.target.style.accentColor = wishDesireColor(addWishValue);
+      return;
+    }
+    if (event.target.matches('[data-watch-rating-range]')) {
+      var watchValue = Number(event.target.value || 0).toFixed(1);
+      var watchForm = event.target.closest('.life-watch-form');
+      if (watchForm) {
+        Array.prototype.forEach.call(watchForm.querySelectorAll('[data-watch-rating-value]'), function(node) {
+          node.textContent = watchValue;
+        });
+      }
+      if (watchForm && watchForm.elements.rating) watchForm.elements.rating.value = watchValue;
+      syncWatchDesireStars(watchForm);
+      return;
+    }
+    if (event.target.matches('#lifeWatchForm input[name="rating"]')) {
+      var watchFormNum = event.target.closest('.life-watch-form');
+      var value = Math.max(1, Math.min(10, Number(event.target.value || 1))).toFixed(1);
+      event.target.value = value;
+      if (watchFormNum && watchFormNum.elements.ratingRange) watchFormNum.elements.ratingRange.value = value;
+      if (watchFormNum) {
+        Array.prototype.forEach.call(watchFormNum.querySelectorAll('[data-watch-rating-value]'), function(node) {
+          node.textContent = value;
+        });
+      }
+      syncWatchDesireStars(watchFormNum);
       return;
     }
     if (event.target === els.search || event.target.matches('[data-decision-search]')) {
       state.query = els.search.value;
       if (event.target.matches('[data-decision-search]')) state.query = event.target.value;
+      resetPages(['timeline', 'axis', 'decision', 'moodRecent', 'relationship', 'wish']);
       render();
       if (event.target === els.search) els.search.focus();
       return;
@@ -4758,6 +6436,16 @@
       syncDecisionReviewDate(event.target.closest('#lifeDecisionForm'));
       return;
     }
+    if (event.target.matches('#lifeMoodForm select[name="weather"]')) {
+      refreshMoodAside();
+      return;
+    }
+    if (event.target.matches('#lifeWatchForm input[name="date"]')) {
+      var date = normalizeISODate(event.target.value, todayISO());
+      var watchFormDate = event.target.closest('#lifeWatchForm');
+      if (watchFormDate && watchFormDate.elements.date) watchFormDate.elements.date.value = date;
+      return;
+    }
     if (event.target.matches('[data-add-body-source]')) {
       Array.prototype.forEach.call(document.querySelectorAll('[data-add-body-source]'), function(node) {
         if (node !== event.target) node.value = event.target.value;
@@ -4770,6 +6458,15 @@
   });
 
   document.addEventListener('change', function(event) {
+    if (blockLoggedOutInteraction(event)) return;
+    if (event.target.matches('[data-watch-action="set-year"]')) {
+      var nextYear = event.target.value;
+      state.watchYear = nextYear === 'recent2' || nextYear === 'all' ? nextYear : Number(nextYear);
+      state.watchMode = 'wall';
+      state.watchFormMode = null;
+      renderWatch();
+      return;
+    }
     if (event.target.matches('[data-wish-image-upload]')) {
       var wishFile = event.target.files && event.target.files[0];
       var wishForm = event.target.closest('#lifeWishForm');
@@ -4792,24 +6489,92 @@
       syncDecisionReviewDate(event.target.closest('#lifeDecisionForm'));
       return;
     }
+    if (event.target.matches('#lifeRelationshipForm input[name="nextDate"]')) {
+      syncRelationshipNextFromDate(event.target.closest('#lifeRelationshipForm'));
+      return;
+    }
+    if (event.target.matches('#lifeWishForm input[name="days"], #lifeWishForm select[name="status"]')) {
+      syncWishDueFromDays(event.target.closest('#lifeWishForm'));
+      return;
+    }
     if (event.target.matches('#lifeAxisEditForm select[name="year"]')) {
       var axisYearForm = event.target.closest('#lifeAxisEditForm');
       var currentDate = axisYearForm && axisYearForm.elements.date ? axisYearForm.elements.date.value : '';
       syncAxisDateFields(axisYearForm, String(event.target.value || '2026') + '-' + axisDayFromDate(currentDate));
       return;
     }
-    if (event.target.matches('[data-axis-image-upload]')) {
-      var axisFile = event.target.files && event.target.files[0];
-      var axisForm = event.target.closest('#lifeAxisEditForm');
-      var axisHidden = axisForm && axisForm.querySelector('[data-axis-uploaded-photo]');
-      var axisPreview = axisForm && axisForm.querySelector('[data-axis-upload-preview]');
-      if (!axisFile || !axisHidden || typeof FileReader === 'undefined') return;
-      var axisReader = new FileReader();
-      axisReader.onload = function() {
-        axisHidden.value = String(axisReader.result || '');
-        if (axisPreview) axisPreview.innerHTML = axisPhotoHtml(axisHidden.value, '') + '<em>' + escapeHtml(axisFile.name) + '</em>';
+    if (event.target.matches('#lifeWatchForm select[name="kind"], #lifeWatchForm select[name="finished"], #lifeWatchForm select[name="watchState"]')) {
+      syncWatchFormVisibility(event.target.closest('#lifeWatchForm'));
+      return;
+    }
+    if (event.target.matches('[data-mood-year-select], [data-mood-month-select]')) {
+      var yearSelect = document.querySelector('[data-mood-year-select]');
+      var monthSelect = document.querySelector('[data-mood-month-select]');
+      state.moodYear = Number(yearSelect && yearSelect.value || state.moodYear);
+      state.moodMonth = Number(monthSelect && monthSelect.value || state.moodMonth);
+      state.selectedMoodDay = Math.min(state.selectedMoodDay, new Date(state.moodYear, state.moodMonth + 1, 0).getDate());
+      state.moodFormMode = null;
+      state.moodEditingId = '';
+      state.moodRangeMenu = null;
+      renderMood();
+      return;
+    }
+    if (event.target.matches('[data-watch-image-upload]')) {
+      var watchFile = event.target.files && event.target.files[0];
+      var watchForm = event.target.closest('#lifeWatchForm');
+      var watchHidden = watchForm && watchForm.querySelector('[data-watch-uploaded-image]');
+      var watchPreview = watchForm && watchForm.querySelector('[data-watch-image-preview]');
+      if (!watchFile || !watchHidden || typeof FileReader === 'undefined') return;
+      var watchReader = new FileReader();
+      watchReader.onload = function() {
+        watchHidden.value = String(watchReader.result || '');
+        if (watchPreview) watchPreview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(watchHidden.value) + '" alt=""></span><em>' + escapeHtml(watchFile.name) + '</em>';
       };
-      axisReader.readAsDataURL(axisFile);
+      watchReader.readAsDataURL(watchFile);
+      return;
+    }
+    if (event.target.matches('[data-axis-image-upload]')) {
+      var axisFiles = Array.prototype.slice.call(event.target.files || []);
+      var axisForm = event.target.closest('#lifeAxisEditForm');
+      var axisHidden = axisForm && axisForm.elements.photos;
+      if (!axisFiles.length || !axisHidden || typeof FileReader === 'undefined') return;
+      var currentAxisPhotos = splitAxisList(axisHidden.value).slice(0, 3);
+      var availableAxisSlots = Math.max(0, 3 - currentAxisPhotos.length);
+      if (!availableAxisSlots) {
+        showToast('最多只能上传 3 张图片');
+        event.target.value = '';
+        return;
+      }
+      var selectedAxisFiles = axisFiles.slice(0, availableAxisSlots);
+      if (axisFiles.length > availableAxisSlots) showToast('最多只能上传 3 张图片，已保留前 ' + availableAxisSlots + ' 张');
+      var loadedAxisPhotos = new Array(selectedAxisFiles.length);
+      selectedAxisFiles.forEach(function(axisFile, index) {
+        var axisReader = new FileReader();
+        axisReader.onload = function() {
+          loadedAxisPhotos[index] = String(axisReader.result || '');
+          if (loadedAxisPhotos.filter(Boolean).length !== selectedAxisFiles.length) return;
+          var nextAxisPhotos = currentAxisPhotos.concat(loadedAxisPhotos).slice(0, 3);
+          setAxisFormPhotos(axisForm, nextAxisPhotos);
+          event.target.value = '';
+        };
+        axisReader.readAsDataURL(axisFile);
+      });
+      return;
+    }
+    if (event.target.matches('[data-axis-image-replace]')) {
+      var replaceFile = event.target.files && event.target.files[0];
+      var replaceIndex = Number(event.target.getAttribute('data-axis-image-replace'));
+      var replaceForm = event.target.closest('#lifeAxisEditForm');
+      var replaceHidden = replaceForm && replaceForm.elements.photos;
+      if (!replaceFile || !replaceHidden || typeof FileReader === 'undefined' || replaceIndex < 0 || replaceIndex > 2) return;
+      var replacePhotos = splitAxisList(replaceHidden.value).slice(0, 3);
+      if (replaceIndex >= replacePhotos.length) return;
+      var replaceReader = new FileReader();
+      replaceReader.onload = function() {
+        replacePhotos[replaceIndex] = String(replaceReader.result || '');
+        setAxisFormPhotos(replaceForm, replacePhotos);
+      };
+      replaceReader.readAsDataURL(replaceFile);
       return;
     }
     if (!event.target.matches('[data-relationship-editor-image-upload]')) return;
@@ -4839,6 +6604,7 @@
   });
 
   document.addEventListener('submit', function(event) {
+    if (blockLoggedOutInteraction(event)) return;
     var accountForm = event.target.closest('#lifeAccountForm');
     if (accountForm) {
       event.preventDefault();
@@ -4906,10 +6672,22 @@
       saveMonthlyQuote(monthlyQuoteForm);
       return;
     }
+    var monthlySummaryForm = event.target.closest('#lifeMonthlySummaryForm');
+    if (monthlySummaryForm) {
+      event.preventDefault();
+      saveMonthlySummary(monthlySummaryForm);
+      return;
+    }
     var wishForm = event.target.closest('#lifeWishForm');
     if (wishForm) {
       event.preventDefault();
       saveWishForm(wishForm);
+      return;
+    }
+    var watchForm = event.target.closest('#lifeWatchForm');
+    if (watchForm) {
+      event.preventDefault();
+      saveWatchForm(watchForm);
       return;
     }
     var form = event.target.closest('#lifeAddForm');
@@ -4918,6 +6696,41 @@
     saveMomentFromForm(form);
   });
 
-  hydrateStaticIcons(document);
-  render();
+  window.addEventListener('life:data-synced', function() {
+    render();
+  });
+
+  function bootLifeApp() {
+    if (!accountSession()) {
+      redirectToLogin();
+      return;
+    }
+    if (lifeAccount() && lifeAccount().refreshAccounts && isAdminSession()) {
+      lifeAccount().refreshAccounts().catch(function() {
+        return [];
+      });
+    }
+    hydrateStaticIcons(document);
+    render();
+  }
+
+  function waitForLifeDataReady() {
+    return window.__lifeDataReady && typeof window.__lifeDataReady.then === 'function'
+      ? window.__lifeDataReady.catch(function() { return false; })
+      : Promise.resolve(false);
+  }
+
+  if (lifeAccount() && lifeAccount().refreshSession) {
+    lifeAccount().refreshSession().then(function(user) {
+      if (!user || !accountSession()) {
+        redirectToLogin();
+        return null;
+      }
+      return waitForLifeDataReady().then(bootLifeApp);
+    }).catch(function() {
+      redirectToLogin();
+    });
+  } else {
+    redirectToLogin();
+  }
 })();

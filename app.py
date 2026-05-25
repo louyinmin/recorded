@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify, g, send_from_directory, Response
 from urllib.parse import quote
 import io
 from expiry_backend import init_expiry_module
+from life_backend import init_life_module
 from expiry_backend.service import (
     create_session,
     get_token_from_request,
@@ -21,8 +22,10 @@ BASE_DIR = os.environ.get('RECORDED_BASE_DIR', os.path.dirname(os.path.abspath(_
 app = Flask(__name__, static_folder=None)
 
 DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
+LIFE_DB_PATH = os.environ.get('LIFE_DB_PATH', os.path.join(BASE_DIR, 'life.db'))
 
 init_expiry_module(app, BASE_DIR, DB_PATH)
+init_life_module(app, BASE_DIR, LIFE_DB_PATH)
 
 DEFAULT_CATEGORIES = ['交通工具（飞机/动车/自驾）', '住宿', '餐费', '打车']
 
