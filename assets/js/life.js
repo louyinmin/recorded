@@ -64,8 +64,8 @@
     watchEditingId: '',
     watchCreatePreset: null,
     selectedWatchId: 'ws5',
-    monthlyYear: 2026,
-    monthlyMonth: 4,
+    monthlyYear: initialToday.getFullYear(),
+    monthlyMonth: initialToday.getMonth(),
     monthlyLetterMode: false,
     monthlyQuoteMode: false,
     monthlySummaryMode: false,
@@ -177,6 +177,20 @@
     var yearOnly = text.match(/^(\d{4})$/);
     if (yearOnly) return yearOnly[1] + '-01-01';
     return fallback || todayISO();
+  }
+
+  function parseISODateStrict(value) {
+    var text = String(value || '').trim().replace(/\//g, '-');
+    var full = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!full) return '';
+    return full[1] + '-' + String(full[2]).padStart(2, '0') + '-' + String(full[3]).padStart(2, '0');
+  }
+
+  function parseMonthDayWithYear(value, year) {
+    var text = String(value || '').trim().replace(/\//g, '-');
+    var monthDay = text.match(/(?:^|\s)(\d{1,2})-(\d{1,2})(?:\s|$)/);
+    if (!monthDay || !year) return '';
+    return year + '-' + String(monthDay[1]).padStart(2, '0') + '-' + String(monthDay[2]).padStart(2, '0');
   }
 
   function selectedAxisDateISO() {
@@ -1974,10 +1988,24 @@
   }
 
   function renderMonthlyMini() {
-    return '<section class="life-detail-card"><div class="life-detail-head"><div><h2 class="life-detail-title">本月值得记住</h2><p class="life-panel-sub">5 月 · 8 条记录</p></div></div><div class="life-list" style="margin-top:12px">' +
-      ['苏州一日游', '完成年度体检', '拿到驾照', '妈妈生日'].map(function(item, idx) {
-        return '<div class="life-row life-memory-row"><span class="life-side-icon ' + ['blue','green','amber','danger'][idx] + '">' + iconHtml(['monthly','health','decision','relationship'][idx]) + '</span><span class="life-memory-date">05-' + ['13','08','05','01'][idx] + '</span><strong>' + item + '</strong><span class="life-badge ' + ['amber','green','blue','red'][idx] + '">' + ['旅行','健康','里程碑','家庭'][idx] + '</span>' + (idx === 0 ? '<span class="life-photo photo-garden"></span>' : '') + '</div>';
-      }).join('') + '</div><button class="life-card-link" type="button" data-action="view-monthly">查看全部 →</button></section>';
+    var items = monthlyHighlights();
+    var total = monthlyMediaCandidates().length;
+    var rows = items.length ? items.map(renderMonthlyMiniRow).join('') : '<div class="life-empty">本月还没有值得记住的记录。</div>';
+    return '<section class="life-detail-card"><div class="life-detail-head"><div><h2 class="life-detail-title">本月值得记住</h2><p class="life-panel-sub">' + (state.monthlyMonth + 1) + ' 月 · ' + total + ' 条记录</p></div></div><div class="life-list" style="margin-top:12px">' +
+      rows + '</div><button class="life-card-link" type="button" data-action="view-monthly">查看全部 →</button></section>';
+  }
+
+  function renderMonthlyMiniRow(item, idx) {
+    var tone = ['blue', 'green', 'amber', 'danger'][idx % 4];
+    var badgeTone = ['amber', 'green', 'blue', 'red'][idx % 4];
+    var sourceIcons = {
+      '时间河流': 'monthly',
+      '关系温度': 'relationship',
+      '愿望冷却箱': 'wish',
+      '观影墙': 'watch'
+    };
+    var photo = monthlyHighlightImageSource(item) ? '<span class="life-photo" style="background-image:url(\'' + escapeHtml(safeCssImageUrl(monthlyHighlightImageSource(item))) + '\')"></span>' : (item.photo ? '<span class="life-photo ' + escapeHtml(item.photo) + '"></span>' : '');
+    return '<div class="life-row life-memory-row clickable" data-action="view-monthly"><span class="life-side-icon ' + tone + '">' + iconHtml(sourceIcons[item.source] || 'monthly') + '</span><span class="life-memory-date">' + escapeHtml(item.dateLabel || monthlyDateText(item.day)) + '</span><strong>' + escapeHtml(item.title) + '</strong><span class="life-badge ' + badgeTone + '">' + escapeHtml(item.tag || item.source || '记录') + '</span>' + photo + '</div>';
   }
 
   function renderPageHead(title) {
@@ -4367,6 +4395,29 @@
     return String(state.monthlyMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
+  function monthlyItemDateISO(item, field) {
+    var source = item || {};
+    var value = source[field || 'date'];
+    var explicit = parseISODateStrict(source.absoluteDate) || parseISODateStrict(value);
+    if (explicit) return explicit;
+    var text = String(value || '').trim();
+    var relative = todayAndYesterdayISO();
+    if (text.indexOf('今天') === 0) return relative.today;
+    if (text.indexOf('昨天') === 0) return relative.yesterday;
+    var year = source.year || state.monthlyYear;
+    var monthDay = parseMonthDayWithYear(text, year);
+    if (monthDay) return monthDay;
+    if (source.year != null && source.month != null && source.day != null) {
+      return source.year + '-' + String(Number(source.month) + 1).padStart(2, '0') + '-' + String(source.day).padStart(2, '0');
+    }
+    return '';
+  }
+
+  function monthlyItemInCurrentMonth(item, field) {
+    var iso = monthlyItemDateISO(item, field);
+    return iso && iso.slice(0, 7) === monthlyKey();
+  }
+
   function defaultMonthlySummary() {
     return '这个月是充实又温柔的一个月。\n\n工作上有突破，生活中也有很多温暖的连接。我开始更清楚地知道，什么对我来说很重要：健康的身体、真诚的关系、持续成长，以及自由的时间。\n\n下个月，希望继续保持这份节奏，也给自己更多的耐心和信任。';
   }
@@ -4419,9 +4470,9 @@
   }
 
   function monthlyMomentDay(item) {
-    var match = String(item.date || '').match(/(\d{2})-(\d{2})/);
-    if (!match) return 1;
-    return Number(match[2] || 1);
+    var iso = monthlyItemDateISO(item, 'date');
+    if (!iso) return 1;
+    return Number(iso.slice(8, 10) || 1);
   }
 
   function isRealImageSource(value) {
@@ -4448,11 +4499,14 @@
   function monthlyMediaCandidates() {
     var candidates = [];
     allMoments().filter(function(item) {
-      return item.photos && item.photos.length && String(item.date || '').indexOf(String(state.monthlyMonth + 1).padStart(2, '0') + '-') >= 0;
+      return item.photos && item.photos.length && monthlyItemInCurrentMonth(item, 'date');
     }).forEach(function(item, idx) {
+      var iso = monthlyItemDateISO(item, 'date');
       candidates.push({
         id: 'moment-' + item.id,
-        day: monthlyMomentDay(item),
+        day: Number(iso.slice(8, 10) || monthlyMomentDay(item)),
+        dateISO: iso,
+        dateLabel: iso ? iso.slice(5) : monthlyDateText(monthlyMomentDay(item)),
         title: item.title,
         copy: item.copy,
         tag: (item.tags || [item.type])[0] || item.type,
@@ -4469,9 +4523,13 @@
         ['places', '一起去过的地方', 'place']
       ].forEach(function(config) {
         normalizeRelationshipMedia(person[config[0]]).forEach(function(media, idx) {
+          var iso = monthlyItemDateISO(media, 'date');
+          if (iso && iso.slice(0, 7) !== monthlyKey()) return;
           candidates.push({
             id: 'relationship-' + person.id + '-' + config[0] + '-' + idx,
-            day: [3, 5, 8, 10, 13][idx % 5],
+            day: iso ? Number(iso.slice(8, 10)) : [3, 5, 8, 10, 13][idx % 5],
+            dateISO: iso || '',
+            dateLabel: iso ? iso.slice(5) : monthlyDateText([3, 5, 8, 10, 13][idx % 5]),
             title: media.text || person.name + '的' + config[1],
             copy: person.name + ' · ' + (person.notes || ['重要关系图片记录'])[0],
             tag: config[1],
@@ -4485,11 +4543,14 @@
       });
     });
     allWishes().filter(function(item) {
-      return item.photo;
+      return item.photo && monthlyItemInCurrentMonth(item, 'due');
     }).forEach(function(item, idx) {
+      var iso = monthlyItemDateISO(item, 'due');
       candidates.push({
         id: 'wish-' + item.id,
-        day: Number((String(item.due || '').split('-')[2] || 13)),
+        day: Number((iso || '').slice(8, 10) || 13),
+        dateISO: iso,
+        dateLabel: iso ? iso.slice(5) : monthlyDateText(13),
         title: item.name,
         copy: item.reason,
         tag: item.status,
@@ -4499,7 +4560,28 @@
         photo: wishPhoto(item)
       });
     });
-    return candidates;
+    allWatchEntries().filter(function(item) {
+      return item.watchState !== 'want' && monthlyItemInCurrentMonth(item, 'date');
+    }).forEach(function(item) {
+      var iso = monthlyItemDateISO(item, 'date');
+      candidates.push({
+        id: 'watch-' + item.id,
+        day: Number((iso || '').slice(8, 10) || 1),
+        dateISO: iso,
+        dateLabel: iso ? iso.slice(5) : monthlyDateText(1),
+        title: item.title,
+        copy: item.review || '来自观影墙的本月记录。',
+        tag: watchKindLabel(item.kind),
+        source: '观影墙',
+        view: 'watch',
+        likes: Math.max(8, Math.round((item.rating || 8) * 1.4)),
+        photo: item.cover || 'photo-river',
+        image: item.image || ''
+      });
+    });
+    return candidates.sort(function(a, b) {
+      return String(b.dateISO || '').localeCompare(String(a.dateISO || '')) || Number(b.likes || 0) - Number(a.likes || 0);
+    });
   }
 
   function monthlyHighlights() {
@@ -4979,22 +5061,27 @@
     var mood = addSelectedMood(form);
     var stored = getStoredMoments();
     var shouldLinkTimeline = !form.elements.linkTimeline || form.elements.linkTimeline.checked;
+    var monthlyBucket = type === '记忆' && form.elements.memoryBucket && form.elements.memoryBucket.value === '本月值得记住';
+    var linkedModules = addSelectedAssociations();
+    if (monthlyBucket && linkedModules.indexOf('本月值得记住') < 0) linkedModules.push('本月值得记住');
     var moment = {
       id: 'local-' + Date.now(),
       type: type,
       icon: '☀',
       time: dateParts.time,
-      date: '今天 ' + dateParts.date.slice(5),
+      date: timelineDateLabel(dateParts.date),
+      absoluteDate: dateParts.date,
       title: addTitleForType(type, form),
       copy: body,
-      location: addValue(form, 'location', '未选择地点'),
+      location: monthlyBucket ? '本月值得记住' : addValue(form, 'location', '未选择地点'),
       people: people,
       mood: mood,
       photos: ['photo-river', 'photo-cafe', 'photo-night', 'photo-book'],
-      tags: (tags.length ? tags : ['日常']).concat([type]),
+      tags: (tags.length ? tags : ['日常']).concat([type]).concat(monthlyBucket ? ['本月值得记住'] : []),
       privacy: form.elements.privacy ? form.elements.privacy.value : '仅自己可见',
-      linkedModules: addSelectedAssociations()
+      linkedModules: linkedModules
     };
+    if (monthlyBucket) moment.linkedView = 'monthly';
     if (shouldLinkTimeline) {
       stored.unshift(moment);
       saveStoredMoments(stored);
