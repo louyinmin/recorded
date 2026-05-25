@@ -44,6 +44,9 @@ env/
 .password
 .expiry_secret
 
+# 服务器本地部署证书脚本
+deploy_ssl_cert.sh
+
 # IDE
 .idea/
 .vscode/
