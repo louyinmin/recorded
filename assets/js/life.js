@@ -2572,7 +2572,7 @@
     var resultAction = archived ? '' : '<button class="life-mini-btn" data-decision-action="edit-result">' + iconHtml('add') + '</button>';
     var emotion = decisionEmotion(item);
     return '<section class="life-decision-side-card"><h2>信心 <strong data-confidence-value>' + item.confidence + '</strong><span>/100</span></h2>' + progress(item.confidence, 'var(--life-amber)') + '<p>详情页只展示当时信心；进入编辑决定后才能调整。</p></section>' +
-      '<section class="life-decision-side-card"><div class="life-detail-head"><h2>实际结果</h2>' + resultAction + '</div><dl><dt>状态</dt><dd><span class="life-badge green">已在新公司工作中</span></dd><dt>入职日期</dt><dd>2026-05-18</dd></dl><p>' + escapeHtml(item.result) + '</p><button class="life-card-link" data-decision-action="records">查看全部记录 →</button></section>' +
+      '<section class="life-decision-side-card"><div class="life-detail-head"><h2>实际结果</h2>' + resultAction + '</div><dl><dt>状态</dt><dd><span class="life-badge green">' + escapeHtml(item.choice || '暂未决定') + '</span></dd><dt>记录日期</dt><dd>' + escapeHtml(item.date) + '</dd></dl><p>' + escapeHtml(item.result) + '</p><button class="life-card-link" data-decision-action="records">查看全部记录 →</button></section>' +
       '<section class="life-decision-side-card"><h2>当时情绪 <span>（记录时）</span></h2><div class="life-decision-emotion">' + iconHtml('smile') + '<strong>' + escapeHtml(emotion.name) + '</strong><span>期待 ' + escapeHtml(emotion.expectation) + '%</span><span>焦虑 ' + escapeHtml(emotion.anxiety) + '%</span></div><p>关键词：' + escapeHtml(emotion.keywords.join('、')) + '</p></section>' +
       renderDecisionReviewCard(item);
   }
