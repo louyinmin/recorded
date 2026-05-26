@@ -5639,7 +5639,6 @@
     var watchState = form.elements.watchState && form.elements.watchState.value === 'want' ? 'want' : 'watched';
     var dateInput = form.elements.date ? form.elements.date.value : '';
     var date = normalizeISODate(dateInput, todayISO());
-    if (watchState === 'want') date = todayISO();
     var rating = Math.max(1, Math.min(10, Number(form.elements.rating.value || 1)));
     var finished = form.elements.finished ? form.elements.finished.value === 'finished' : true;
     var cover = (form.elements.cover && form.elements.cover.value) || (selected ? selected.cover : 'photo-river');
@@ -5794,7 +5793,7 @@
       '<input type="hidden" name="id" value="' + escapeHtml(source.id) + '">' +
       '<div class="life-two-grid"><label>片名 / 剧名<input class="life-input" name="title" value="' + escapeHtml(source.title) + '" required></label><label>类型<select class="life-select" name="kind"><option value="movie"' + (source.kind === 'movie' ? ' selected' : '') + '>电影</option><option value="series"' + (source.kind === 'series' ? ' selected' : '') + '>剧集</option></select></label></div>' +
       '<label>记录状态<select class="life-select" name="watchState"><option value="watched"' + (source.watchState !== 'want' ? ' selected' : '') + '>已看</option><option value="want"' + (source.watchState === 'want' ? ' selected' : '') + '>想看</option></select></label>' +
-      '<label data-watch-watched-only><span data-watch-date-label>观看日期</span><input class="life-input" type="date" name="date" value="' + escapeHtml(source.date || todayISO()) + '" required></label>' +
+      '<label><span data-watch-date-label>观看日期</span><input class="life-input" type="date" name="date" value="' + escapeHtml(source.date || todayISO()) + '" required></label>' +
       '<div class="life-two-grid"><label data-watch-rating-row>评分<input class="life-input" type="number" min="1" max="10" step="0.1" name="rating" value="' + Number(source.rating).toFixed(1) + '" required></label></div>' +
       '<label class="life-watch-range" data-watch-range-row>评分预览 <strong><span data-watch-rating-value>' + Number(source.rating).toFixed(1) + '</span>/10</strong><input class="life-confidence-slider" type="range" min="1" max="10" step="0.1" name="ratingRange" value="' + Number(source.rating).toFixed(1) + '" data-watch-rating-range></label>' +
       '<section class="life-watch-desire-stars" data-watch-desire-row><h3>想看指数 <strong><span data-watch-rating-value>' + Number(source.rating).toFixed(1) + '</span>/10</strong></h3><div class="life-watch-desire-buttons">' + [1,2,3,4,5].map(function(star) { return '<button type="button" class="life-watch-desire-star" data-watch-desire-star="' + star + '">★</button>'; }).join('') + '</div></section>' +
@@ -5844,7 +5843,7 @@
       node.style.display = isWant ? 'none' : '';
     });
     var dateLabel = form.querySelector('[data-watch-date-label]');
-    if (dateLabel) dateLabel.textContent = '观看日期';
+    if (dateLabel) dateLabel.textContent = isWant ? '想看日期' : '观看日期';
     var progressRow = form.querySelector('[data-watch-progress-row]');
     if (progressRow) {
       var showProgress = !isWant && kind === 'series' && finished === 'unfinished';
