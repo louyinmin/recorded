@@ -721,6 +721,10 @@
     return div.innerHTML;
   }
 
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function getStoredMoments() {
     try {
       return JSON.parse(localStorage.getItem(mockMode ? MOCK_STORAGE_KEY : STORAGE_KEY) || '[]');
@@ -2180,7 +2184,7 @@
     var currentPhotos = (item.photos || []).slice(0, 3);
     return '<section class="life-axis-photo-editor">' +
       '<div class="life-axis-photo-head"><div><strong>图片</strong><span>最多 3 张，未上传时使用默认占位图</span></div></div>' +
-      '<input type="hidden" name="photos" value="' + escapeHtml(axisPhotosValue(currentPhotos)) + '">' +
+      '<input type="hidden" name="photos" value="' + escapeAttr(axisPhotosValue(currentPhotos)) + '">' +
       '<div class="life-axis-upload-row">' +
         '<div class="life-axis-upload-preview" data-axis-upload-preview>' + axisPhotoPreviewHtml(currentPhotos) + '</div>' +
         '<label class="life-axis-upload-button">上传图片<input type="file" accept="image/*" multiple data-axis-image-upload></label>' +
@@ -2423,8 +2427,9 @@
     var day = axisDayFromDate(date);
     var season = axisSeasonFromDate(date);
     var type = form.elements.type.value.trim() || '项目';
+    var current = axisMilestones().filter(function(item) { return item.id === state.selectedAxisId; })[0] || {};
     var photoList = splitAxisList(form.elements.photos.value).slice(0, 3);
-    var defaultPhotos = (photoList.length ? photoList : ['photo-office']).slice(0, 3);
+    var defaultPhotos = (photoList.length ? photoList : (current.photos && current.photos.length ? current.photos : ['photo-office'])).slice(0, 3);
     var edited = (store.added || []).filter(function(item) { return item.id === state.selectedAxisId; })[0];
     if (edited) edited.draft = false;
     store.edits[state.selectedAxisId] = {
