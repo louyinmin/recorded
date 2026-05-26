@@ -2533,11 +2533,15 @@
 
   function decisionEmotion(item) {
     var emotion = item && item.emotion && typeof item.emotion === 'object' ? item.emotion : {};
+    var hasName = Object.prototype.hasOwnProperty.call(emotion, 'name');
+    var hasExpectation = Object.prototype.hasOwnProperty.call(emotion, 'expectation');
+    var hasAnxiety = Object.prototype.hasOwnProperty.call(emotion, 'anxiety');
+    var hasKeywords = Object.prototype.hasOwnProperty.call(emotion, 'keywords');
     return {
-      name: emotion.name || '偏紧张',
-      expectation: Number(emotion.expectation == null ? 60 : emotion.expectation),
-      anxiety: Number(emotion.anxiety == null ? 40 : emotion.anxiety),
-      keywords: Array.isArray(emotion.keywords) && emotion.keywords.length ? emotion.keywords : ['不确定', '兴奋', '担心', '期待']
+      name: hasName ? emotion.name : '偏紧张',
+      expectation: hasExpectation ? emotion.expectation : 60,
+      anxiety: hasAnxiety ? emotion.anxiety : 40,
+      keywords: hasKeywords && Array.isArray(emotion.keywords) ? emotion.keywords : ['不确定', '兴奋', '担心', '期待']
     };
   }
 
@@ -2589,20 +2593,23 @@
   function normalizeDecisionOptionRow(row, defaultName) {
     var option = Array.isArray(row) ? row : [];
     return {
-      name: option[0] || defaultName,
-      role: option[1] || '-',
-      place: option[2] || '-',
-      cost: option[3] || '-',
-      growth: option[4] || '-'
+      name: option[0] || defaultName || '',
+      role: option[1] || '',
+      place: option[2] || '',
+      cost: option[3] || '',
+      growth: option[4] || ''
     };
   }
 
   function buildDecisionOptionRow(prefix, option) {
-    return '<label>方案 ' + prefix + '<input class="life-input" name="option' + prefix + '" value="' + escapeHtml(option.name) + '"></label>' +
-      '<label>' + prefix + ' 角色/内容<input class="life-input" name="option' + prefix + 'Role" value="' + escapeHtml(option.role) + '"></label>' +
-      '<label>' + prefix + ' 收益<input class="life-input" name="option' + prefix + 'Place" value="' + escapeHtml(option.place) + '"></label>' +
-      '<label>' + prefix + ' 成本<input class="life-input" name="option' + prefix + 'Cost" value="' + escapeHtml(option.cost) + '"></label>' +
-      '<label>' + prefix + ' 成长<input class="life-input" name="option' + prefix + 'Growth" value="' + escapeHtml(option.growth) + '"></label>';
+    var placeholder = prefix === 'A'
+      ? { name: '接受方案', role: '角色或内容', place: '可能收益', cost: '成本', growth: '成长' }
+      : { name: '保留现状', role: '角色或内容', place: '可能收益', cost: '成本', growth: '成长' };
+    return '<label>方案 ' + prefix + '<input class="life-input" name="option' + prefix + '" value="' + escapeHtml(option.name) + '" placeholder="' + escapeHtml(placeholder.name) + '"></label>' +
+      '<label>' + prefix + ' 角色/内容<input class="life-input" name="option' + prefix + 'Role" value="' + escapeHtml(option.role) + '" placeholder="' + escapeHtml(placeholder.role) + '"></label>' +
+      '<label>' + prefix + ' 收益<input class="life-input" name="option' + prefix + 'Place" value="' + escapeHtml(option.place) + '" placeholder="' + escapeHtml(placeholder.place) + '"></label>' +
+      '<label>' + prefix + ' 成本<input class="life-input" name="option' + prefix + 'Cost" value="' + escapeHtml(option.cost) + '" placeholder="' + escapeHtml(placeholder.cost) + '"></label>' +
+      '<label>' + prefix + ' 成长<input class="life-input" name="option' + prefix + 'Growth" value="' + escapeHtml(option.growth) + '" placeholder="' + escapeHtml(placeholder.growth) + '"></label>';
   }
 
   function readDecisionOptionFromForm(form, prefix, fallbackName) {
@@ -2619,10 +2626,15 @@
   }
 
   function readDecisionEmotionFromForm(form) {
+    function percentValue(name, fallback) {
+      var raw = form.elements[name] && form.elements[name].value;
+      if (String(raw || '').trim() === '') return fallback;
+      return Math.max(0, Math.min(100, Number(raw || fallback)));
+    }
     return {
       name: (form.elements.emotionName && form.elements.emotionName.value.trim()) || '偏紧张',
-      expectation: Math.max(0, Math.min(100, Number(form.elements.emotionExpectation && form.elements.emotionExpectation.value || 0))),
-      anxiety: Math.max(0, Math.min(100, Number(form.elements.emotionAnxiety && form.elements.emotionAnxiety.value || 0))),
+      expectation: percentValue('emotionExpectation', 60),
+      anxiety: percentValue('emotionAnxiety', 40),
       keywords: splitLines(String((form.elements.emotionKeywords && form.elements.emotionKeywords.value) || '').replace(/[，,、]/g, '\n'), ['不确定'])
     };
   }
@@ -2639,11 +2651,13 @@
       background: '',
       reason: [''],
       risks: [''],
-      options: [['接受方案', '', '', '', ''], ['保留现状', '', '', '', '']],
+      emotion: { name: '', expectation: '', anxiety: '', keywords: [] },
+      result: '',
+      options: [['', '', '', '', ''], ['', '', '', '', '']],
       reviewDate: addMonthsToDate(baseDate, 6)
     };
-    var optionA = normalizeDecisionOptionRow(source.options && source.options[0], '接受方案');
-    var optionB = normalizeDecisionOptionRow(source.options && source.options[1], '保留现状');
+    var optionA = normalizeDecisionOptionRow(source.options && source.options[0], '');
+    var optionB = normalizeDecisionOptionRow(source.options && source.options[1], '');
     var emotion = decisionEmotion(source);
     var linkedMoment = mode === 'edit' ? linkedTimelineMoment('decision', source.id) : null;
     return '<article class="life-decision-detail life-decision-form-shell">' +
@@ -2654,8 +2668,8 @@
         '<div class="life-three-grid"><label>状态<select class="life-select" name="status">' + ['待复盘','冷却中','已归档','已复盘'].map(function(status) { return '<option value="' + status + '"' + (source.status === status ? ' selected' : '') + '>' + status + '</option>'; }).join('') + '</select></label><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(source.date) + '"></label><label>复盘日期<input class="life-input" type="date" name="reviewDate" value="' + escapeHtml(source.reviewDate) + '"></label></div>' +
         '<label>背景<textarea class="life-textarea" name="background" placeholder="为什么现在要做这个决定？">' + escapeHtml(source.background) + '</textarea></label>' +
         '<div class="life-decision-form-confidence"><div><strong>信心 <span data-confidence-value>' + source.confidence + '</span>/100</strong><p>拖动后保存到这条决定。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="confidence" value="' + source.confidence + '" data-form-confidence-range></div>' +
-        '<div class="life-two-grid"><label>我的选择<input class="life-input" name="choice" value="' + escapeHtml(source.choice) + '" placeholder="最终选择或暂定方向"></label><label>主要结果<input class="life-input" name="result" value="' + escapeHtml(source.result || '尚未产生结果。') + '" placeholder="已有结果可先记录"></label></div>' +
-        '<section class="life-decision-form-section"><h3>当时情绪</h3><div class="life-three-grid"><label>情绪状态<input class="life-input" name="emotionName" value="' + escapeHtml(emotion.name) + '" placeholder="例如：偏紧张"></label><label>期待比例<input class="life-input" type="number" min="0" max="100" name="emotionExpectation" value="' + escapeHtml(emotion.expectation) + '"></label><label>焦虑比例<input class="life-input" type="number" min="0" max="100" name="emotionAnxiety" value="' + escapeHtml(emotion.anxiety) + '"></label></div><label>关键词<input class="life-input" name="emotionKeywords" value="' + escapeHtml(emotion.keywords.join('、')) + '" placeholder="用顿号或逗号分隔"></label></section>' +
+        '<div class="life-two-grid"><label>我的选择<input class="life-input" name="choice" value="' + escapeHtml(source.choice) + '" placeholder="最终选择或暂定方向"></label><label>主要结果<input class="life-input" name="result" value="' + escapeHtml(source.result || '') + '" placeholder="尚未产生结果。"></label></div>' +
+        '<section class="life-decision-form-section"><h3>当时情绪</h3><div class="life-three-grid"><label>情绪状态<input class="life-input" name="emotionName" value="' + escapeHtml(emotion.name) + '" placeholder="偏紧张"></label><label>期待比例<input class="life-input" type="number" min="0" max="100" name="emotionExpectation" value="' + escapeHtml(emotion.expectation) + '" placeholder="60"></label><label>焦虑比例<input class="life-input" type="number" min="0" max="100" name="emotionAnxiety" value="' + escapeHtml(emotion.anxiety) + '" placeholder="40"></label></div><label>关键词<input class="life-input" name="emotionKeywords" value="' + escapeHtml(emotion.keywords.join('、')) + '" placeholder="不确定、兴奋、担心、期待"></label></section>' +
         '<section class="life-decision-form-section"><h3>可选方案</h3><div class="life-decision-options-grid">' + buildDecisionOptionRow('A', optionA) + buildDecisionOptionRow('B', optionB) + '</div></section>' +
         '<div class="life-two-grid"><label>选择理由<textarea class="life-textarea" name="reason" placeholder="一行一个理由">' + escapeHtml((source.reason || []).join('\n')) + '</textarea></label><label>风险<textarea class="life-textarea" name="risks" placeholder="一行一个风险">' + escapeHtml((source.risks || []).join('\n')) + '</textarea></label></div>' +
         renderTimelineLinkControls(mode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', mode === 'edit' && !!linkedMoment) +
