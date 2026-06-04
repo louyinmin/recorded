@@ -771,12 +771,31 @@
     if (raw.indexOf('昨天') === 0) return relative.yesterday;
     var normalized = normalizeISODate(raw, '');
     if (normalized) return normalized;
+    var shortYear = raw.match(/(?:^|\s)(\d{2})-(\d{1,2})-(\d{1,2})(?:\s|$)/);
+    if (shortYear) {
+      return '20' + shortYear[1] + '-' + String(shortYear[2]).padStart(2, '0') + '-' + String(shortYear[3]).padStart(2, '0');
+    }
     var monthDay = raw.match(/(\d{2})-(\d{2})/);
     if (monthDay) {
       var year = String(new Date().getFullYear());
       return year + '-' + monthDay[1] + '-' + monthDay[2];
     }
     return '';
+  }
+
+  function timelineTimeSortValue(moment) {
+    var match = String((moment && moment.time) || '').match(/(\d{1,2}):(\d{2})/);
+    if (!match) return -1;
+    return Number(match[1]) * 60 + Number(match[2]);
+  }
+
+  function compareTimelineMomentsDesc(a, b) {
+    var dateA = timelineDateISOFromMoment(a);
+    var dateB = timelineDateISOFromMoment(b);
+    if (dateA !== dateB) return String(dateB).localeCompare(String(dateA));
+    var timeDiff = timelineTimeSortValue(b) - timelineTimeSortValue(a);
+    if (timeDiff) return timeDiff;
+    return String(b.id || '').localeCompare(String(a.id || ''));
   }
 
   function timelineRailMeta(moment) {
@@ -1929,10 +1948,9 @@
 
   function filteredMoments() {
     return allMoments().filter(function(item) {
-      var inType = state.timelineFilter === '全部' || item.type === state.timelineFilter || item.tags.indexOf(state.timelineFilter) >= 0;
       var text = [item.title, item.copy, item.location, item.type, item.tags.join(' '), item.people.join(' ')].join(' ');
-      return inType && queryMatch(text);
-    });
+      return queryMatch(text);
+    }).sort(compareTimelineMomentsDesc);
   }
 
   function renderTimeline() {
