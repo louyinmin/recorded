@@ -318,6 +318,24 @@ class LifeBackendTestCase(unittest.TestCase):
         url = upload.get_json()['url']
         self.assertTrue(url.startswith('/assets/uploads/life/'))
 
+        no_ext_upload = self.client.post(
+            '/api/life/uploads',
+            headers=self.headers(token),
+            data={'file': (io.BytesIO(b'\x89PNG\r\n\x1a\nxxxx'), 'demo')},
+            content_type='multipart/form-data'
+        )
+        self.assertEqual(no_ext_upload.status_code, 200)
+        self.assertTrue(no_ext_upload.get_json()['url'].endswith('.png'))
+
+        custom_ext_upload = self.client.post(
+            '/api/life/uploads',
+            headers=self.headers(token),
+            data={'file': (io.BytesIO(b'\x89PNG\r\n\x1a\nxxxx'), 'demo.notimageext', 'image/png')},
+            content_type='multipart/form-data'
+        )
+        self.assertEqual(custom_ext_upload.status_code, 200)
+        self.assertTrue(custom_ext_upload.get_json()['url'].endswith('.notimageext'))
+
     def test_admin_can_reset_normal_user_password(self):
         admin_token = self.login()
         create_user = self.client.post('/api/life/admin/users', headers=self.headers(admin_token), json={

@@ -41,8 +41,43 @@ from .service import (
 
 life_bp = Blueprint('life_backend', __name__, url_prefix='/api/life')
 
-ALLOWED_IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'}
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+IMAGE_EXT_BY_MIME = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/avif': '.avif',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'image/svg+xml': '.svg',
+}
+
+
+def image_ext_from_header(header):
+    if header.startswith(b'\xff\xd8\xff'):
+        return '.jpg'
+    if header.startswith(b'\x89PNG\r\n\x1a\n'):
+        return '.png'
+    if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+        return '.gif'
+    if len(header) >= 12 and header[:4] == b'RIFF' and header[8:12] == b'WEBP':
+        return '.webp'
+    if b'ftypavif' in header[:32]:
+        return '.avif'
+    if b'ftypheic' in header[:32] or b'ftypheif' in header[:32]:
+        return '.heic'
+    return ''
+
+
+def upload_image_ext(filename, mimetype, header):
+    _, ext = os.path.splitext(secure_filename(filename or '').lower())
+    if ext and len(ext) <= 16 and ext[1:].replace('-', '').replace('_', '').isalnum():
+        return ext
+    sniffed = image_ext_from_header(header)
+    if sniffed:
+        return sniffed
+    return IMAGE_EXT_BY_MIME.get(str(mimetype or '').split(';', 1)[0].lower(), '.jpg')
 
 
 def parse_json():
@@ -468,15 +503,17 @@ def upload_image():
     file = request.files.get('file')
     if not file:
         return jsonify({'error': '缺少文件'}), 400
-    filename = secure_filename(file.filename or '')
-    _, ext = os.path.splitext(filename.lower())
-    if ext not in ALLOWED_IMAGE_EXT:
-        return jsonify({'error': '仅支持图片文件'}), 400
     file.stream.seek(0, os.SEEK_END)
     file_size = file.stream.tell()
     file.stream.seek(0)
     if file_size > MAX_UPLOAD_BYTES:
         return jsonify({'error': '图片不能超过 8MB'}), 400
+    header = file.stream.read(64)
+    file.stream.seek(0)
+    mimetype = str(file.mimetype or '')
+    if not mimetype.lower().startswith('image/') and not image_ext_from_header(header):
+        return jsonify({'error': '请上传图片文件'}), 400
+    ext = upload_image_ext(file.filename, mimetype, header)
     folder = ensure_upload_dir(current_app.config['LIFE_BASE_DIR'], g.life_user['id'])
     name = '{}{}{}'.format(__import__('datetime').datetime.utcnow().strftime('%Y%m%d%H%M%S'), secrets.token_hex(4), ext)
     dest = os.path.join(folder, name)
