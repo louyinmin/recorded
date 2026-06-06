@@ -1023,8 +1023,24 @@
     }
   }
 
-  function saveWatchStore(store) {
-    localStorage.setItem(watchStorageKey(), JSON.stringify(store));
+  function saveWatchStore(store, suppressAutoSync) {
+    if (!suppressAutoSync) {
+      localStorage.setItem(watchStorageKey(), JSON.stringify(store));
+      return;
+    }
+    var previous = !!window.__lifeSuppressStorageSync;
+    window.__lifeSuppressStorageSync = true;
+    try {
+      localStorage.setItem(watchStorageKey(), JSON.stringify(store));
+    } finally {
+      window.__lifeSuppressStorageSync = previous;
+    }
+  }
+
+  function syncWatchStore(store) {
+    var account = lifeAccount();
+    if (!account || !account.syncStorageItem || !accountSession()) return Promise.resolve(true);
+    return account.syncStorageItem(watchStorageKey(), store, mockMode);
   }
 
   function monthlyStorageKey() {
@@ -5639,12 +5655,17 @@
     if (store.edits) delete store.edits[selected.id];
     if (selected.id.indexOf('watch-local-') !== 0 && (store.deleted || []).indexOf(selected.id) < 0) store.deleted.push(selected.id);
     removeLinkedTimelineMoment('watch', selected.id);
-    saveWatchStore(store);
+    saveWatchStore(store, true);
     var left = watchFilteredEntries().filter(function(item) { return item.id !== selected.id; });
     state.selectedWatchId = left[0] ? left[0].id : '';
     state.watchFormMode = null;
-    showToast('观影记录已删除');
     renderWatch();
+    showToast('正在保存到服务器...');
+    syncWatchStore(store).then(function() {
+      showToast('观影记录已删除');
+    }).catch(function(err) {
+      showToast((err && err.message ? err.message : '服务器保存失败') + '，当前仅保存在本地浏览器');
+    });
   }
 
   function renderWatchImageEditor(source) {
@@ -5654,6 +5675,32 @@
       '<div class="life-wish-image-preview" data-watch-image-preview>' + watchCoverHtml(source, '') + '<em>' + (source.image ? '已上传影片图片' : '当前占位图') + '</em></div>' +
       '<label class="life-wish-upload-button">上传影片图片<input type="file" accept="image/*" data-watch-image-upload></label>' +
     '</section>';
+  }
+
+  var LIFE_IMAGE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+
+  function uploadLifeImage(file) {
+    var session = accountSession();
+    if (!session || !session.token) return Promise.reject(new Error('请先登录后再上传图片'));
+    if (file.size > LIFE_IMAGE_UPLOAD_MAX_BYTES) return Promise.reject(new Error('图片不能超过 8MB'));
+    var formData = new FormData();
+    formData.append('file', file);
+    return fetch('/api/life/uploads', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + session.token },
+      body: formData
+    }).then(function(resp) {
+      return resp.json().catch(function() { return {}; }).then(function(data) {
+        if (!resp.ok) throw new Error(data.error || '图片上传失败');
+        if (!data.url) throw new Error('图片上传失败');
+        return data.url;
+      });
+    });
+  }
+
+  function previewWatchUpload(preview, imageUrl, label) {
+    if (!preview) return;
+    preview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(imageUrl) + '" alt=""></span><em>' + escapeHtml(label || '已上传影片图片') + '</em>';
   }
 
   function watchFromForm(form) {
@@ -5706,6 +5753,10 @@
   }
 
   function saveWatchForm(form) {
+    if (form.dataset.watchUploadPending === '1') {
+      showToast('影片图片仍在上传，请稍后保存');
+      return;
+    }
     var item = watchFromForm(form);
     upsertWatchTimelineFromForm(form, item);
     var store = getWatchStore();
@@ -5719,7 +5770,7 @@
       store.added = (store.added || []).filter(function(record) { return record.id !== item.id; });
       store.added.unshift(item);
     }
-    saveWatchStore(store);
+    saveWatchStore(store, true);
     state.selectedWatchId = item.id;
     state.watchStatus = item.watchState === 'want' ? 'want' : 'watched';
     state.watchYear = item.year;
@@ -5727,8 +5778,13 @@
     state.watchCreatePreset = null;
     state.watchMode = 'month';
     state.watchFormMode = null;
-    showToast('观影记录已保存');
     renderWatch();
+    showToast('正在保存到服务器...');
+    syncWatchStore(store).then(function() {
+      showToast('观影记录已保存');
+    }).catch(function(err) {
+      showToast((err && err.message ? err.message : '服务器保存失败') + '，当前仅保存在本地浏览器');
+    });
   }
 
   function renderWatchWall(entries) {
@@ -6647,13 +6703,25 @@
       var watchForm = event.target.closest('#lifeWatchForm');
       var watchHidden = watchForm && watchForm.querySelector('[data-watch-uploaded-image]');
       var watchPreview = watchForm && watchForm.querySelector('[data-watch-image-preview]');
-      if (!watchFile || !watchHidden || typeof FileReader === 'undefined') return;
-      var watchReader = new FileReader();
-      watchReader.onload = function() {
-        watchHidden.value = String(watchReader.result || '');
-        if (watchPreview) watchPreview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(watchHidden.value) + '" alt=""></span><em>' + escapeHtml(watchFile.name) + '</em>';
-      };
-      watchReader.readAsDataURL(watchFile);
+      if (!watchFile || !watchHidden || !watchForm) return;
+      watchForm.dataset.watchUploadPending = '1';
+      if (watchPreview && window.URL && URL.createObjectURL) {
+        previewWatchUpload(watchPreview, URL.createObjectURL(watchFile), '正在上传 ' + watchFile.name);
+      } else if (watchPreview) {
+        watchPreview.innerHTML = '<span>正在上传 ' + escapeHtml(watchFile.name) + '</span>';
+      }
+      uploadLifeImage(watchFile).then(function(url) {
+        watchHidden.value = url;
+        previewWatchUpload(watchPreview, url, watchFile.name);
+        showToast('影片图片已上传');
+      }).catch(function(err) {
+        watchHidden.value = '';
+        if (watchPreview) watchPreview.innerHTML = watchCoverHtml({}, '') + '<em>图片上传失败</em>';
+        showToast(err.message || '图片上传失败');
+      }).then(function() {
+        watchForm.dataset.watchUploadPending = '0';
+        event.target.value = '';
+      });
       return;
     }
     if (event.target.matches('[data-axis-image-upload]')) {

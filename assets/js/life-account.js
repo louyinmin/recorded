@@ -399,6 +399,25 @@
     return Object.keys(byId).map(function(id) { return byId[id]; });
   }
 
+  function isInlineImage(value) {
+    return /^data:image\//.test(String(value || ''));
+  }
+
+  function snapshotSafeItem(item) {
+    var next = Object.assign({}, item);
+    if (isInlineImage(next.image)) delete next.image;
+    if (Array.isArray(next.photos)) {
+      next.photos = next.photos.filter(function(photo) {
+        return !isInlineImage(photo);
+      });
+    }
+    return next;
+  }
+
+  function snapshotItemsFromStorageValue(module, value) {
+    return moduleRecordsFromStorageValue(module, value).map(snapshotSafeItem);
+  }
+
   function isBackendCacheRecord(item) {
     var scope = item && String(item.dataScope || '');
     return scope === 'server_mock_fixture' || scope === 'sync_bridge_test';
@@ -436,7 +455,7 @@
         method: 'PUT',
         body: JSON.stringify({
           mode: 'real',
-          items: moduleRecordsFromStorageValue(module, value)
+          items: snapshotItemsFromStorageValue(module, value)
         })
       }).then(function() { return true; });
     }
