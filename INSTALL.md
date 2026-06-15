@@ -1,13 +1,14 @@
-# Recorded 双模块系统 - 安装与运行指南
+# Recorded 多模块系统 - 安装与运行指南
 
 ## 项目简介
 
-这是一个基于 **Flask + SQLite + Nginx** 的双模块系统：
+这是一个基于 **Flask + SQLite + Nginx** 的多模块系统：
 
 - **旅游记账**：记录旅行支出
 - **续费雷达**：管理订阅、会员和到期提醒
+- **NBA 球员数据**：采集新浪 NBA 球员资料并为微信小程序提供 JSON 接口
 
-两个模块共享服务器资源与部署体系，但账号、页面、API 和业务数据完全隔离。
+各模块共享服务器资源与部署体系，但账号、页面、API 和业务数据完全隔离。
 
 ## 环境要求
 
@@ -24,13 +25,17 @@
 recorded/
 ├── app.py                  # Flask 后端（API 服务）
 ├── expiry_backend/         # 到期管理后端模块
+├── life_backend/           # 人生记录后端模块
+├── nba_backend/            # NBA 球员数据后端模块
 ├── expiry/                 # 到期管理前端页面与静态资源
 ├── requirements.txt        # Python 依赖
 ├── nginx.conf              # Nginx 配置模板
 ├── run_server.sh           # 一键部署脚本
 ├── run_expiry_reminder.sh  # 到期提醒脚本
 ├── reset_expiry_admin_password.sh  # 重置续费雷达管理员密码
-├── data.db                 # SQLite 数据库（运行后自动生成）
+├── data.db                 # 旅游记账与续费雷达 SQLite 数据库（运行后自动生成）
+├── life.db                 # 人生记录 SQLite 数据库（运行后自动生成）
+├── nba.db                  # NBA 球员 SQLite 数据库（运行后自动生成）
 ├── login.html              # 登录页
 ├── trips.html              # 旅行列表页
 ├── trip.html               # 单次旅行记账页
@@ -66,7 +71,7 @@ sudo ./run_server.sh
 脚本会自动完成以下操作：
 1. 安装 Python3、pip、venv、Nginx
 2. 创建 Python 虚拟环境并安装 Flask
-3. 初始化旅游记账与续费雷达的数据表
+3. 初始化旅游记账、续费雷达、人生记录与 NBA 球员数据表
 4. 创建续费雷达管理员账号与应用密钥
 5. 配置 Nginx（静态文件 + 反向代理）
 6. 安装续费提醒定时任务
@@ -119,7 +124,29 @@ nohup ./venv/bin/python3 app.py > flask.log 2>&1 &
 
 Flask 默认监听 `127.0.0.1:5000`。
 
-### 4. 配置 Nginx
+### 4. NBA 球员数据接口
+
+NBA 数据默认写入项目目录下的 `nba.db`，可用 `NBA_DB_PATH` 指定独立路径。球星卡图片默认读取项目目录下的 `nba_images`，可用 `NBA_IMAGE_DIR` 指定独立路径。小程序读取接口：
+
+```text
+GET /api/nba/players
+GET /api/nba/players?team=洛杉矶湖人&position=后卫
+GET /api/nba/players/search?q=Luke
+GET /api/nba/filters
+GET /api/nba/players/:pid
+GET /api/nba/images/:filename
+GET /api/nba/images/missing
+```
+
+采集接口访问新浪 NBA。生产环境建议设置 `NBA_SYNC_TOKEN`，调用时通过 `X-NBA-Sync-Token` 请求头传递：
+
+```text
+POST /api/nba/sync/player
+POST /api/nba/sync/images
+POST /api/nba/sync
+```
+
+### 5. 配置 Nginx
 
 ```bash
 # 编辑 nginx.conf 中的 root 路径为实际项目路径
@@ -132,7 +159,7 @@ sudo systemctl restart nginx
 sudo systemctl enable nginx
 ```
 
-### 5. 配置续费提醒任务
+### 6. 配置续费提醒任务
 
 创建文件 `/etc/cron.d/recorded-expiry-reminder`：
 
@@ -143,7 +170,7 @@ CRON_TZ=Asia/Shanghai
 0 9 * * * root cd /home/user/recorded && RECORDED_BASE_DIR=/home/user/recorded RECORDED_DB_PATH=/home/user/recorded/data.db /home/user/recorded/run_expiry_reminder.sh >> /home/user/recorded/expiry_reminder.log 2>&1
 ```
 
-### 6. 访问
+### 7. 访问
 
 ```text
 http://服务器IP/login.html

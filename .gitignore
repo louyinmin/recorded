@@ -40,6 +40,13 @@ env/
 # 日志文件
 *.log
 
+# 本地采集缓存
+nba_work/
+
+# NBA 球星卡图片由服务器本地手动维护
+nba_images/
+nba_images*.zip
+
 # 密码文件
 .password
 .expiry_secret

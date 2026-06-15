@@ -11,6 +11,7 @@ from urllib.parse import quote
 import io
 from expiry_backend import init_expiry_module
 from life_backend import init_life_module
+from nba_backend import init_nba_module
 from expiry_backend.service import (
     create_session,
     get_token_from_request,
@@ -23,9 +24,11 @@ app = Flask(__name__, static_folder=None)
 
 DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
 LIFE_DB_PATH = os.environ.get('LIFE_DB_PATH', os.path.join(BASE_DIR, 'life.db'))
+NBA_DB_PATH = os.environ.get('NBA_DB_PATH', os.path.join(BASE_DIR, 'nba.db'))
 
 init_expiry_module(app, BASE_DIR, DB_PATH)
 init_life_module(app, BASE_DIR, LIFE_DB_PATH)
+init_nba_module(app, BASE_DIR, NBA_DB_PATH)
 
 DEFAULT_CATEGORIES = ['交通工具（飞机/动车/自驾）', '住宿', '餐费', '打车']
 
