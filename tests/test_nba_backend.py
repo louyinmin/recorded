@@ -143,14 +143,19 @@ class NbaBackendTestCase(unittest.TestCase):
         self.life_db_path = os.path.join(self.base_dir, 'life.db')
         self.nba_db_path = os.path.join(self.base_dir, 'nba.db')
         self.nba_image_dir = os.path.join(self.base_dir, 'nba_images')
+        self.nba_avatar_dir = os.path.join(self.base_dir, 'nba_avatar')
         os.makedirs(self.nba_image_dir)
+        os.makedirs(self.nba_avatar_dir)
         with open(os.path.join(self.nba_image_dir, 'Luke_Kennard.jpg'), 'wb') as handle:
             handle.write(b'fake-jpg')
+        with open(os.path.join(self.nba_avatar_dir, 'Luke_Kennard.png'), 'wb') as handle:
+            handle.write(b'fake-png')
         os.environ['RECORDED_BASE_DIR'] = self.base_dir
         os.environ['RECORDED_DB_PATH'] = self.db_path
         os.environ['LIFE_DB_PATH'] = self.life_db_path
         os.environ['NBA_DB_PATH'] = self.nba_db_path
         os.environ['NBA_IMAGE_DIR'] = self.nba_image_dir
+        os.environ['NBA_AVATAR_DIR'] = self.nba_avatar_dir
         os.environ.pop('NBA_SYNC_TOKEN', None)
 
         self.app_module = importlib.import_module('app')
@@ -164,6 +169,31 @@ class NbaBackendTestCase(unittest.TestCase):
         original = service.fetch_sina_json
         service.fetch_sina_json = fake_sina_json
         self.addCleanup(lambda: setattr(service, 'fetch_sina_json', original))
+
+    def test_asset_name_matching_handles_short_names_and_middle_names(self):
+        from nba_backend.service import collect_image_index, match_image_filename
+
+        filenames = [
+            'Alex_Sarr.png',
+            'Cam_Whitmore.png',
+            'Olivier_Maxence_Prosper.png',
+            'Yves_Missi.png',
+            'Bones_Hyland.png',
+        ]
+        for filename in filenames:
+            with open(os.path.join(self.nba_avatar_dir, filename), 'wb') as handle:
+                handle.write(b'fake-png')
+        image_index, collisions = collect_image_index(self.nba_avatar_dir)
+
+        self.assertEqual(collisions, {})
+        self.assertEqual(match_image_filename('Alexandre Sarr', image_index), 'Alex_Sarr.png')
+        self.assertEqual(match_image_filename('Cameron Whitmore', image_index), 'Cam_Whitmore.png')
+        self.assertEqual(
+            match_image_filename('Olivier-Maxence Gaetan Prosper', image_index),
+            'Olivier_Maxence_Prosper.png',
+        )
+        self.assertEqual(match_image_filename('Yves Thierry Ouwe Missi', image_index), 'Yves_Missi.png')
+        self.assertEqual(match_image_filename("Nah'Shon Hyland", image_index), 'Bones_Hyland.png')
 
     def test_sync_single_player_collects_expected_fields(self):
         self.patch_sina_fetch()
@@ -274,6 +304,56 @@ class NbaBackendTestCase(unittest.TestCase):
         missing = self.client.get('/api/nba/images/missing')
         self.assertEqual(missing.status_code, 200)
         self.assertEqual(missing.get_json()['items'][0]['pid'], SECOND_PID)
+
+    def test_sync_avatars_links_headshots_and_marks_missing(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})
+        self.assertEqual(synced.status_code, 200)
+
+        avatars = self.client.post('/api/nba/sync/avatars')
+        self.assertEqual(avatars.status_code, 200)
+        result = avatars.get_json()['result']
+        self.assertEqual(result['matched_count'], 1)
+        self.assertEqual(result['missing_count'], 1)
+        self.assertEqual(result['missing'][0]['pid'], SECOND_PID)
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        avatar = detail.get_json()['avatar']
+        self.assertFalse(avatar['missing'])
+        self.assertEqual(avatar['filename'], 'Luke_Kennard.png')
+        self.assertEqual(avatar['url'], '/api/nba/avatars/Luke_Kennard.png')
+        self.assertNotIn('path', avatar)
+        self.assertNotIn('avatar_path', detail.get_json())
+
+        missing = self.client.get('/api/nba/avatars/missing')
+        self.assertEqual(missing.status_code, 200)
+        self.assertEqual(missing.get_json()['items'][0]['pid'], SECOND_PID)
+
+    def test_sync_avatars_ignores_request_avatar_dir(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync/player', json={'pid': PLAYER_PID})
+        self.assertEqual(synced.status_code, 200)
+
+        other_dir = os.path.join(self.base_dir, 'other_avatars')
+        os.makedirs(other_dir)
+        with open(os.path.join(other_dir, 'Jalen_Johnson.png'), 'wb') as handle:
+            handle.write(b'wrong-dir')
+
+        avatars = self.client.post('/api/nba/sync/avatars', json={'avatarDir': other_dir})
+        self.assertEqual(avatars.status_code, 200)
+        self.assertNotIn('avatar_dir', avatars.get_json()['result'])
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.get_json()['avatar']['filename'], 'Luke_Kennard.png')
+
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            row = conn.execute('SELECT avatar_path FROM nba_players WHERE pid=?', (PLAYER_PID,)).fetchone()
+            self.assertTrue(row[0].startswith(self.nba_avatar_dir))
+        finally:
+            conn.close()
 
     def test_sync_images_ignores_request_image_dir(self):
         self.patch_sina_fetch()

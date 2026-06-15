@@ -126,7 +126,7 @@ Flask 默认监听 `127.0.0.1:5000`。
 
 ### 4. NBA 球员数据接口
 
-NBA 数据默认写入项目目录下的 `nba.db`，可用 `NBA_DB_PATH` 指定独立路径。球星卡图片默认读取项目目录下的 `nba_images`，可用 `NBA_IMAGE_DIR` 指定独立路径。小程序读取接口：
+NBA 数据默认写入项目目录下的 `nba.db`，可用 `NBA_DB_PATH` 指定独立路径。球星卡图片默认读取项目目录下的 `nba_images`，可用 `NBA_IMAGE_DIR` 指定独立路径；球员头像默认读取项目目录下的 `nba_avatar`，可用 `NBA_AVATAR_DIR` 指定独立路径。小程序读取接口：
 
 ```text
 GET /api/nba/players
@@ -136,6 +136,8 @@ GET /api/nba/filters
 GET /api/nba/players/:pid
 GET /api/nba/images/:filename
 GET /api/nba/images/missing
+GET /api/nba/avatars/:filename
+GET /api/nba/avatars/missing
 ```
 
 采集接口访问新浪 NBA。生产环境建议设置 `NBA_SYNC_TOKEN`，调用时通过 `X-NBA-Sync-Token` 请求头传递：
@@ -143,6 +145,7 @@ GET /api/nba/images/missing
 ```text
 POST /api/nba/sync/player
 POST /api/nba/sync/images
+POST /api/nba/sync/avatars
 POST /api/nba/sync
 ```
 

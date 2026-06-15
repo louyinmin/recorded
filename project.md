@@ -234,6 +234,8 @@ CREATE TABLE categories (
 
 ### 6.6 NBA 球员数据
 
+接口调用细节见 [NBA_API.md](NBA_API.md)。
+
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/nba/players` | GET | 小程序读取球员列表，支持 `q`、`teamTid`、`team`、`position`、`limit`、`offset` |
@@ -242,8 +244,11 @@ CREATE TABLE categories (
 | `/api/nba/filters` | GET | 获取球队和位置筛选项 |
 | `/api/nba/images/:filename` | GET | 展示本地球星卡图片 |
 | `/api/nba/images/missing` | GET | 获取未匹配到球星卡图片的球员清单 |
+| `/api/nba/avatars/:filename` | GET | 展示本地球员头像图片 |
+| `/api/nba/avatars/missing` | GET | 获取未匹配到头像图片的球员清单 |
 | `/api/nba/sync/player` | POST | 从新浪 NBA 采集并入库单个球员，参数 `pid` |
 | `/api/nba/sync/images` | POST | 按球员英文名匹配 `nba_images` 目录下的球星卡图片 |
+| `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
 | `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
 
 ---

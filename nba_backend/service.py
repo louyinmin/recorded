@@ -93,6 +93,11 @@ def init_nba_db(db_path):
                 image_url TEXT NOT NULL DEFAULT '',
                 image_missing INTEGER NOT NULL DEFAULT 1,
                 image_checked_at TEXT NOT NULL DEFAULT '',
+                avatar_path TEXT NOT NULL DEFAULT '',
+                avatar_filename TEXT NOT NULL DEFAULT '',
+                avatar_url TEXT NOT NULL DEFAULT '',
+                avatar_missing INTEGER NOT NULL DEFAULT 1,
+                avatar_checked_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -120,6 +125,11 @@ def migrate_nba_db(conn):
         'image_url': "TEXT NOT NULL DEFAULT ''",
         'image_missing': 'INTEGER NOT NULL DEFAULT 1',
         'image_checked_at': "TEXT NOT NULL DEFAULT ''",
+        'avatar_path': "TEXT NOT NULL DEFAULT ''",
+        'avatar_filename': "TEXT NOT NULL DEFAULT ''",
+        'avatar_url': "TEXT NOT NULL DEFAULT ''",
+        'avatar_missing': 'INTEGER NOT NULL DEFAULT 1',
+        'avatar_checked_at': "TEXT NOT NULL DEFAULT ''",
     }
     for name, definition in columns.items():
         if not has_column(conn, 'nba_players', name):
@@ -172,6 +182,12 @@ def row_to_player(row):
         'missing': bool(item.get('image_missing')),
         'checked_at': item.get('image_checked_at') or '',
     }
+    item['avatar'] = {
+        'filename': item.get('avatar_filename') or '',
+        'url': item.get('avatar_url') or '',
+        'missing': bool(item.get('avatar_missing')),
+        'checked_at': item.get('avatar_checked_at') or '',
+    }
     item.pop('raw_info_json', None)
     item.pop('raw_stats_json', None)
     item.pop('image_path', None)
@@ -179,6 +195,11 @@ def row_to_player(row):
     item.pop('image_url', None)
     item.pop('image_missing', None)
     item.pop('image_checked_at', None)
+    item.pop('avatar_path', None)
+    item.pop('avatar_filename', None)
+    item.pop('avatar_url', None)
+    item.pop('avatar_missing', None)
+    item.pop('avatar_checked_at', None)
     return item
 
 
@@ -238,12 +259,13 @@ def image_name_variants(value):
         return re.sub(r'[^a-z0-9]+', '', source)
 
     variants = {alnum(text)}
-    spaced = re.sub(r'([a-z])\\.([a-z])\\.?', r'\1 \2 ', text)
+    spaced = re.sub(r'([a-z])\.([a-z])\.?', r'\1 \2 ', text)
     spaced = spaced.replace("'", ' ').replace('-', ' ')
     variants.add(alnum(spaced))
     variants.add(alnum(re.sub(r'\b(jr|ii|iii|iv)\b', '', spaced)))
 
     tokens = [token for token in re.split(r'[^a-z0-9]+', spaced) if token]
+    add_name_token_variants(tokens, variants)
     merged = []
     index = 0
     while index < len(tokens):
@@ -265,6 +287,35 @@ def image_name_variants(value):
         variants.add(''.join(merged))
         variants.add(''.join(token for token in merged if token not in ('jr', 'ii', 'iii', 'iv')))
     return {variant for variant in variants if variant}
+
+
+def add_name_token_variants(tokens, variants):
+    if len(tokens) < 2:
+        return
+    suffixes = {'jr', 'ii', 'iii', 'iv'}
+    clean_tokens = [token for token in tokens if token not in suffixes]
+    if len(clean_tokens) < 2:
+        return
+
+    first = clean_tokens[0]
+    last = clean_tokens[-1]
+    variants.add(first + last)
+    if len(clean_tokens) > 2:
+        variants.add(first + clean_tokens[1] + last)
+
+    aliases = {
+        ('alexandre',): ('alex',),
+        ('cameron',): ('cam',),
+        ('nah', 'shon'): ('bones',),
+    }
+    for source, replacements in aliases.items():
+        if tuple(clean_tokens[:len(source)]) != source:
+            continue
+        tail = clean_tokens[len(source):]
+        for replacement in replacements:
+            variants.add(replacement + ''.join(tail))
+            if tail:
+                variants.add(replacement + tail[-1])
 
 
 def collect_image_index(image_dir):
@@ -539,11 +590,16 @@ def sync_all_players(conn, limit_teams=None, limit_players=None, concurrency=DEF
     }
 
 
-def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
-    image_index, collisions = collect_image_index(image_dir)
+def sync_player_assets(conn, asset_dir, column_prefix, url_prefix):
+    image_index, collisions = collect_image_index(asset_dir)
     now = utcnow_iso()
     matched = 0
     missing = []
+    path_column = column_prefix + '_path'
+    filename_column = column_prefix + '_filename'
+    url_column = column_prefix + '_url'
+    missing_column = column_prefix + '_missing'
+    checked_column = column_prefix + '_checked_at'
     rows = conn.execute(
         '''
         SELECT pid, chinese_name, english_name
@@ -554,14 +610,21 @@ def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
     for row in rows:
         filename = match_image_filename(row['english_name'], image_index)
         if filename:
-            image_path = os.path.abspath(os.path.join(image_dir, filename))
+            image_path = os.path.abspath(os.path.join(asset_dir, filename))
             image_url = url_prefix.rstrip('/') + '/' + urllib.parse.quote(filename)
             conn.execute(
                 '''
                 UPDATE nba_players
-                SET image_path=?, image_filename=?, image_url=?, image_missing=0, image_checked_at=?, updated_at=?
+                SET {path_column}=?, {filename_column}=?, {url_column}=?, {missing_column}=0,
+                    {checked_column}=?, updated_at=?
                 WHERE pid=?
-                ''',
+                '''.format(
+                    path_column=path_column,
+                    filename_column=filename_column,
+                    url_column=url_column,
+                    missing_column=missing_column,
+                    checked_column=checked_column,
+                ),
                 (image_path, filename, image_url, now, now, row['pid']),
             )
             matched += 1
@@ -569,9 +632,16 @@ def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
         conn.execute(
             '''
             UPDATE nba_players
-            SET image_path='', image_filename='', image_url='', image_missing=1, image_checked_at=?, updated_at=?
+            SET {path_column}='', {filename_column}='', {url_column}='', {missing_column}=1,
+                {checked_column}=?, updated_at=?
             WHERE pid=?
-            ''',
+            '''.format(
+                path_column=path_column,
+                filename_column=filename_column,
+                url_column=url_column,
+                missing_column=missing_column,
+                checked_column=checked_column,
+            ),
             (now, now, row['pid']),
         )
         missing.append({
@@ -580,9 +650,10 @@ def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
             'english_name': row['english_name'],
         })
     conn.commit()
-    return {
+    asset_count = len(set(image_index.values()))
+    result = {
         'total': len(rows),
-        'image_count': len(set(image_index.values())),
+        'asset_count': asset_count,
         'matched_count': matched,
         'missing_count': len(missing),
         'missing': missing,
@@ -592,6 +663,19 @@ def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
         ],
         'checked_at': now,
     }
+    if column_prefix == 'image':
+        result['image_count'] = asset_count
+    if column_prefix == 'avatar':
+        result['avatar_count'] = asset_count
+    return result
+
+
+def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
+    return sync_player_assets(conn, image_dir, 'image', url_prefix)
+
+
+def sync_player_avatars(conn, avatar_dir, url_prefix='/api/nba/avatars'):
+    return sync_player_assets(conn, avatar_dir, 'avatar', url_prefix)
 
 
 def list_players(conn, query='', team_tid='', team='', position='', limit=50, offset=0, name_only=False):
@@ -675,13 +759,21 @@ def get_player(conn, pid):
 
 
 def list_missing_images(conn):
+    return list_missing_assets(conn, 'image')
+
+
+def list_missing_avatars(conn):
+    return list_missing_assets(conn, 'avatar')
+
+
+def list_missing_assets(conn, column_prefix):
     rows = conn.execute(
         '''
         SELECT pid, chinese_name, english_name, team_full_name
         FROM nba_players
-        WHERE image_missing=1
+        WHERE {missing_column}=1
         ORDER BY team_full_name ASC, chinese_name ASC
-        '''
+        '''.format(missing_column=column_prefix + '_missing')
     ).fetchall()
     return [dict(row) for row in rows]
 
