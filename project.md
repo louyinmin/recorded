@@ -246,9 +246,12 @@ CREATE TABLE categories (
 | `/api/nba/images/missing` | GET | 获取未匹配到球星卡图片的球员清单 |
 | `/api/nba/avatars/:filename` | GET | 展示本地球员头像图片 |
 | `/api/nba/avatars/missing` | GET | 获取未匹配到头像图片的球员清单 |
+| `/api/nba/team-images/:filename` | GET | 展示本地球队图标图片 |
+| `/api/nba/team-images/missing` | GET | 获取未匹配到球队图标的球队清单 |
 | `/api/nba/sync/player` | POST | 从新浪 NBA 采集并入库单个球员，参数 `pid` |
 | `/api/nba/sync/images` | POST | 按球员英文名匹配 `nba_images` 目录下的球星卡图片 |
 | `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
+| `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
 | `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
 
 ---

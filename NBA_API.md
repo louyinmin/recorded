@@ -22,7 +22,7 @@ These APIs are designed for the Mini Program and do not require authentication.
 GET /api/nba/players
 ```
 
-Returns paginated player records. The response includes profile data, season average stats, team data, and public card/avatar image URLs.
+Returns paginated player records. The response includes profile data, season average stats, team data, and public card/avatar/team image URLs.
 
 #### Query Parameters
 
@@ -73,7 +73,13 @@ GET /api/nba/players?q=卢克
         "tid": "583ecae2-fb46-11e1-82cb-f4ce4684ea4c",
         "market": "洛杉矶",
         "name": "湖人",
-        "full_name": "洛杉矶湖人"
+        "full_name": "洛杉矶湖人",
+        "logo": {
+          "filename": "Los_Angeles_Lakers.png",
+          "url": "/api/nba/team-images/Los_Angeles_Lakers.png",
+          "missing": false,
+          "checked_at": "2026-06-16T09:10:00"
+        }
       },
       "profile": {
         "birthdate": "1996-06-24",
@@ -250,6 +256,22 @@ The Mini Program should use the `avatar.url` value returned by the player APIs.
 GET /api/nba/avatars/Luke_Kennard.png
 ```
 
+### Get Team Image
+
+```http
+GET /api/nba/team-images/{filename}
+```
+
+Serves a team logo image from the server-side `NBA_TEAM_IMAGE_DIR`.
+
+The Mini Program should use the `team.logo.url` value returned by the player and filter APIs.
+
+#### Example
+
+```http
+GET /api/nba/team-images/Los_Angeles_Lakers.png
+```
+
 ### List Missing Images
 
 ```http
@@ -305,6 +327,38 @@ Returns players that do not currently have a matched avatar image.
 ```
 
 When all avatars are matched:
+
+```json
+{
+  "items": []
+}
+```
+
+### List Missing Team Images
+
+```http
+GET /api/nba/team-images/missing
+```
+
+Returns teams that do not currently have a matched team logo image.
+
+#### Response
+
+```json
+{
+  "items": [
+    {
+      "team_tid": "583ecb8f-fb46-11e1-82cb-f4ce4684ea4c",
+      "team_market": "亚特兰大",
+      "team_name": "老鹰",
+      "team_full_name": "亚特兰大老鹰",
+      "player_count": 19
+    }
+  ]
+}
+```
+
+When all team images are matched:
 
 ```json
 {
@@ -447,6 +501,37 @@ The request body cannot override the avatar directory. The server always uses `N
 }
 ```
 
+### Sync Team Images
+
+```http
+POST /api/nba/sync/team-images
+Content-Type: application/json
+X-NBA-Sync-Token: your-token
+```
+
+Matches team logo files under `NBA_TEAM_IMAGE_DIR` by team name, updates `team.logo.url`, and marks missing team images.
+
+The request body cannot override the team image directory. The server always uses `NBA_TEAM_IMAGE_DIR`.
+
+#### Response
+
+```json
+{
+  "ok": true,
+  "result": {
+    "total": 30,
+    "asset_count": 30,
+    "team_image_count": 30,
+    "matched_count": 30,
+    "missing_count": 0,
+    "affected_player_count": 537,
+    "missing": [],
+    "collisions": [],
+    "checked_at": "2026-06-16T09:10:00"
+  }
+}
+```
+
 ## Deployment Notes
 
 ### Database
@@ -489,11 +574,24 @@ Override it with:
 NBA_AVATAR_DIR=/home/user/recorded/nba_avatar
 ```
 
-The image and avatar directories are server-local and should not be committed to Git. Upload them manually, then run:
+By default, team images are loaded from:
+
+```text
+nba_team_images/
+```
+
+Override it with:
+
+```bash
+NBA_TEAM_IMAGE_DIR=/home/user/recorded/nba_team_images
+```
+
+The image, avatar, and team image directories are server-local and should not be committed to Git. Upload them manually, then run:
 
 ```http
 POST /api/nba/sync/images
 POST /api/nba/sync/avatars
+POST /api/nba/sync/team-images
 ```
 
 ### Sync Token
@@ -518,6 +616,9 @@ X-NBA-Sync-Token: your-token
 - Use `GET /api/nba/players/{pid}` for detail pages.
 - Use `player.image.url` to display player card images.
 - Use `player.avatar.url` to display player avatars.
+- Use `player.team.logo.url` to display team logos.
+- Use `team.logo.url` from `GET /api/nba/filters` for team filter controls.
 - Do not use server-local filesystem paths. Public responses do not expose image paths.
 - If `image.missing` is `true`, display a placeholder card image in the Mini Program.
 - If `avatar.missing` is `true`, display a placeholder avatar in the Mini Program.
+- If `team.logo.missing` is `true`, display a placeholder team logo in the Mini Program.

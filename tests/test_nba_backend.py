@@ -144,18 +144,23 @@ class NbaBackendTestCase(unittest.TestCase):
         self.nba_db_path = os.path.join(self.base_dir, 'nba.db')
         self.nba_image_dir = os.path.join(self.base_dir, 'nba_images')
         self.nba_avatar_dir = os.path.join(self.base_dir, 'nba_avatar')
+        self.nba_team_image_dir = os.path.join(self.base_dir, 'nba_team_images')
         os.makedirs(self.nba_image_dir)
         os.makedirs(self.nba_avatar_dir)
+        os.makedirs(self.nba_team_image_dir)
         with open(os.path.join(self.nba_image_dir, 'Luke_Kennard.jpg'), 'wb') as handle:
             handle.write(b'fake-jpg')
         with open(os.path.join(self.nba_avatar_dir, 'Luke_Kennard.png'), 'wb') as handle:
             handle.write(b'fake-png')
+        with open(os.path.join(self.nba_team_image_dir, 'Los_Angeles_Lakers.png'), 'wb') as handle:
+            handle.write(b'fake-team-png')
         os.environ['RECORDED_BASE_DIR'] = self.base_dir
         os.environ['RECORDED_DB_PATH'] = self.db_path
         os.environ['LIFE_DB_PATH'] = self.life_db_path
         os.environ['NBA_DB_PATH'] = self.nba_db_path
         os.environ['NBA_IMAGE_DIR'] = self.nba_image_dir
         os.environ['NBA_AVATAR_DIR'] = self.nba_avatar_dir
+        os.environ['NBA_TEAM_IMAGE_DIR'] = self.nba_team_image_dir
         os.environ.pop('NBA_SYNC_TOKEN', None)
 
         self.app_module = importlib.import_module('app')
@@ -352,6 +357,68 @@ class NbaBackendTestCase(unittest.TestCase):
         try:
             row = conn.execute('SELECT avatar_path FROM nba_players WHERE pid=?', (PLAYER_PID,)).fetchone()
             self.assertTrue(row[0].startswith(self.nba_avatar_dir))
+        finally:
+            conn.close()
+
+    def test_sync_team_images_links_logos_and_marks_missing(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})
+        self.assertEqual(synced.status_code, 200)
+
+        logos = self.client.post('/api/nba/sync/team-images')
+        self.assertEqual(logos.status_code, 200)
+        result = logos.get_json()['result']
+        self.assertEqual(result['matched_count'], 1)
+        self.assertEqual(result['missing_count'], 1)
+        self.assertEqual(result['missing'][0]['team_full_name'], '亚特兰大老鹰')
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        logo = detail.get_json()['team']['logo']
+        self.assertFalse(logo['missing'])
+        self.assertEqual(logo['filename'], 'Los_Angeles_Lakers.png')
+        self.assertEqual(logo['url'], '/api/nba/team-images/Los_Angeles_Lakers.png')
+        self.assertNotIn('path', logo)
+        self.assertNotIn('team_image_path', detail.get_json())
+
+        filters = self.client.get('/api/nba/filters')
+        self.assertEqual(filters.status_code, 200)
+        teams = {item['full_name']: item for item in filters.get_json()['teams']}
+        self.assertEqual(teams['洛杉矶湖人']['logo']['filename'], 'Los_Angeles_Lakers.png')
+
+        image = self.client.get('/api/nba/team-images/Los_Angeles_Lakers.png')
+        try:
+            self.assertEqual(image.status_code, 200)
+            self.assertEqual(image.data, b'fake-team-png')
+        finally:
+            image.close()
+
+        missing = self.client.get('/api/nba/team-images/missing')
+        self.assertEqual(missing.status_code, 200)
+        self.assertEqual(missing.get_json()['items'][0]['team_full_name'], '亚特兰大老鹰')
+
+    def test_sync_team_images_ignores_request_team_image_dir(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync/player', json={'pid': PLAYER_PID})
+        self.assertEqual(synced.status_code, 200)
+
+        other_dir = os.path.join(self.base_dir, 'other_team_images')
+        os.makedirs(other_dir)
+        with open(os.path.join(other_dir, 'Atlanta_Hawks.png'), 'wb') as handle:
+            handle.write(b'wrong-dir')
+
+        logos = self.client.post('/api/nba/sync/team-images', json={'teamImageDir': other_dir})
+        self.assertEqual(logos.status_code, 200)
+        self.assertNotIn('team_image_dir', logos.get_json()['result'])
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.get_json()['team']['logo']['filename'], 'Los_Angeles_Lakers.png')
+
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            row = conn.execute('SELECT team_image_path FROM nba_players WHERE pid=?', (PLAYER_PID,)).fetchone()
+            self.assertTrue(row[0].startswith(self.nba_team_image_dir))
         finally:
             conn.close()
 

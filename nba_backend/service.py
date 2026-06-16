@@ -19,6 +19,38 @@ SINA_PLAYER_PAGE = 'https://slamdunk.sports.sina.com.cn/player?pid={pid}'
 DEFAULT_TIMEOUT = 20
 DEFAULT_CONCURRENCY = 8
 MAX_CONCURRENCY = 16
+TEAM_IMAGE_NAMES_BY_FULL_NAME = {
+    '亚特兰大老鹰': 'Atlanta Hawks',
+    '波士顿凯尔特人': 'Boston Celtics',
+    '布鲁克林篮网': 'Brooklyn Nets',
+    '夏洛特黄蜂': 'Charlotte Hornets',
+    '芝加哥公牛': 'Chicago Bulls',
+    '克利夫兰骑士': 'Cleveland Cavaliers',
+    '达拉斯独行侠': 'Dallas Mavericks',
+    '丹佛掘金': 'Denver Nuggets',
+    '底特律活塞': 'Detroit Pistons',
+    '金州勇士': 'Golden State Warriors',
+    '休斯顿火箭': 'Houston Rockets',
+    '印第安纳步行者': 'Indiana Pacers',
+    '洛杉矶快船': 'LA Clippers',
+    '洛杉矶湖人': 'Los Angeles Lakers',
+    '孟菲斯灰熊': 'Memphis Grizzlies',
+    '迈阿密热火': 'Miami Heat',
+    '密尔沃基雄鹿': 'Milwaukee Bucks',
+    '明尼苏达森林狼': 'Minnesota Timberwolves',
+    '新奥尔良鹈鹕': 'New Orleans Pelicans',
+    '纽约尼克斯': 'New York Knicks',
+    '俄克拉荷马城雷霆': 'Oklahoma City Thunder',
+    '奥兰多魔术': 'Orlando Magic',
+    '费城76人': 'Philadelphia 76ers',
+    '菲尼克斯太阳': 'Phoenix Suns',
+    '波特兰开拓者': 'Portland Trail Blazers',
+    '萨克拉门托国王': 'Sacramento Kings',
+    '圣安东尼奥马刺': 'San Antonio Spurs',
+    '多伦多猛龙': 'Toronto Raptors',
+    '犹他爵士': 'Utah Jazz',
+    '华盛顿奇才': 'Washington Wizards',
+}
 
 
 def utcnow_iso():
@@ -98,6 +130,11 @@ def init_nba_db(db_path):
                 avatar_url TEXT NOT NULL DEFAULT '',
                 avatar_missing INTEGER NOT NULL DEFAULT 1,
                 avatar_checked_at TEXT NOT NULL DEFAULT '',
+                team_image_path TEXT NOT NULL DEFAULT '',
+                team_image_filename TEXT NOT NULL DEFAULT '',
+                team_image_url TEXT NOT NULL DEFAULT '',
+                team_image_missing INTEGER NOT NULL DEFAULT 1,
+                team_image_checked_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -130,6 +167,11 @@ def migrate_nba_db(conn):
         'avatar_url': "TEXT NOT NULL DEFAULT ''",
         'avatar_missing': 'INTEGER NOT NULL DEFAULT 1',
         'avatar_checked_at': "TEXT NOT NULL DEFAULT ''",
+        'team_image_path': "TEXT NOT NULL DEFAULT ''",
+        'team_image_filename': "TEXT NOT NULL DEFAULT ''",
+        'team_image_url': "TEXT NOT NULL DEFAULT ''",
+        'team_image_missing': 'INTEGER NOT NULL DEFAULT 1',
+        'team_image_checked_at': "TEXT NOT NULL DEFAULT ''",
     }
     for name, definition in columns.items():
         if not has_column(conn, 'nba_players', name):
@@ -152,6 +194,12 @@ def row_to_player(row):
         'market': item.get('team_market') or '',
         'name': item.get('team_name') or '',
         'full_name': item.get('team_full_name') or '',
+        'logo': {
+            'filename': item.get('team_image_filename') or '',
+            'url': item.get('team_image_url') or '',
+            'missing': bool(item.get('team_image_missing')),
+            'checked_at': item.get('team_image_checked_at') or '',
+        },
     }
     item['stats'] = {
         'avg_points': item.get('avg_points'),
@@ -200,6 +248,11 @@ def row_to_player(row):
     item.pop('avatar_url', None)
     item.pop('avatar_missing', None)
     item.pop('avatar_checked_at', None)
+    item.pop('team_image_path', None)
+    item.pop('team_image_filename', None)
+    item.pop('team_image_url', None)
+    item.pop('team_image_missing', None)
+    item.pop('team_image_checked_at', None)
     return item
 
 
@@ -678,6 +731,94 @@ def sync_player_avatars(conn, avatar_dir, url_prefix='/api/nba/avatars'):
     return sync_player_assets(conn, avatar_dir, 'avatar', url_prefix)
 
 
+def team_image_search_values(row):
+    full_name = row['team_full_name'] or ''
+    values = []
+    mapped = TEAM_IMAGE_NAMES_BY_FULL_NAME.get(full_name)
+    if mapped:
+        values.append(mapped)
+    values.extend([
+        full_name,
+        normalize_name(row['team_market'], row['team_name'], ''),
+        row['team_name'] or '',
+    ])
+    return [value for value in values if value]
+
+
+def match_team_image_filename(row, image_index):
+    for value in team_image_search_values(row):
+        filename = match_image_filename(value, image_index)
+        if filename:
+            return filename
+    return ''
+
+
+def sync_team_images(conn, team_image_dir, url_prefix='/api/nba/team-images'):
+    image_index, collisions = collect_image_index(team_image_dir)
+    now = utcnow_iso()
+    matched = 0
+    affected_players = 0
+    missing = []
+    rows = conn.execute(
+        '''
+        SELECT team_tid, team_market, team_name, team_full_name, COUNT(*) AS player_count
+        FROM nba_players
+        WHERE team_tid!=''
+        GROUP BY team_tid, team_market, team_name, team_full_name
+        ORDER BY team_full_name ASC
+        '''
+    ).fetchall()
+    for row in rows:
+        filename = match_team_image_filename(row, image_index)
+        if filename:
+            image_path = os.path.abspath(os.path.join(team_image_dir, filename))
+            image_url = url_prefix.rstrip('/') + '/' + urllib.parse.quote(filename)
+            cursor = conn.execute(
+                '''
+                UPDATE nba_players
+                SET team_image_path=?, team_image_filename=?, team_image_url=?, team_image_missing=0,
+                    team_image_checked_at=?, updated_at=?
+                WHERE team_tid=?
+                ''',
+                (image_path, filename, image_url, now, now, row['team_tid']),
+            )
+            matched += 1
+            affected_players += cursor.rowcount
+            continue
+        conn.execute(
+            '''
+            UPDATE nba_players
+            SET team_image_path='', team_image_filename='', team_image_url='', team_image_missing=1,
+                team_image_checked_at=?, updated_at=?
+            WHERE team_tid=?
+            ''',
+            (now, now, row['team_tid']),
+        )
+        missing.append({
+            'team_tid': row['team_tid'],
+            'team_market': row['team_market'],
+            'team_name': row['team_name'],
+            'team_full_name': row['team_full_name'],
+            'player_count': row['player_count'],
+        })
+    conn.commit()
+    asset_count = len(set(image_index.values()))
+    return {
+        'total': len(rows),
+        'asset_count': asset_count,
+        'team_image_count': asset_count,
+        'matched_count': matched,
+        'missing_count': len(missing),
+        'affected_player_count': affected_players,
+        'missing': missing,
+        'collisions': [
+            {'key': key, 'filenames': sorted(value)}
+            for key, value in sorted(collisions.items())
+        ],
+        'checked_at': now,
+    }
+
+
 def list_players(conn, query='', team_tid='', team='', position='', limit=50, offset=0, name_only=False):
     where = []
     params = []
@@ -716,7 +857,11 @@ def list_players(conn, query='', team_tid='', team='', position='', limit=50, of
 def list_filter_options(conn):
     team_rows = conn.execute(
         '''
-        SELECT team_tid, team_market, team_name, team_full_name, COUNT(*) AS player_count
+        SELECT team_tid, team_market, team_name, team_full_name, COUNT(*) AS player_count,
+               MAX(team_image_filename) AS team_image_filename,
+               MAX(team_image_url) AS team_image_url,
+               MIN(team_image_missing) AS team_image_missing,
+               MAX(team_image_checked_at) AS team_image_checked_at
         FROM nba_players
         WHERE team_tid!=''
         GROUP BY team_tid, team_market, team_name, team_full_name
@@ -740,6 +885,12 @@ def list_filter_options(conn):
                 'name': row['team_name'],
                 'full_name': row['team_full_name'],
                 'player_count': row['player_count'],
+                'logo': {
+                    'filename': row['team_image_filename'] or '',
+                    'url': row['team_image_url'] or '',
+                    'missing': bool(row['team_image_missing']),
+                    'checked_at': row['team_image_checked_at'] or '',
+                },
             }
             for row in team_rows
         ],
@@ -764,6 +915,19 @@ def list_missing_images(conn):
 
 def list_missing_avatars(conn):
     return list_missing_assets(conn, 'avatar')
+
+
+def list_missing_team_images(conn):
+    rows = conn.execute(
+        '''
+        SELECT team_tid, team_market, team_name, team_full_name, COUNT(*) AS player_count
+        FROM nba_players
+        WHERE team_tid!='' AND team_image_missing=1
+        GROUP BY team_tid, team_market, team_name, team_full_name
+        ORDER BY team_full_name ASC
+        '''
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def list_missing_assets(conn, column_prefix):

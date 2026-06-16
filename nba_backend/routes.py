@@ -8,12 +8,14 @@ from .service import (
     list_filter_options,
     list_missing_avatars,
     list_missing_images,
+    list_missing_team_images,
     list_players,
     nba_sync_token,
     row_to_player,
     sync_all_players,
     sync_player_avatars,
     sync_player_images,
+    sync_team_images,
     sync_single_player,
 )
 
@@ -117,6 +119,16 @@ def player_avatar(filename):
     return send_from_directory(current_app.config['NBA_AVATAR_DIR'], filename)
 
 
+@nba_bp.route('/team-images/missing', methods=['GET'])
+def missing_team_images():
+    return jsonify({'items': list_missing_team_images(get_nba_db())})
+
+
+@nba_bp.route('/team-images/<path:filename>', methods=['GET'])
+def team_image(filename):
+    return send_from_directory(current_app.config['NBA_TEAM_IMAGE_DIR'], filename)
+
+
 @nba_bp.route('/sync/player', methods=['POST'])
 def sync_player():
     payload = parse_json()
@@ -155,6 +167,19 @@ def sync_avatars():
     result = sync_player_avatars(
         get_nba_db(),
         current_app.config['NBA_AVATAR_DIR'],
+    )
+    return jsonify({'ok': True, 'result': result})
+
+
+@nba_bp.route('/sync/team-images', methods=['POST'])
+def sync_team_logos():
+    payload = parse_json()
+    error = require_sync_token(payload)
+    if error:
+        return error
+    result = sync_team_images(
+        get_nba_db(),
+        current_app.config['NBA_TEAM_IMAGE_DIR'],
     )
     return jsonify({'ok': True, 'result': result})
 

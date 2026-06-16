@@ -48,6 +48,8 @@ nba_images/
 nba_images*.zip
 nba_avatar/
 nba_avatar*.zip
+nba_team_images/
+nba_team_images*.zip
 
 # 密码文件
 .password
