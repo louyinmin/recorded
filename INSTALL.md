@@ -27,6 +27,7 @@ recorded/
 ├── expiry_backend/         # 到期管理后端模块
 ├── life_backend/           # 人生记录后端模块
 ├── nba_backend/            # NBA 球员数据后端模块
+├── wechat_backend/         # 微信小程序登录会话后端模块
 ├── expiry/                 # 到期管理前端页面与静态资源
 ├── requirements.txt        # Python 依赖
 ├── nginx.conf              # Nginx 配置模板
@@ -36,6 +37,7 @@ recorded/
 ├── data.db                 # 旅游记账与续费雷达 SQLite 数据库（运行后自动生成）
 ├── life.db                 # 人生记录 SQLite 数据库（运行后自动生成）
 ├── nba.db                  # NBA 球员 SQLite 数据库（运行后自动生成）
+├── wechat.db               # 微信小程序用户 SQLite 数据库（运行后自动生成）
 ├── login.html              # 登录页
 ├── trips.html              # 旅行列表页
 ├── trip.html               # 单次旅行记账页
@@ -71,7 +73,7 @@ sudo ./run_server.sh
 脚本会自动完成以下操作：
 1. 安装 Python3、pip、venv、Nginx
 2. 创建 Python 虚拟环境并安装 Flask
-3. 初始化旅游记账、续费雷达、人生记录与 NBA 球员数据表
+3. 初始化旅游记账、续费雷达、人生记录、NBA 球员与微信小程序用户数据表
 4. 创建续费雷达管理员账号与应用密钥
 5. 配置 Nginx（静态文件 + 反向代理）
 6. 安装续费提醒定时任务
@@ -152,7 +154,41 @@ POST /api/nba/sync/team-images
 POST /api/nba/sync
 ```
 
-### 5. 配置 Nginx
+### 5. 微信小程序登录接口
+
+微信会话数据默认写入项目目录下的 `wechat.db`，可用 `WECHAT_DB_PATH` 指定独立路径。小程序登录接口：
+
+```text
+POST /api/wechat/session
+```
+
+请求体：
+
+```json
+{
+  "code": "wx.login 返回的临时代码"
+}
+```
+
+服务端通过微信 `jscode2session` 换取 `openid`，查找或创建本地用户，返回：
+
+```json
+{
+  "userId": "wx_xxx",
+  "openid": "wechat_openid"
+}
+```
+
+生产环境必须配置：
+
+```bash
+WECHAT_MINIPROGRAM_APPID=wxb329162424904f03
+WECHAT_MINIPROGRAM_SECRET=your-secret
+```
+
+`WECHAT_MINIPROGRAM_SECRET` 只保存在服务器环境变量中，不提交到 Git，也不返回给小程序。
+
+### 6. 配置 Nginx
 
 ```bash
 # 编辑 nginx.conf 中的 root 路径为实际项目路径
@@ -165,7 +201,7 @@ sudo systemctl restart nginx
 sudo systemctl enable nginx
 ```
 
-### 6. 配置续费提醒任务
+### 7. 配置续费提醒任务
 
 创建文件 `/etc/cron.d/recorded-expiry-reminder`：
 

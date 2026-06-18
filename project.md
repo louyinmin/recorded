@@ -199,6 +199,7 @@ CREATE TABLE categories (
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/login` | POST | 用户登录，获取 Token |
+| `/api/wechat/session` | POST | 微信小程序 `wx.login` code 换取稳定用户标识 |
 | `/api/password` | POST | 兼容保留，固定返回 403（请到续费雷达修改密码） |
 
 ### 6.2 旅行管理
