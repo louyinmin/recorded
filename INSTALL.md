@@ -203,13 +203,13 @@ DELETE /api/timing/plan-config/custom-plans/:planId
 生产环境必须配置：
 
 ```bash
-WECHAT_MINIPROGRAM_NBA_APPID=wxb329162424904f03
+WECHAT_MINIPROGRAM_NBA_APPID=your-nba-appid
 WECHAT_MINIPROGRAM_NBA_SECRET=your-nba-secret
-WECHAT_MINIPROGRAM_TIMING_APPID=wxb57f6c567b4033fa
+WECHAT_MINIPROGRAM_TIMING_APPID=your-timing-appid
 WECHAT_MINIPROGRAM_TIMING_SECRET=your-timing-secret
 ```
 
-`WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。
+`WECHAT_MINIPROGRAM_*_APPID` 和 `WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。
 
 ### 6. 配置 Nginx
 

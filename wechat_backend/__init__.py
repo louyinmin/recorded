@@ -10,11 +10,11 @@ def init_wechat_module(app, base_dir, db_path):
     app.config['WECHAT_DB_PATH'] = db_path
     app.config['WECHAT_MINIPROGRAMS'] = {
         'nba': {
-            'appid': os.environ.get('WECHAT_MINIPROGRAM_NBA_APPID', 'wxb329162424904f03'),
+            'appid': os.environ.get('WECHAT_MINIPROGRAM_NBA_APPID', ''),
             'secret': os.environ.get('WECHAT_MINIPROGRAM_NBA_SECRET', ''),
         },
         'timing': {
-            'appid': os.environ.get('WECHAT_MINIPROGRAM_TIMING_APPID', 'wxb57f6c567b4033fa'),
+            'appid': os.environ.get('WECHAT_MINIPROGRAM_TIMING_APPID', ''),
             'secret': os.environ.get('WECHAT_MINIPROGRAM_TIMING_SECRET', ''),
         },
     }
