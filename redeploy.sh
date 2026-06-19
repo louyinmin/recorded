@@ -10,6 +10,7 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 FLASK_PORT=5000
 NGINX_SITE_NAME="travel-recorder"
 CRON_FILE="/etc/cron.d/recorded-expiry-reminder"
+WECHAT_ENV_FILE="${WECHAT_ENV_FILE:-/etc/recorded/wechat-miniprogram.env}"
 
 echo "=============================="
 echo "  Recorded 双模块 - 重新部署"
@@ -18,13 +19,39 @@ echo ""
 echo "项目目录: $APP_DIR"
 echo ""
 
+# ===== 0. 加载服务器本地密钥配置 =====
+echo "[0/5] 加载微信小程序环境变量..."
+if [ ! -f "$WECHAT_ENV_FILE" ]; then
+    echo "  ❌ 缺少微信小程序环境变量文件: $WECHAT_ENV_FILE"
+    echo "  请先创建该文件，并写入 WECHAT_MINIPROGRAM_NBA_* 和 WECHAT_MINIPROGRAM_TIMING_*。"
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+. "$WECHAT_ENV_FILE"
+set +a
+
+for name in \
+    WECHAT_MINIPROGRAM_NBA_APPID \
+    WECHAT_MINIPROGRAM_NBA_SECRET \
+    WECHAT_MINIPROGRAM_TIMING_APPID \
+    WECHAT_MINIPROGRAM_TIMING_SECRET
+do
+    if [ -z "${!name:-}" ]; then
+        echo "  ❌ $WECHAT_ENV_FILE 缺少: $name"
+        exit 1
+    fi
+done
+echo "  ✅ 微信小程序环境变量已加载"
+
 # ===== 1. 停止现有服务 =====
-echo "[1/4] 停止现有服务..."
+echo "[1/5] 停止现有服务..."
 pkill -f "python3.*app.py" 2>/dev/null || true
 echo "  ✅ Flask 进程已停止"
 
 # ===== 2. 安装/更新 Python 依赖 =====
-echo "[2/4] 更新 Python 依赖..."
+echo "[2/5] 更新 Python 依赖..."
 if [ ! -d "$APP_DIR/venv" ]; then
     python3 -m venv "$APP_DIR/venv"
 fi

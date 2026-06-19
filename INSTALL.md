@@ -209,7 +209,24 @@ WECHAT_MINIPROGRAM_TIMING_APPID=your-timing-appid
 WECHAT_MINIPROGRAM_TIMING_SECRET=your-timing-secret
 ```
 
-`WECHAT_MINIPROGRAM_*_APPID` 和 `WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。
+`redeploy.sh` 默认从服务器本地文件 `/etc/recorded/wechat-miniprogram.env` 读取这些变量。该文件只保存在服务器，不提交到 Git：
+
+```bash
+sudo install -d -m 700 /etc/recorded
+sudo tee /etc/recorded/wechat-miniprogram.env >/dev/null <<'EOF'
+WECHAT_MINIPROGRAM_NBA_APPID=your-nba-appid
+WECHAT_MINIPROGRAM_NBA_SECRET=your-nba-secret
+WECHAT_MINIPROGRAM_TIMING_APPID=your-timing-appid
+WECHAT_MINIPROGRAM_TIMING_SECRET=your-timing-secret
+EOF
+sudo chmod 600 /etc/recorded/wechat-miniprogram.env
+```
+
+`WECHAT_MINIPROGRAM_*_APPID` 和 `WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。配置好本地文件后，后续部署继续使用：
+
+```bash
+sudo ./redeploy.sh
+```
 
 ### 6. 配置 Nginx
 
