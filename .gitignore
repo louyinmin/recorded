@@ -73,3 +73,9 @@ deploy_ssl_cert.sh
 # 敏感配置
 .env
 .env.local
+.env.*
+*.env
+*.secret
+secrets/
+wechat-miniprogram.env
+wechat*.env
