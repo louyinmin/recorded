@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 from .service import (
     WeChatCodeExchangeError,
     WeChatUpstreamError,
+    WECHAT_PROJECTS,
     create_session,
     exchange_wechat_code,
     find_or_create_user,
@@ -20,15 +21,27 @@ def parse_json():
     return request.get_json(silent=True) or {}
 
 
+def miniprogram_credentials(project):
+    configs = current_app.config.get('WECHAT_MINIPROGRAMS') or {}
+    config = configs.get(project) or {}
+    return (
+        str(config.get('appid') or '').strip(),
+        str(config.get('secret') or '').strip(),
+    )
+
+
 def create_wechat_session_response(app_name=''):
     payload = parse_json()
     code = str(payload.get('code') or '').strip()
     if not code:
         return jsonify({'message': 'code is required'}), 400
     app_name = str(app_name or payload.get('app') or '').strip()
+    if not app_name:
+        return jsonify({'message': 'wechat project is required'}), 400
+    if app_name not in WECHAT_PROJECTS:
+        return jsonify({'message': 'unsupported wechat project'}), 400
 
-    appid = str(current_app.config.get('WECHAT_MINIPROGRAM_APPID') or '').strip()
-    secret = str(current_app.config.get('WECHAT_MINIPROGRAM_SECRET') or '').strip()
+    appid, secret = miniprogram_credentials(app_name)
     if not appid or not secret:
         return jsonify({'message': 'wechat credentials are not configured'}), 500
 
@@ -44,6 +57,7 @@ def create_wechat_session_response(app_name=''):
 
     user = find_or_create_user(
         get_wechat_db(),
+        app_name,
         str(session.get('openid') or ''),
         str(session.get('unionid') or ''),
     )

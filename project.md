@@ -199,9 +199,9 @@ CREATE TABLE categories (
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/login` | POST | 用户登录，获取 Token |
-| `/api/wechat/session` | POST | 微信小程序 `wx.login` code 换取稳定用户标识和后端会话 Token |
-| `/api/nba/wechat/session` | POST | NBA 小程序微信登录别名，返回 `app=nba` |
-| `/api/timing/wechat/session` | POST | Timing 小程序微信登录别名，返回 `app=timing` |
+| `/api/wechat/session` | POST | 兼容登录入口，必须传 `app` 来选择小程序密钥 |
+| `/api/nba/wechat/session` | POST | NBA 小程序微信登录，使用 NBA AppID/AppSecret，返回 `app=nba` |
+| `/api/timing/wechat/session` | POST | Timing 小程序微信登录，使用 Timing AppID/AppSecret，返回 `app=timing` |
 | `/api/password` | POST | 兼容保留，固定返回 403（请到续费雷达修改密码） |
 
 ### 6.2 旅行管理

@@ -9,7 +9,7 @@ from wechat_backend.service import (
     get_timing_plan_row,
     get_wechat_db,
     normalize_timing_plan,
-    require_wechat_auth,
+    require_wechat_project,
     save_timing_plan_config,
     assert_timing_version,
     utcnow_iso,
@@ -47,14 +47,14 @@ def create_timing_session():
 
 
 @timing_bp.route('/plan-config', methods=['GET'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def read_plan_config():
     config, version, updated_at = get_timing_plan_config(get_wechat_db(), g.wechat_user)
     return timing_config_response(config, version, updated_at)
 
 
 @timing_bp.route('/plan-config', methods=['PUT'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def replace_plan_config():
     payload = parse_json()
     conn = get_wechat_db()
@@ -75,7 +75,7 @@ def replace_plan_config():
 
 
 @timing_bp.route('/plan-config/default-task-duration', methods=['PATCH'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def update_default_task_duration():
     payload = parse_json()
     key = str(payload.get('defaultTaskKey') or '').strip()
@@ -97,7 +97,7 @@ def update_default_task_duration():
 
 
 @timing_bp.route('/plan-config/custom-plans', methods=['POST'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def create_custom_plan():
     payload = parse_json()
     conn = get_wechat_db()
@@ -123,7 +123,7 @@ def create_custom_plan():
 
 
 @timing_bp.route('/plan-config/custom-plans/<plan_id>', methods=['PUT'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def update_custom_plan(plan_id):
     payload = parse_json()
     conn = get_wechat_db()
@@ -154,7 +154,7 @@ def update_custom_plan(plan_id):
 
 
 @timing_bp.route('/plan-config/custom-plans/<plan_id>', methods=['DELETE'])
-@require_wechat_auth
+@require_wechat_project(TIMING_PROJECT)
 def delete_custom_plan(plan_id):
     payload = parse_json()
     conn = get_wechat_db()

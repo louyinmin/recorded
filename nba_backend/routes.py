@@ -7,7 +7,7 @@ from wechat_backend.service import (
     get_wechat_db,
     get_nba_user_config,
     patch_nba_user_config,
-    require_wechat_auth,
+    require_wechat_project,
 )
 
 from .service import (
@@ -67,7 +67,7 @@ def create_nba_session():
 
 
 @nba_bp.route('/user-config', methods=['GET'])
-@require_wechat_auth
+@require_wechat_project(NBA_APP)
 def read_user_config():
     config, updated_at = get_nba_user_config(get_wechat_db(), g.wechat_user['id'])
     return jsonify({
@@ -78,7 +78,7 @@ def read_user_config():
 
 
 @nba_bp.route('/user-config', methods=['PATCH'])
-@require_wechat_auth
+@require_wechat_project(NBA_APP)
 def update_user_config():
     payload = parse_json()
     try:

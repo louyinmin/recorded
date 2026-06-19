@@ -17,8 +17,12 @@ class WeChatBackendTestCase(unittest.TestCase):
         os.environ['LIFE_DB_PATH'] = self.life_db_path
         os.environ['NBA_DB_PATH'] = self.nba_db_path
         os.environ['WECHAT_DB_PATH'] = self.wechat_db_path
-        os.environ['WECHAT_MINIPROGRAM_APPID'] = 'test-appid'
-        os.environ['WECHAT_MINIPROGRAM_SECRET'] = 'test-secret'
+        os.environ.pop('WECHAT_MINIPROGRAM_APPID', None)
+        os.environ.pop('WECHAT_MINIPROGRAM_SECRET', None)
+        os.environ['WECHAT_MINIPROGRAM_NBA_APPID'] = 'nba-appid'
+        os.environ['WECHAT_MINIPROGRAM_NBA_SECRET'] = 'nba-secret'
+        os.environ['WECHAT_MINIPROGRAM_TIMING_APPID'] = 'timing-appid'
+        os.environ['WECHAT_MINIPROGRAM_TIMING_SECRET'] = 'timing-secret'
 
         self.app_module = importlib.import_module('app')
         self.app_module = importlib.reload(self.app_module)
@@ -55,8 +59,8 @@ class WeChatBackendTestCase(unittest.TestCase):
 
         self.patch_code_exchange(fake_exchange)
 
-        first = self.client.post('/api/wechat/session', json={'code': 'code-one'})
-        second = self.client.post('/api/wechat/session', json={'code': 'code-two'})
+        first = self.client.post('/api/wechat/session', json={'app': 'nba', 'code': 'code-one'})
+        second = self.client.post('/api/wechat/session', json={'app': 'nba', 'code': 'code-two'})
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
@@ -65,10 +69,11 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(first_payload['userId'], second_payload['userId'])
         self.assertEqual(first_payload['openid'], 'openid-123')
         self.assertEqual(first_payload['unionid'], 'unionid-456')
+        self.assertEqual(first_payload['app'], 'nba')
         self.assertIn('sessionToken', first_payload)
         self.assertIn('expiresAt', first_payload)
         self.assertNotIn('session_key', first_payload)
-        self.assertEqual(calls[0], ('test-appid', 'test-secret', 'code-one'))
+        self.assertEqual(calls[0], ('nba-appid', 'nba-secret', 'code-one'))
 
         conn = sqlite3.connect(self.wechat_db_path)
         try:
@@ -85,7 +90,7 @@ class WeChatBackendTestCase(unittest.TestCase):
 
         self.patch_code_exchange(fake_exchange)
 
-        response = self.client.post('/api/wechat/session', json={'code': 'bad-code'})
+        response = self.client.post('/api/wechat/session', json={'app': 'timing', 'code': 'bad-code'})
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.get_json(), {
@@ -94,14 +99,151 @@ class WeChatBackendTestCase(unittest.TestCase):
         })
 
     def test_session_requires_configured_secret(self):
-        os.environ['WECHAT_MINIPROGRAM_SECRET'] = ''
+        os.environ['WECHAT_MINIPROGRAM_NBA_SECRET'] = ''
         self.app_module = importlib.reload(self.app_module)
         self.client = self.app_module.app.test_client()
 
-        response = self.client.post('/api/wechat/session', json={'code': 'code-one'})
+        response = self.client.post('/api/nba/wechat/session', json={'code': 'code-one'})
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.get_json(), {'message': 'wechat credentials are not configured'})
+
+    def test_generic_session_requires_project_after_code_is_present(self):
+        response = self.client.post('/api/wechat/session', json={'code': 'code-one'})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'message': 'wechat project is required'})
+
+    def test_project_scoped_routes_use_project_credentials_and_identity_scope(self):
+        calls = []
+
+        def fake_exchange(appid, secret, code):
+            calls.append((appid, secret, code))
+            return {
+                'openid': 'shared-openid',
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+
+        nba = self.client.post('/api/nba/wechat/session', json={'code': 'nba-code'})
+        timing = self.client.post('/api/timing/wechat/session', json={'code': 'timing-code'})
+
+        self.assertEqual(nba.status_code, 200)
+        self.assertEqual(timing.status_code, 200)
+        nba_payload = nba.get_json()
+        timing_payload = timing.get_json()
+        self.assertEqual(calls, [
+            ('nba-appid', 'nba-secret', 'nba-code'),
+            ('timing-appid', 'timing-secret', 'timing-code'),
+        ])
+        self.assertEqual(nba_payload['app'], 'nba')
+        self.assertEqual(timing_payload['app'], 'timing')
+        self.assertNotEqual(nba_payload['userId'], timing_payload['userId'])
+
+        cross_project = self.client.get(
+            '/api/timing/plan-config',
+            headers={'Authorization': 'Bearer ' + nba_payload['sessionToken']},
+        )
+        self.assertEqual(cross_project.status_code, 401)
+        self.assertEqual(cross_project.get_json(), {'message': 'unauthorized'})
+
+        conn = sqlite3.connect(self.wechat_db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                'SELECT project, wechat_openid FROM wechat_users ORDER BY project'
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual([dict(row) for row in rows], [
+            {'project': 'nba', 'wechat_openid': 'shared-openid'},
+            {'project': 'timing', 'wechat_openid': 'shared-openid'},
+        ])
+
+    def test_wechat_user_schema_migration_preserves_config_and_scopes_openid(self):
+        from wechat_backend.service import init_wechat_db
+
+        db_path = os.path.join(self.base_dir, 'legacy-wechat.db')
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.execute('PRAGMA foreign_keys=ON')
+            conn.executescript(
+                '''
+                CREATE TABLE wechat_users (
+                    id TEXT PRIMARY KEY,
+                    wechat_openid TEXT UNIQUE NOT NULL,
+                    wechat_unionid TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    last_login_at TEXT NOT NULL
+                );
+                CREATE TABLE user_configs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    app TEXT NOT NULL,
+                    config_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES wechat_users(id) ON DELETE CASCADE,
+                    UNIQUE (user_id, app)
+                );
+                INSERT INTO wechat_users (
+                    id, wechat_openid, wechat_unionid, created_at, updated_at, last_login_at
+                ) VALUES (
+                    'wx_legacy', 'shared-openid', NULL,
+                    '2026-06-19T00:00:00', '2026-06-19T00:00:00', '2026-06-19T00:00:00'
+                );
+                INSERT INTO user_configs (
+                    id, user_id, app, config_json, created_at, updated_at
+                ) VALUES (
+                    'ucfg_legacy', 'wx_legacy', 'nba', '{}',
+                    '2026-06-19T00:00:00', '2026-06-19T00:00:00'
+                );
+                '''
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        init_wechat_db(db_path)
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            legacy_user = conn.execute(
+                'SELECT id, project, wechat_openid FROM wechat_users WHERE id=?',
+                ('wx_legacy',),
+            ).fetchone()
+            config_count = conn.execute(
+                'SELECT COUNT(*) FROM user_configs WHERE user_id=?',
+                ('wx_legacy',),
+            ).fetchone()[0]
+            conn.execute(
+                '''
+                INSERT INTO wechat_users (
+                    id, project, wechat_openid, created_at, updated_at, last_login_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    'wx_timing',
+                    'timing',
+                    'shared-openid',
+                    '2026-06-19T00:00:00',
+                    '2026-06-19T00:00:00',
+                    '2026-06-19T00:00:00',
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        self.assertEqual(dict(legacy_user), {
+            'id': 'wx_legacy',
+            'project': 'nba',
+            'wechat_openid': 'shared-openid',
+        })
+        self.assertEqual(config_count, 1)
 
     def test_nba_user_config_requires_session_and_persists_per_wechat_user(self):
         def fake_exchange(appid, secret, code):

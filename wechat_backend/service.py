@@ -18,6 +18,7 @@ DEFAULT_TIMEOUT = 10
 SESSION_DAYS = 30
 NBA_APP = 'nba'
 TIMING_PROJECT = 'timing'
+WECHAT_PROJECTS = {NBA_APP, TIMING_PROJECT}
 DEFAULT_NBA_USER_CONFIG = {
     'associated_home_player_pid': None,
     'search_default_player_pid': [],
@@ -85,6 +86,65 @@ def close_wechat_db(exc=None):
         db.close()
 
 
+def has_column(conn, table_name, column_name):
+    rows = conn.execute("PRAGMA table_info({})".format(table_name)).fetchall()
+    return any(row['name'] == column_name for row in rows)
+
+
+def table_sql(conn, table_name):
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return (row['sql'] or '') if row else ''
+
+
+def migrate_wechat_users_schema(conn):
+    sql = table_sql(conn, 'wechat_users')
+    needs_project = not has_column(conn, 'wechat_users', 'project')
+    needs_unique_rebuild = 'wechat_openid TEXT UNIQUE NOT NULL' in sql
+    if not needs_project and not needs_unique_rebuild:
+        return
+
+    foreign_keys = conn.execute('PRAGMA foreign_keys').fetchone()[0]
+    conn.commit()
+    conn.execute('PRAGMA foreign_keys=OFF')
+    try:
+        conn.execute('DROP TABLE IF EXISTS wechat_users_new')
+        conn.execute(
+            '''
+            CREATE TABLE wechat_users_new (
+                id TEXT PRIMARY KEY,
+                project TEXT NOT NULL DEFAULT '',
+                wechat_openid TEXT NOT NULL,
+                wechat_unionid TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_login_at TEXT NOT NULL,
+                UNIQUE (project, wechat_openid)
+            )
+            '''
+        )
+        project_expr = 'COALESCE(NULLIF(project, \'\'), ?)' if has_column(conn, 'wechat_users', 'project') else '?'
+        conn.execute(
+            '''
+            INSERT OR IGNORE INTO wechat_users_new (
+                id, project, wechat_openid, wechat_unionid, created_at, updated_at, last_login_at
+            )
+            SELECT id, {project_expr}, wechat_openid, wechat_unionid, created_at, updated_at, last_login_at
+            FROM wechat_users
+            ORDER BY created_at
+            '''.format(project_expr=project_expr),
+            (NBA_APP,),
+        )
+        conn.execute('DROP TABLE wechat_users')
+        conn.execute('ALTER TABLE wechat_users_new RENAME TO wechat_users')
+        conn.commit()
+    finally:
+        if foreign_keys:
+            conn.execute('PRAGMA foreign_keys=ON')
+
+
 def init_wechat_db(db_path):
     conn = connect_db(db_path)
     try:
@@ -92,11 +152,13 @@ def init_wechat_db(db_path):
             '''
             CREATE TABLE IF NOT EXISTS wechat_users (
                 id TEXT PRIMARY KEY,
-                wechat_openid TEXT UNIQUE NOT NULL,
+                project TEXT NOT NULL DEFAULT '',
+                wechat_openid TEXT NOT NULL,
                 wechat_unionid TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                last_login_at TEXT NOT NULL
+                last_login_at TEXT NOT NULL,
+                UNIQUE (project, wechat_openid)
             );
 
             CREATE INDEX IF NOT EXISTS idx_wechat_users_unionid ON wechat_users(wechat_unionid);
@@ -140,6 +202,8 @@ def init_wechat_db(db_path):
             );
             '''
         )
+        migrate_wechat_users_schema(conn)
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_wechat_users_unionid ON wechat_users(wechat_unionid)')
         conn.commit()
     finally:
         conn.close()
@@ -173,11 +237,11 @@ def exchange_wechat_code(appid, secret, code, timeout=DEFAULT_TIMEOUT):
     return data
 
 
-def find_or_create_user(conn, openid, unionid=''):
+def find_or_create_user(conn, project, openid, unionid=''):
     now = utcnow_iso()
     row = conn.execute(
-        'SELECT * FROM wechat_users WHERE wechat_openid=?',
-        (openid,),
+        'SELECT * FROM wechat_users WHERE project=? AND wechat_openid=?',
+        (project, openid),
     ).fetchone()
     if row:
         conn.execute(
@@ -197,10 +261,10 @@ def find_or_create_user(conn, openid, unionid=''):
     conn.execute(
         '''
         INSERT INTO wechat_users (
-            id, wechat_openid, wechat_unionid, created_at, updated_at, last_login_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            id, project, wechat_openid, wechat_unionid, created_at, updated_at, last_login_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ''',
-        (user_id, openid, unionid or None, now, now, now),
+        (user_id, project, openid, unionid or None, now, now, now),
     )
     conn.commit()
     return conn.execute('SELECT * FROM wechat_users WHERE id=?', (user_id,)).fetchone()
@@ -267,6 +331,19 @@ def require_wechat_auth(func):
         g.wechat_user = user
         return func(*args, **kwargs)
     return wrapped
+
+
+def require_wechat_project(project):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            user = resolve_session(get_wechat_db(), get_token_from_request())
+            if not user or user.get('session_app') != project:
+                return jsonify({'message': 'unauthorized'}), 401
+            g.wechat_user = user
+            return func(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def user_session_payload(user, app='', session_token='', expires_at=''):

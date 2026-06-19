@@ -159,9 +159,9 @@ POST /api/nba/sync
 微信会话数据默认写入项目目录下的 `wechat.db`，可用 `WECHAT_DB_PATH` 指定独立路径。小程序登录接口：
 
 ```text
-POST /api/wechat/session
 POST /api/nba/wechat/session
 POST /api/timing/wechat/session
+POST /api/wechat/session
 ```
 
 请求体：
@@ -172,6 +172,8 @@ POST /api/timing/wechat/session
   "app": "nba"
 }
 ```
+
+项目命名路由会自动选择对应小程序密钥；通用 `/api/wechat/session` 必须显式传 `app`，否则后端无法判断应使用哪一组 AppID/AppSecret。
 
 服务端通过微信 `jscode2session` 换取 `openid`，查找或创建本地用户，返回：
 
@@ -201,11 +203,13 @@ DELETE /api/timing/plan-config/custom-plans/:planId
 生产环境必须配置：
 
 ```bash
-WECHAT_MINIPROGRAM_APPID=wxb329162424904f03
-WECHAT_MINIPROGRAM_SECRET=your-secret
+WECHAT_MINIPROGRAM_NBA_APPID=wxb329162424904f03
+WECHAT_MINIPROGRAM_NBA_SECRET=your-nba-secret
+WECHAT_MINIPROGRAM_TIMING_APPID=wxb57f6c567b4033fa
+WECHAT_MINIPROGRAM_TIMING_SECRET=your-timing-secret
 ```
 
-`WECHAT_MINIPROGRAM_SECRET` 只保存在服务器环境变量中，不提交到 Git，也不返回给小程序。
+`WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。
 
 ### 6. 配置 Nginx
 
