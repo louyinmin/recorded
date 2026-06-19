@@ -160,13 +160,16 @@ POST /api/nba/sync
 
 ```text
 POST /api/wechat/session
+POST /api/nba/wechat/session
+POST /api/timing/wechat/session
 ```
 
 请求体：
 
 ```json
 {
-  "code": "wx.login 返回的临时代码"
+  "code": "wx.login 返回的临时代码",
+  "app": "nba"
 }
 ```
 
@@ -175,8 +178,24 @@ POST /api/wechat/session
 ```json
 {
   "userId": "wx_xxx",
-  "openid": "wechat_openid"
+  "openid": "wechat_openid",
+  "app": "nba",
+  "sessionToken": "opaque_backend_session_token",
+  "expiresAt": "2026-07-19T00:00:00"
 }
+```
+
+微信配置同步接口通过 `Authorization: Bearer <sessionToken>` 识别当前用户：
+
+```text
+GET /api/nba/user-config
+PATCH /api/nba/user-config
+GET /api/timing/plan-config
+PUT /api/timing/plan-config
+PATCH /api/timing/plan-config/default-task-duration
+POST /api/timing/plan-config/custom-plans
+PUT /api/timing/plan-config/custom-plans/:planId
+DELETE /api/timing/plan-config/custom-plans/:planId
 ```
 
 生产环境必须配置：

@@ -199,7 +199,9 @@ CREATE TABLE categories (
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/login` | POST | 用户登录，获取 Token |
-| `/api/wechat/session` | POST | 微信小程序 `wx.login` code 换取稳定用户标识 |
+| `/api/wechat/session` | POST | 微信小程序 `wx.login` code 换取稳定用户标识和后端会话 Token |
+| `/api/nba/wechat/session` | POST | NBA 小程序微信登录别名，返回 `app=nba` |
+| `/api/timing/wechat/session` | POST | Timing 小程序微信登录别名，返回 `app=timing` |
 | `/api/password` | POST | 兼容保留，固定返回 403（请到续费雷达修改密码） |
 
 ### 6.2 旅行管理
@@ -249,11 +251,21 @@ CREATE TABLE categories (
 | `/api/nba/avatars/missing` | GET | 获取未匹配到头像图片的球员清单 |
 | `/api/nba/team-images/:filename` | GET | 展示本地球队图标图片 |
 | `/api/nba/team-images/missing` | GET | 获取未匹配到球队图标的球队清单 |
+| `/api/nba/user-config` | GET/PATCH | 同步当前微信用户的 NBA 小程序配置 |
 | `/api/nba/sync/player` | POST | 从新浪 NBA 采集并入库单个球员，参数 `pid` |
 | `/api/nba/sync/images` | POST | 按球员英文名匹配 `nba_images` 目录下的球星卡图片 |
 | `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
 | `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
 | `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
+
+### 6.7 Timing 计划配置
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/timing/plan-config` | GET/PUT | 读取或整份替换当前微信用户的 Timing 计划配置 |
+| `/api/timing/plan-config/default-task-duration` | PATCH | 更新内置首页任务的默认时长 |
+| `/api/timing/plan-config/custom-plans` | POST | 新增自定义计划 |
+| `/api/timing/plan-config/custom-plans/:planId` | PUT/DELETE | 更新或删除自定义计划 |
 
 ---
 

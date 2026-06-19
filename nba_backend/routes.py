@@ -1,6 +1,14 @@
 """Flask routes for NBA player data."""
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
+from wechat_backend.routes import create_wechat_session_response
+from wechat_backend.service import (
+    NBA_APP,
+    get_wechat_db,
+    get_nba_user_config,
+    patch_nba_user_config,
+    require_wechat_auth,
+)
 
 from .service import (
     get_nba_db,
@@ -51,6 +59,41 @@ def require_sync_token(payload):
     if provided != expected:
         return jsonify({'error': 'NBA sync token is invalid'}), 403
     return None
+
+
+@nba_bp.route('/wechat/session', methods=['POST'])
+def create_nba_session():
+    return create_wechat_session_response(NBA_APP)
+
+
+@nba_bp.route('/user-config', methods=['GET'])
+@require_wechat_auth
+def read_user_config():
+    config, updated_at = get_nba_user_config(get_wechat_db(), g.wechat_user['id'])
+    return jsonify({
+        'app': NBA_APP,
+        'config': config,
+        'updatedAt': updated_at,
+    })
+
+
+@nba_bp.route('/user-config', methods=['PATCH'])
+@require_wechat_auth
+def update_user_config():
+    payload = parse_json()
+    try:
+        config, updated_at = patch_nba_user_config(
+            get_wechat_db(),
+            g.wechat_user['id'],
+            payload.get('config'),
+        )
+    except ValueError:
+        return jsonify({'message': 'invalid nba user config'}), 400
+    return jsonify({
+        'app': NBA_APP,
+        'config': config,
+        'updatedAt': updated_at,
+    })
 
 
 @nba_bp.route('/players', methods=['GET'])
