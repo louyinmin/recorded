@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -270,7 +271,8 @@ class WeChatBackendTestCase(unittest.TestCase):
         )
         self.assertEqual(default_config.status_code, 200)
         self.assertEqual(default_config.get_json()['config'], {
-            'associated_home_player_pid': None,
+            'associated_home_player_pid': [],
+            'current_home_player_pid': None,
             'search_default_player_pid': [],
         })
 
@@ -278,7 +280,8 @@ class WeChatBackendTestCase(unittest.TestCase):
             '/api/nba/user-config',
             json={
                 'config': {
-                    'associated_home_player_pid': ' player-a ',
+                    'associated_home_player_pid': [' player-a ', '', 'player-b', 'player-a'],
+                    'current_home_player_pid': ' player-b ',
                     'search_default_player_pid': ['p1', '', 'p2', 'p1', '  p3  '],
                 },
             },
@@ -286,9 +289,24 @@ class WeChatBackendTestCase(unittest.TestCase):
         )
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.get_json()['config'], {
-            'associated_home_player_pid': 'player-a',
+            'associated_home_player_pid': ['player-a', 'player-b'],
+            'current_home_player_pid': 'player-b',
             'search_default_player_pid': ['p1', 'p2', 'p3'],
         })
+        conn = sqlite3.connect(self.wechat_db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            stored = conn.execute(
+                '''
+                SELECT config_json
+                FROM user_configs
+                WHERE user_id=? AND app='nba'
+                ''',
+                (session_payload['userId'],),
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(json.loads(stored['config_json'])['associated_home_player_pid'], ['player-a', 'player-b'])
 
         second_session = self.client.post('/api/nba/wechat/session', json={'code': 'two'})
         second_token = second_session.get_json()['sessionToken']
@@ -297,7 +315,8 @@ class WeChatBackendTestCase(unittest.TestCase):
             headers={'Authorization': 'Bearer ' + second_token},
         )
         self.assertEqual(isolated.get_json()['config'], {
-            'associated_home_player_pid': None,
+            'associated_home_player_pid': [],
+            'current_home_player_pid': None,
             'search_default_player_pid': [],
         })
 
@@ -308,6 +327,72 @@ class WeChatBackendTestCase(unittest.TestCase):
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.get_json(), {'message': 'invalid nba user config'})
+
+    def test_nba_user_config_reads_legacy_home_player_string_as_list(self):
+        def fake_exchange(appid, secret, code):
+            return {
+                'openid': 'legacy-openid',
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+
+        session = self.client.post('/api/nba/wechat/session', json={'code': 'legacy'})
+        self.assertEqual(session.status_code, 200)
+        session_payload = session.get_json()
+        token = session_payload['sessionToken']
+
+        conn = sqlite3.connect(self.wechat_db_path)
+        try:
+            conn.execute(
+                '''
+                INSERT INTO user_configs (id, user_id, app, config_json, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    'ucfg_legacy_nba',
+                    session_payload['userId'],
+                    'nba',
+                    json.dumps({
+                        'associated_home_player_pid': 'old-home-player',
+                        'search_default_player_pid': ['p1'],
+                    }),
+                    '2026-06-19T00:00:00',
+                    '2026-06-19T00:00:00',
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        response = self.client.get(
+            '/api/nba/user-config',
+            headers={'Authorization': 'Bearer ' + token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['config'], {
+            'associated_home_player_pid': ['old-home-player'],
+            'current_home_player_pid': None,
+            'search_default_player_pid': ['p1'],
+        })
+
+        updated = self.client.patch(
+            '/api/nba/user-config',
+            json={'config': {'associated_home_player_pid': ['new-home-player']}},
+            headers={'Authorization': 'Bearer ' + token},
+        )
+        self.assertEqual(updated.status_code, 200)
+
+        conn = sqlite3.connect(self.wechat_db_path)
+        try:
+            stored = conn.execute(
+                'SELECT config_json FROM user_configs WHERE id=?',
+                ('ucfg_legacy_nba',),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(json.loads(stored)['associated_home_player_pid'], ['new-home-player'])
 
     def test_timing_plan_config_crud_and_version_conflicts(self):
         def fake_exchange(appid, secret, code):

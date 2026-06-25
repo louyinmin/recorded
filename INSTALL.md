@@ -200,6 +200,16 @@ PUT /api/timing/plan-config/custom-plans/:planId
 DELETE /api/timing/plan-config/custom-plans/:planId
 ```
 
+NBA 用户配置请求和响应中的 `config` 结构：
+
+```json
+{
+  "associated_home_player_pid": ["player_pid_1", "player_pid_2"],
+  "current_home_player_pid": "player_pid_2",
+  "search_default_player_pid": ["player_pid_3"]
+}
+```
+
 生产环境必须配置：
 
 ```bash

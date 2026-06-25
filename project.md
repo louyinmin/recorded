@@ -258,6 +258,8 @@ CREATE TABLE categories (
 | `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
 | `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
 
+NBA 用户配置 `config` 字段包含 `associated_home_player_pid` 球星卡 PID 数组、`current_home_player_pid` 当前首页球员 PID 或 `null`、`search_default_player_pid` 搜索页固定球员 PID 数组。
+
 ### 6.7 Timing 计划配置
 
 | 端点 | 方法 | 说明 |

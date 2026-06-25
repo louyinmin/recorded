@@ -20,7 +20,8 @@ NBA_APP = 'nba'
 TIMING_PROJECT = 'timing'
 WECHAT_PROJECTS = {NBA_APP, TIMING_PROJECT}
 DEFAULT_NBA_USER_CONFIG = {
-    'associated_home_player_pid': None,
+    'associated_home_player_pid': [],
+    'current_home_player_pid': None,
     'search_default_player_pid': [],
 }
 TIMING_DEFAULT_TASK_DURATIONS = {
@@ -371,35 +372,54 @@ def load_json_object(raw, default_value):
     return value
 
 
-def normalize_nba_user_config(config):
+def normalize_nba_player_pid(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError('invalid nba player pid')
+    return value.strip() or None
+
+
+def normalize_nba_player_pid_list(value):
+    if value is None:
+        return []
+    if isinstance(value, str):
+        pid = value.strip()
+        return [pid] if pid else []
+    if not isinstance(value, list):
+        raise ValueError('invalid nba player pid list')
+    seen = set()
+    players = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError('invalid nba player pid list')
+        pid = item.strip()
+        if pid and pid not in seen:
+            seen.add(pid)
+            players.append(pid)
+    return players
+
+
+def normalize_nba_user_config(config, strict_unknown=True):
     result = dict(DEFAULT_NBA_USER_CONFIG)
     if not isinstance(config, dict):
         raise ValueError('invalid nba user config')
-    unknown = set(config.keys()) - set(DEFAULT_NBA_USER_CONFIG.keys())
-    if unknown:
-        raise ValueError('unknown nba user config field')
+    if strict_unknown:
+        unknown = set(config.keys()) - set(DEFAULT_NBA_USER_CONFIG.keys())
+        if unknown:
+            raise ValueError('unknown nba user config field')
     if 'associated_home_player_pid' in config:
-        value = config.get('associated_home_player_pid')
-        if value is None:
-            result['associated_home_player_pid'] = None
-        elif isinstance(value, str):
-            result['associated_home_player_pid'] = value.strip() or None
-        else:
-            raise ValueError('invalid associated_home_player_pid')
+        result['associated_home_player_pid'] = normalize_nba_player_pid_list(
+            config.get('associated_home_player_pid')
+        )
+    if 'current_home_player_pid' in config:
+        result['current_home_player_pid'] = normalize_nba_player_pid(
+            config.get('current_home_player_pid')
+        )
     if 'search_default_player_pid' in config:
-        value = config.get('search_default_player_pid')
-        if not isinstance(value, list):
-            raise ValueError('invalid search_default_player_pid')
-        seen = set()
-        players = []
-        for item in value:
-            if not isinstance(item, str):
-                raise ValueError('invalid search_default_player_pid')
-            pid = item.strip()
-            if pid and pid not in seen:
-                seen.add(pid)
-                players.append(pid)
-        result['search_default_player_pid'] = players
+        result['search_default_player_pid'] = normalize_nba_player_pid_list(
+            config.get('search_default_player_pid')
+        )
     return result
 
 
@@ -419,7 +439,7 @@ def get_nba_user_config(conn, user_id):
         key: saved[key]
         for key in saved
         if key in DEFAULT_NBA_USER_CONFIG
-    }))
+    }, strict_unknown=False))
     return config, row['updated_at']
 
 
