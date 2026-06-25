@@ -7,6 +7,9 @@ import unittest
 
 PLAYER_PID = 'a537047d-c29f-4dfe-99b0-3bac4e258dc7'
 SECOND_PID = 'c4475a2b-157d-45b4-ac0e-f5462ebcc8c9'
+ROOKIE_DRAFT_URL = 'https://news.zhibo8.com/nba/2026-06-24/6a3b1f07f33eenative.htm'
+ROOKIE_DETAIL_URL = 'https://news.zhibo8.com/nba/2026-05-27/6a1136ff7b2c0native.htm'
+ROOKIE_OKORIE_DETAIL_URL = 'https://news.zhibo8.com/nba/2026-06-20/6a36504ce6c0fnative.htm'
 
 
 def player_info(
@@ -136,6 +139,54 @@ def fake_sina_json(params, timeout=20):
     raise AssertionError('unexpected Sina params: {}'.format(params))
 
 
+def rookie_draft_html():
+    return '''
+    <html><body>
+      <p><strong>首轮汇总如下：</strong></p>
+      <p>1、AJ·迪班萨 前锋 奇才</p>
+      <p><a href="{}">模板麦迪的超强得分手！迪班萨依靠犀利进攻 锁定大年状元席位？</a></p>
+      <p>17、埃布卡·奥科里 后卫 雷霆（来自76人）摘下之后交易去灰熊，再送往活塞</p>
+      <p><a href="{}">斯坦福跑车！奥科里：力压布泽尔夺ACC得分王 模板马克西/施罗德</a></p>
+    </body></html>
+    '''.format(ROOKIE_DETAIL_URL, ROOKIE_OKORIE_DETAIL_URL)
+
+
+def rookie_detail_html():
+    return '''
+    <html><body>
+      <p><strong>姓名：</strong>AJ·迪班萨（AJ Dybantsa）</p>
+      <p><strong>出生日期：</strong>2007年1月29日</p>
+      <p><strong>位置：</strong>小前锋</p>
+      <p><strong>球队：</strong>杨百翰大学</p>
+      <p><strong>身高：</strong>6尺9（2米06）</p>
+      <p><strong>体重：</strong>217磅（98公斤）</p>
+      <p><strong>臂展：</strong>7尺1（2米16）</p>
+      <p><strong>球员模板：</strong>安东尼/麦迪/保罗·乔治</p>
+      <p><strong>顺位预测：</strong>状元</p>
+      <p><strong>数据统计：</strong></p>
+      <p>迪班萨大一赛季为球队出战了35场比赛，场均34.8分钟，可以得到25.5分6.8篮板3.7助攻1.1抢断。</p>
+    </body></html>
+    '''
+
+
+def rookie_okorie_detail_html():
+    return '''
+    <html><body>
+      <p><strong>姓名：</strong>埃布卡·奥科里（Ebuka Okorie）</p>
+      <p><strong>出生日期：</strong>2007年4月10日</p>
+      <p><strong>位置：</strong>控卫</p>
+      <p><strong>球队：</strong>斯坦福大学（大一）</p>
+      <p><strong>裸足身高：</strong>6尺1（1米86）</p>
+      <p><strong>体重：</strong>186磅（84公斤）</p>
+      <p><strong>臂展：</strong>6尺8（2米03）</p>
+      <p><strong>球员模板：</strong>马克西/施罗德/雷吉·杰克逊</p>
+      <p><strong>数据统计：</strong></p>
+      <p>2025-26赛季，奥科里为斯坦福大学出战31场比赛，场均登场35.1分钟得到23.2分3.6篮板3.6助攻。</p>
+      <p><strong>顺位预测：</strong>首轮中后段</p>
+    </body></html>
+    '''
+
+
 class NbaBackendTestCase(unittest.TestCase):
     def setUp(self):
         self.base_dir = tempfile.mkdtemp(prefix='nba-backend-test-')
@@ -175,6 +226,24 @@ class NbaBackendTestCase(unittest.TestCase):
         service.fetch_sina_json = fake_sina_json
         self.addCleanup(lambda: setattr(service, 'fetch_sina_json', original))
 
+    def patch_zhibo8_fetch(self):
+        import nba_backend.service as service
+
+        pages = {
+            ROOKIE_DRAFT_URL: rookie_draft_html(),
+            ROOKIE_DETAIL_URL: rookie_detail_html(),
+            ROOKIE_OKORIE_DETAIL_URL: rookie_okorie_detail_html(),
+        }
+
+        def fake_fetch(url, timeout=20):
+            if url not in pages:
+                raise AssertionError('unexpected Zhibo8 URL: {}'.format(url))
+            return pages[url]
+
+        original = service.fetch_zhibo8_html
+        service.fetch_zhibo8_html = fake_fetch
+        self.addCleanup(lambda: setattr(service, 'fetch_zhibo8_html', original))
+
     def test_asset_name_matching_handles_short_names_and_middle_names(self):
         from nba_backend.service import collect_image_index, match_image_filename
 
@@ -199,6 +268,61 @@ class NbaBackendTestCase(unittest.TestCase):
         )
         self.assertEqual(match_image_filename('Yves Thierry Ouwe Missi', image_index), 'Yves_Missi.png')
         self.assertEqual(match_image_filename("Nah'Shon Hyland", image_index), 'Bones_Hyland.png')
+
+    def test_2026_rookie_summary_uses_final_traded_team(self):
+        from nba_backend.service import parse_2026_rookie_summaries
+
+        summaries = parse_2026_rookie_summaries(rookie_draft_html())
+        by_pick = {item['draft_pick']: item for item in summaries}
+
+        self.assertEqual(by_pick[1]['selected_team'], '奇才')
+        self.assertEqual(by_pick[17]['selected_team'], '活塞')
+        self.assertEqual(by_pick[17]['selection_text'], '雷霆（来自76人）摘下之后交易去灰熊，再送往活塞')
+
+    def test_sync_2026_rookies_adds_rookie_team_and_extension_fields(self):
+        self.patch_zhibo8_fetch()
+
+        response = self.client.post('/api/nba/sync/rookies-2026')
+
+        self.assertEqual(response.status_code, 200)
+        result = response.get_json()['result']
+        self.assertEqual(result['succeeded_count'], 2)
+        self.assertEqual(result['failed_count'], 0)
+
+        filters = self.client.get('/api/nba/filters')
+        self.assertEqual(filters.status_code, 200)
+        teams = {item['full_name']: item for item in filters.get_json()['teams']}
+        self.assertIn('2026 新秀', teams)
+        self.assertEqual(teams['2026 新秀']['player_count'], 2)
+
+        listed = self.client.get('/api/nba/players?team=2026%20%E6%96%B0%E7%A7%80')
+        self.assertEqual(listed.status_code, 200)
+        payload = listed.get_json()
+        self.assertEqual(payload['total'], 2)
+        player = next(item for item in payload['items'] if item['chinese_name'] == 'AJ·迪班萨')
+        self.assertEqual(player['source'], 'zhibo8_2026_rookies')
+        self.assertEqual(player['team']['full_name'], '2026 新秀')
+        self.assertEqual(player['profile']['draft_pick'], '1')
+        self.assertEqual(player['profile']['college'], '杨百翰大学')
+        self.assertEqual(player['profile']['height_cm'], 206)
+        self.assertEqual(player['profile']['weight_kg'], 98)
+        self.assertEqual(player['extension']['rookie']['selected_team'], '奇才')
+        self.assertEqual(player['extension']['rookie']['university_team'], '杨百翰大学')
+        self.assertEqual(player['extension']['rookie']['tag']['title'], '模板麦迪的超强得分手！迪班萨依靠犀利进攻 锁定大年状元席位？')
+        self.assertNotIn('顺位预测', player['extension']['rookie'])
+
+        okorie = next(item for item in payload['items'] if item['chinese_name'] == '埃布卡·奥科里')
+        self.assertEqual(okorie['extension']['rookie']['selected_team'], '活塞')
+        self.assertEqual(okorie['extension']['rookie']['selection_text'], '雷霆（来自76人）摘下之后交易去灰熊，再送往活塞')
+
+        images = self.client.post('/api/nba/sync/images')
+        avatars = self.client.post('/api/nba/sync/avatars')
+        self.assertEqual(images.status_code, 200)
+        self.assertEqual(avatars.status_code, 200)
+        missing_images = {item['english_name'] for item in self.client.get('/api/nba/images/missing').get_json()['items']}
+        missing_avatars = {item['english_name'] for item in self.client.get('/api/nba/avatars/missing').get_json()['items']}
+        self.assertIn('AJ Dybantsa', missing_images)
+        self.assertIn('AJ Dybantsa', missing_avatars)
 
     def test_sync_single_player_collects_expected_fields(self):
         self.patch_sina_fetch()

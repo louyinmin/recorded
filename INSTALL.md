@@ -151,6 +151,7 @@ POST /api/nba/sync/player
 POST /api/nba/sync/images
 POST /api/nba/sync/avatars
 POST /api/nba/sync/team-images
+POST /api/nba/sync/rookies-2026
 POST /api/nba/sync
 ```
 

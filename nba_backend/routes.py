@@ -23,6 +23,7 @@ from .service import (
     sync_all_players,
     sync_player_avatars,
     sync_player_images,
+    sync_2026_rookies,
     sync_team_images,
     sync_single_player,
 )
@@ -244,4 +245,17 @@ def sync_all():
         )
     except Exception as exc:
         return jsonify({'error': '新浪 NBA 批量采集失败', 'detail': str(exc)}), 502
+    return jsonify({'ok': True, 'result': result})
+
+
+@nba_bp.route('/sync/rookies-2026', methods=['POST'])
+def sync_rookies_2026():
+    payload = parse_json()
+    error = require_sync_token(payload)
+    if error:
+        return error
+    try:
+        result = sync_2026_rookies(get_nba_db())
+    except Exception as exc:
+        return jsonify({'error': '2026 NBA 新秀采集失败', 'detail': str(exc)}), 502
     return jsonify({'ok': True, 'result': result})

@@ -532,6 +532,35 @@ The request body cannot override the team image directory. The server always use
 }
 ```
 
+### Sync 2026 Rookies
+
+```http
+POST /api/nba/sync/rookies-2026
+Content-Type: application/json
+X-NBA-Sync-Token: your-token
+```
+
+Collects the 2026 first-round rookie list from Zhibo8 and stores those players under the `2026 新秀` team category. Rookie-only fields are stored in `extension.rookie` so they do not overwrite active-player team fields.
+
+`extension.rookie.selected_team` stores the final selected team after trade text is resolved. For example, text ending with `送往活塞` is stored as `活塞`.
+
+#### Response
+
+```json
+{
+  "ok": true,
+  "result": {
+    "source_url": "https://news.zhibo8.com/nba/2026-06-24/6a3b1f07f33eenative.htm",
+    "team_full_name": "2026 新秀",
+    "requested_count": 30,
+    "succeeded_count": 30,
+    "failed_count": 0,
+    "errors": [],
+    "elapsed_seconds": 10.512
+  }
+}
+```
+
 ## Deployment Notes
 
 ### Database

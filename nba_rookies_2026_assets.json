@@ -1,0 +1,950 @@
+{
+  "source_url": "https://news.zhibo8.com/nba/2026-06-24/6a3b1f07f33eenative.htm",
+  "generated_for": "2026 NBA rookie card and avatar asset collection",
+  "asset_directory_contract": {
+    "card_images": "nba_images/",
+    "avatars": "nba_avatar/",
+    "naming_rule": "Use english_name with accents removed and non-alphanumeric characters replaced by underscores. Card images are suggested as .jpg; avatars are suggested as .png. The backend also accepts .jpeg, .png, and .webp and matches by normalized English name variants."
+  },
+  "rookies": [
+    {
+      "draft_pick": 1,
+      "pid": "rookie-2026-01-aj-dybantsa",
+      "chinese_name": "AJ·迪班萨",
+      "english_name": "AJ Dybantsa",
+      "position": "小前锋",
+      "selected_team": "奇才",
+      "university_team": "杨百翰大学",
+      "player_template": "安东尼/麦迪/保罗·乔治",
+      "tag": {
+        "title": "模板麦迪的超强得分手！迪班萨依靠犀利进攻 锁定大年状元席位？",
+        "url": "https://news.zhibo8.com/nba/2026-05-27/6a1136ff7b2c0native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "AJ_Dybantsa.jpg",
+        "card_path": "nba_images/AJ_Dybantsa.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "AJ_Dybantsa.png",
+        "avatar_path": "nba_avatar/AJ_Dybantsa.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "ajdybantsa"
+        ]
+      }
+    },
+    {
+      "draft_pick": 2,
+      "pid": "rookie-2026-02-darryn-peterson",
+      "chinese_name": "达林·彼得森",
+      "english_name": "Darryn Peterson",
+      "position": "后卫",
+      "selected_team": "爵士",
+      "university_team": "",
+      "player_template": "科比·布莱恩特/德文·布克/布兰登·罗伊",
+      "tag": {
+        "title": "有几分像科比？彼得森：状元竞争也有我的份 抽筋问题解决了吗？",
+        "url": "https://news.zhibo8.com/nba/2026-05-28/6a17fa49664e0native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Darryn_Peterson.jpg",
+        "card_path": "nba_images/Darryn_Peterson.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Darryn_Peterson.png",
+        "avatar_path": "nba_avatar/Darryn_Peterson.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "darrynpeterson"
+        ]
+      }
+    },
+    {
+      "draft_pick": 3,
+      "pid": "rookie-2026-03-cameron-boozer",
+      "chinese_name": "卡梅隆·布泽尔",
+      "english_name": "Cameron Boozer",
+      "position": "大前锋",
+      "selected_team": "灰熊",
+      "university_team": "",
+      "player_template": "艾尔·霍福德/凯文·乐福/克里斯·韦伯",
+      "tag": {
+        "title": "青出于蓝而胜于蓝？布泽尔：拿奖无数 下限极高 本届第一安全牌？",
+        "url": "https://news.zhibo8.com/nba/2026-05-29/6a1949899c2canative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Cameron_Boozer.jpg",
+        "card_path": "nba_images/Cameron_Boozer.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Cameron_Boozer.png",
+        "avatar_path": "nba_avatar/Cameron_Boozer.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "camboozer",
+          "cameronboozer"
+        ]
+      }
+    },
+    {
+      "draft_pick": 4,
+      "pid": "rookie-2026-04-caleb-wilson",
+      "chinese_name": "凯莱布·威尔逊",
+      "english_name": "Caleb Wilson",
+      "position": "大前锋",
+      "selected_team": "公牛",
+      "university_team": "北卡大学",
+      "player_template": "肖恩·坎普/拉里·南斯/约什·史密斯",
+      "tag": {
+        "title": "凯莱布·威尔逊：久违的野兽派大前锋 能否突破桎梏成为全能锋线",
+        "url": "https://news.zhibo8.com/nba/2026-05-30/6a168f1d83700native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Caleb_Wilson.jpg",
+        "card_path": "nba_images/Caleb_Wilson.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Caleb_Wilson.png",
+        "avatar_path": "nba_avatar/Caleb_Wilson.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "calebwilson"
+        ]
+      }
+    },
+    {
+      "draft_pick": 5,
+      "pid": "rookie-2026-05-keaton-wagler",
+      "chinese_name": "基顿·瓦格勒",
+      "english_name": "Keaton Wagler",
+      "position": "分卫/控卫",
+      "selected_team": "快船",
+      "university_team": "伊利诺伊大学（大一）",
+      "player_template": "哈利伯顿/里夫斯/贾马尔·穆雷",
+      "tag": {
+        "title": "零扣篮杀入前十？瓦格勒：1米96天赋平平双能卫 凭球商+投射逆袭",
+        "url": "https://news.zhibo8.com/nba/2026-05-31/6a1c05c1569a7native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Keaton_Wagler.jpg",
+        "card_path": "nba_images/Keaton_Wagler.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Keaton_Wagler.png",
+        "avatar_path": "nba_avatar/Keaton_Wagler.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "keatonwagler"
+        ]
+      }
+    },
+    {
+      "draft_pick": 6,
+      "pid": "rookie-2026-06-mikel-brown-jr",
+      "chinese_name": "小迈克尔·布朗",
+      "english_name": "Mikel Brown Jr.",
+      "position": "控卫",
+      "selected_team": "篮网",
+      "university_team": "路易斯维尔大学（大一）",
+      "player_template": "拉梅洛·鲍尔/基昂特·乔治/安芬尼·西蒙斯",
+      "tag": {
+        "title": "背伤难掩传控灵气！小迈克尔·布朗：天才控卫模板三球 射程无限",
+        "url": "https://news.zhibo8.com/nba/2026-06-04/6a215b485808enative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Mikel_Brown_Jr.jpg",
+        "card_path": "nba_images/Mikel_Brown_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Mikel_Brown_Jr.png",
+        "avatar_path": "nba_avatar/Mikel_Brown_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "mikelbrown",
+          "mikelbrownjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 7,
+      "pid": "rookie-2026-07-darius-acuff-jr",
+      "chinese_name": "小达里厄斯·阿卡夫",
+      "english_name": "Darius Acuff Jr.",
+      "position": "组织后卫",
+      "selected_team": "国王",
+      "university_team": "",
+      "player_template": "马布里/利拉德/德隆/阿里纳斯/蒂姆·哈达威",
+      "tag": {
+        "title": "进攻0瑕疵？阿卡夫：卡利帕里治下天才控卫 看到了马布里的影子？",
+        "url": "https://news.zhibo8.com/nba/2026-06-02/6a1eabd34285cnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Darius_Acuff_Jr.jpg",
+        "card_path": "nba_images/Darius_Acuff_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Darius_Acuff_Jr.png",
+        "avatar_path": "nba_avatar/Darius_Acuff_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "dariusacuff",
+          "dariusacuffjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 8,
+      "pid": "rookie-2026-08-kingston-flemings",
+      "chinese_name": "金斯顿·弗莱明斯",
+      "english_name": "Kingston Flemings",
+      "position": "控球后卫/得分后卫",
+      "selected_team": "老鹰",
+      "university_team": "休斯敦大学",
+      "player_template": "罗斯/福克斯/马克西",
+      "tag": {
+        "title": "“穷人版罗斯”弗莱明斯：静态NPC投篮夯爆了 前十还能保住吗？",
+        "url": "https://news.zhibo8.com/nba/2026-06-01/6a1cd0ea1b0denative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Kingston_Flemings.jpg",
+        "card_path": "nba_images/Kingston_Flemings.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Kingston_Flemings.png",
+        "avatar_path": "nba_avatar/Kingston_Flemings.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "kingstonflemings"
+        ]
+      }
+    },
+    {
+      "draft_pick": 9,
+      "pid": "rookie-2026-09-morez-johnson-jr",
+      "chinese_name": "小莫雷兹·约翰逊",
+      "english_name": "Morez Johnson Jr.",
+      "position": "大前锋/中锋",
+      "selected_team": "独行侠",
+      "university_team": "密歇根大学",
+      "player_template": "斯图尔特/奥孔武/阿丘瓦",
+      "tag": {
+        "title": "小莫雷兹·约翰逊：铁血野兽优质冠军拼图 开发三分顺位直逼乐透",
+        "url": "https://news.zhibo8.com/nba/2026-06-15/6a2bf0a1e9c53native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Morez_Johnson_Jr.jpg",
+        "card_path": "nba_images/Morez_Johnson_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Morez_Johnson_Jr.png",
+        "avatar_path": "nba_avatar/Morez_Johnson_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "morezjohnson",
+          "morezjohnsonjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 10,
+      "pid": "rookie-2026-10-brayden-burries",
+      "chinese_name": "布雷登·伯里斯",
+      "english_name": "Brayden Burries",
+      "position": "分卫/控卫",
+      "selected_team": "雄鹿",
+      "university_team": "亚利桑那大学（大一）",
+      "player_template": "德里克·怀特/霍勒迪/亚历山大-沃克",
+      "tag": {
+        "title": "华裔血统乐透热门秀！伯里斯：97公斤强壮双能卫 攻防兼备万金油",
+        "url": "https://news.zhibo8.com/nba/2026-06-03/6a200ff191365native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Brayden_Burries.jpg",
+        "card_path": "nba_images/Brayden_Burries.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Brayden_Burries.png",
+        "avatar_path": "nba_avatar/Brayden_Burries.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "braydenburries"
+        ]
+      }
+    },
+    {
+      "draft_pick": 11,
+      "pid": "rookie-2026-11-yaxel-lendeborg",
+      "chinese_name": "亚克赛尔·伦德博格",
+      "english_name": "Yaxel Lendeborg",
+      "position": "大前锋/小前锋",
+      "selected_team": "勇士",
+      "university_team": "密歇根大学",
+      "player_template": "阿隆·戈登/OG·阿努诺比/赛迪斯·杨",
+      "tag": {
+        "title": "乐透强队目标？伦德博格：大龄多功能即战力 或是争冠队必抢拼图",
+        "url": "https://news.zhibo8.com/nba/2026-06-06/6a1e8687e9e72native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Yaxel_Lendeborg.jpg",
+        "card_path": "nba_images/Yaxel_Lendeborg.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Yaxel_Lendeborg.png",
+        "avatar_path": "nba_avatar/Yaxel_Lendeborg.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "yaxellendeborg"
+        ]
+      }
+    },
+    {
+      "draft_pick": 12,
+      "pid": "rookie-2026-12-aday-mara",
+      "chinese_name": "阿代·马拉",
+      "english_name": "Aday Mara",
+      "position": "中锋",
+      "selected_team": "雷霆",
+      "university_team": "",
+      "player_template": "小加索尔/老萨博尼斯/希伯特/祖巴茨",
+      "tag": {
+        "title": "西班牙中锋杀进前10？马拉：静态天赋真顶级 密歇根夺冠绝对功臣",
+        "url": "https://news.zhibo8.com/nba/2026-06-09/6a27e2e113e5dnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Aday_Mara.jpg",
+        "card_path": "nba_images/Aday_Mara.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Aday_Mara.png",
+        "avatar_path": "nba_avatar/Aday_Mara.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "adaymara"
+        ]
+      }
+    },
+    {
+      "draft_pick": 13,
+      "pid": "rookie-2026-13-nate-ament",
+      "chinese_name": "内特·阿门特",
+      "english_name": "Nate Ament",
+      "position": "大前锋/小前锋",
+      "selected_team": "雄鹿",
+      "university_team": "田纳西大学",
+      "player_template": "库兹马/帕森斯/里萨谢",
+      "tag": {
+        "title": "曾经也是状元热门~阿门特：上下限差距极大的毛坯 乐透谁来赌一把",
+        "url": "https://news.zhibo8.com/nba/2026-06-05/6a1a556306948native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Nate_Ament.jpg",
+        "card_path": "nba_images/Nate_Ament.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Nate_Ament.png",
+        "avatar_path": "nba_avatar/Nate_Ament.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "nateament"
+        ]
+      }
+    },
+    {
+      "draft_pick": 14,
+      "pid": "rookie-2026-14-hannes-steinbach",
+      "chinese_name": "汉内斯·施泰因巴赫",
+      "english_name": "Hannes Steinbach",
+      "position": "中锋",
+      "selected_team": "黄蜂",
+      "university_team": "华盛顿大学",
+      "player_template": "小萨博尼斯/哈尔滕施泰因/大卫·李",
+      "tag": {
+        "title": "哈滕老乡来了~施泰因巴赫：强壮的两双怪兽 需要内线的球队看过来",
+        "url": "https://news.zhibo8.com/nba/2026-06-12/6a23abcc160dfnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Hannes_Steinbach.jpg",
+        "card_path": "nba_images/Hannes_Steinbach.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Hannes_Steinbach.png",
+        "avatar_path": "nba_avatar/Hannes_Steinbach.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "hannessteinbach"
+        ]
+      }
+    },
+    {
+      "draft_pick": 15,
+      "pid": "rookie-2026-15-dailyn-swain",
+      "chinese_name": "戴林·斯温",
+      "english_name": "Dailyn Swain",
+      "position": "小前锋/得分后卫",
+      "selected_team": "公牛",
+      "university_team": "得克萨斯大学",
+      "player_template": "泰瑞克·埃文斯/马绍尔/埃文·特纳",
+      "tag": {
+        "title": "斯温：能突能抢能持球的高大侧翼 或是首轮末捡漏最佳选择？",
+        "url": "https://news.zhibo8.com/nba/2026-06-17/6a2ff137673b2native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Dailyn_Swain.jpg",
+        "card_path": "nba_images/Dailyn_Swain.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Dailyn_Swain.png",
+        "avatar_path": "nba_avatar/Dailyn_Swain.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "dailynswain"
+        ]
+      }
+    },
+    {
+      "draft_pick": 16,
+      "pid": "rookie-2026-16-bennett-stirtz",
+      "chinese_name": "本内特·斯特尔茨",
+      "english_name": "Bennett Stirtz",
+      "position": "组织后卫",
+      "selected_team": "雷霆",
+      "university_team": "",
+      "player_template": "佩顿·普理查德/泰·杰罗姆/安德鲁·内姆哈德",
+      "tag": {
+        "title": "谁家缺铁人+好控卫？斯特尔茨：十足大龄新秀 疯三场场打满全场",
+        "url": "https://news.zhibo8.com/nba/2026-06-14/6a2e5b2a9e086native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Bennett_Stirtz.jpg",
+        "card_path": "nba_images/Bennett_Stirtz.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Bennett_Stirtz.png",
+        "avatar_path": "nba_avatar/Bennett_Stirtz.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "bennettstirtz"
+        ]
+      }
+    },
+    {
+      "draft_pick": 17,
+      "pid": "rookie-2026-17-ebuka-okorie",
+      "chinese_name": "埃布卡·奥科里",
+      "english_name": "Ebuka Okorie",
+      "position": "控卫",
+      "selected_team": "活塞",
+      "university_team": "斯坦福大学（大一）",
+      "player_template": "马克西/施罗德/雷吉·杰克逊",
+      "tag": {
+        "title": "斯坦福跑车！奥科里：力压布泽尔夺ACC得分王 模板马克西/施罗德",
+        "url": "https://news.zhibo8.com/nba/2026-06-20/6a36504ce6c0fnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Ebuka_Okorie.jpg",
+        "card_path": "nba_images/Ebuka_Okorie.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Ebuka_Okorie.png",
+        "avatar_path": "nba_avatar/Ebuka_Okorie.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "ebukaokorie"
+        ]
+      }
+    },
+    {
+      "draft_pick": 18,
+      "pid": "rookie-2026-18-christian-anderson",
+      "chinese_name": "克里斯蒂安·安德森",
+      "english_name": "Christian Anderson",
+      "position": "控卫",
+      "selected_team": "黄蜂",
+      "university_team": "得克萨斯理工大学（大二）",
+      "player_template": "加兰/范弗里特/普理查德",
+      "tag": {
+        "title": "1米85小个指挥官！安德森：德国国青外线火枪手 模板加兰/范乔丹",
+        "url": "https://news.zhibo8.com/nba/2026-06-19/6a34f226b3ff6native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Christian_Anderson.jpg",
+        "card_path": "nba_images/Christian_Anderson.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Christian_Anderson.png",
+        "avatar_path": "nba_avatar/Christian_Anderson.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "christiananderson"
+        ]
+      }
+    },
+    {
+      "draft_pick": 19,
+      "pid": "rookie-2026-19-allen-graves",
+      "chinese_name": "阿伦·格雷夫斯",
+      "english_name": "Allen Graves",
+      "position": "大前锋",
+      "selected_team": "猛龙",
+      "university_team": "圣克拉拉大学（大一）",
+      "player_template": "鲍里斯·迪奥/李凯尔/萨里奇",
+      "tag": {
+        "title": "强力粘合剂！格雷夫斯：控卫出身空间型4号位 模板迪奥/李凯尔",
+        "url": "https://news.zhibo8.com/nba/2026-06-17/6a3269cf2bbfanative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Allen_Graves.jpg",
+        "card_path": "nba_images/Allen_Graves.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Allen_Graves.png",
+        "avatar_path": "nba_avatar/Allen_Graves.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "allengraves"
+        ]
+      }
+    },
+    {
+      "draft_pick": 20,
+      "pid": "rookie-2026-20-jayden-quaintance",
+      "chinese_name": "杰登·奎因坦斯",
+      "english_name": "Jayden Quaintance",
+      "position": "中锋/大前锋",
+      "selected_team": "马刺",
+      "university_team": "",
+      "player_template": "罗伯特·威廉姆斯三世/米切尔·罗宾逊/卡佩拉/诺埃尔",
+      "tag": {
+        "title": "平价版罗威！奎因坦斯：野猫天才内线 存伤病隐患 罚球致敬米切罗",
+        "url": "https://news.zhibo8.com/nba/2026-06-13/6a2cfa7e56b24native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Jayden_Quaintance.jpg",
+        "card_path": "nba_images/Jayden_Quaintance.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Jayden_Quaintance.png",
+        "avatar_path": "nba_avatar/Jayden_Quaintance.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "jaydenquaintance"
+        ]
+      }
+    },
+    {
+      "draft_pick": 21,
+      "pid": "rookie-2026-21-karim-lopez",
+      "chinese_name": "卡里姆·洛佩斯",
+      "english_name": "Karim López",
+      "position": "前锋",
+      "selected_team": "灰熊",
+      "university_team": "新西兰破坏者",
+      "player_template": "阿夫迪亚/约翰·科林斯/阿隆·戈登/巴图姆",
+      "tag": {
+        "title": "墨西哥超新星！K·洛佩斯：攻守两端有迷人潜力 勇士11号签选他？",
+        "url": "https://news.zhibo8.com/nba/2026-06-07/6a2451cfd9457native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Karim_Lopez.jpg",
+        "card_path": "nba_images/Karim_Lopez.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Karim_Lopez.png",
+        "avatar_path": "nba_avatar/Karim_Lopez.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "karimlopez"
+        ]
+      }
+    },
+    {
+      "draft_pick": 22,
+      "pid": "rookie-2026-22-labaron-philon-jr",
+      "chinese_name": "小拉巴隆·菲隆",
+      "english_name": "Labaron Philon Jr.",
+      "position": "控卫",
+      "selected_team": "76人",
+      "university_team": "阿拉巴马大学（大二）",
+      "player_template": "德章泰·穆雷/施罗德/安德鲁·内姆哈德",
+      "tag": {
+        "title": "灵动地板流控卫~菲隆：大二暴涨11.4分 场均轰出22+5敲开乐透大门",
+        "url": "https://news.zhibo8.com/nba/2026-06-08/6a269f62d91b3native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Labaron_Philon_Jr.jpg",
+        "card_path": "nba_images/Labaron_Philon_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Labaron_Philon_Jr.png",
+        "avatar_path": "nba_avatar/Labaron_Philon_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "labaronphilon",
+          "labaronphilonjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 23,
+      "pid": "rookie-2026-23-zuby-ejiofor",
+      "chinese_name": "祖比·埃加福",
+      "english_name": "Zuby Ejiofor",
+      "position": "大前锋/中锋",
+      "selected_team": "老鹰",
+      "university_team": "圣约翰大学",
+      "player_template": "贾雷斯·沃克/博伊尔斯/蒂尔曼",
+      "tag": {
+        "title": "埃加福：四年打磨终成攻防兼备矮壮轰炸机 投篮传控还有进步空间",
+        "url": "https://news.zhibo8.com/nba/2026-06-21/6a32989fc1fc9native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Zuby_Ejiofor.jpg",
+        "card_path": "nba_images/Zuby_Ejiofor.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Zuby_Ejiofor.png",
+        "avatar_path": "nba_avatar/Zuby_Ejiofor.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "zubyejiofor"
+        ]
+      }
+    },
+    {
+      "draft_pick": 24,
+      "pid": "rookie-2026-24-cameron-carr",
+      "chinese_name": "卡梅隆·卡尔",
+      "english_name": "Cameron Carr",
+      "position": "得分后卫",
+      "selected_team": "湖人",
+      "university_team": "贝勒大学（大三）",
+      "player_template": "特雷·墨菲、小蒂姆·哈达威",
+      "tag": {
+        "title": "需要3D侧翼？快看过来！卡尔：保持两项纵跳纪录 联合试训单场30+",
+        "url": "https://news.zhibo8.com/nba/2026-06-10/6a28fdf918444native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Cameron_Carr.jpg",
+        "card_path": "nba_images/Cameron_Carr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Cameron_Carr.png",
+        "avatar_path": "nba_avatar/Cameron_Carr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "camcarr",
+          "cameroncarr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 25,
+      "pid": "rookie-2026-25-sergio-de-larrea",
+      "chinese_name": "塞尔吉奥·德·拉雷亚",
+      "english_name": "Sergio de Larrea",
+      "position": "控球后卫",
+      "selected_team": "独行侠",
+      "university_team": "西甲瓦伦西亚",
+      "player_template": "布罗格登/杰罗姆/萨托兰斯基",
+      "tag": {
+        "title": "德·拉雷亚：少年老成的西班牙高控卫 高薪球队放养解压好选择",
+        "url": "https://news.zhibo8.com/nba/2026-06-23/6a36259e58471native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Sergio_de_Larrea.jpg",
+        "card_path": "nba_images/Sergio_de_Larrea.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Sergio_de_Larrea.png",
+        "avatar_path": "nba_avatar/Sergio_de_Larrea.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "sergiodelarrea",
+          "sergiolarrea"
+        ]
+      }
+    },
+    {
+      "draft_pick": 26,
+      "pid": "rookie-2026-26-tarris-reed-jr",
+      "chinese_name": "小塔里斯·里德",
+      "english_name": "Tarris Reed Jr.",
+      "position": "中锋",
+      "selected_team": "马刺",
+      "university_team": "",
+      "player_template": "查尔斯·奥克利/尼米亚斯·奎塔/戴隆·夏普",
+      "tag": {
+        "title": "单场轰31+27比肩传奇~小里德：大龄新秀 康大内线核心 首轮有戏？",
+        "url": "https://news.zhibo8.com/nba/2026-06-20/6a33673419b3enative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Tarris_Reed_Jr.jpg",
+        "card_path": "nba_images/Tarris_Reed_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Tarris_Reed_Jr.png",
+        "avatar_path": "nba_avatar/Tarris_Reed_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "tarrisreed",
+          "tarrisreedjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 27,
+      "pid": "rookie-2026-27-chris-cenac-jr",
+      "chinese_name": "小克里斯·塞纳克",
+      "english_name": "Chris Cenac Jr.",
+      "position": "大前锋/中锋",
+      "selected_team": "凯尔特人",
+      "university_team": "休斯敦大学（大一）",
+      "player_template": "小贾伦·杰克逊、鲍比·波蒂斯",
+      "tag": {
+        "title": "潜力巨大的机动型内线！塞纳克：身体条件出色 技术还需打磨",
+        "url": "https://news.zhibo8.com/nba/2026-06-11/6a2a82e519a5cnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Chris_Cenac_Jr.jpg",
+        "card_path": "nba_images/Chris_Cenac_Jr.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Chris_Cenac_Jr.png",
+        "avatar_path": "nba_avatar/Chris_Cenac_Jr.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "chriscenac",
+          "chriscenacjr"
+        ]
+      }
+    },
+    {
+      "draft_pick": 28,
+      "pid": "rookie-2026-28-joshua-jefferson",
+      "chinese_name": "约书亚·杰弗森",
+      "english_name": "Joshua Jefferson",
+      "position": "大前锋/小前锋",
+      "selected_team": "篮网",
+      "university_team": "爱荷华州大",
+      "player_template": "迪奥/李凯尔/詹姆斯·约翰逊",
+      "tag": {
+        "title": "打球要用脑~约书亚·杰弗森：地板流重装妖锋 模板迪奥/李凯尔",
+        "url": "https://news.zhibo8.com/nba/2026-06-18/6a3164d75de77native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Joshua_Jefferson.jpg",
+        "card_path": "nba_images/Joshua_Jefferson.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Joshua_Jefferson.png",
+        "avatar_path": "nba_avatar/Joshua_Jefferson.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "joshuajefferson"
+        ]
+      }
+    },
+    {
+      "draft_pick": 29,
+      "pid": "rookie-2026-29-alex-karaban",
+      "chinese_name": "亚历克斯·卡拉班",
+      "english_name": "Alex Karaban",
+      "position": "大前锋/小前锋",
+      "selected_team": "国王",
+      "university_team": "康涅狄格大学",
+      "player_template": "豪泽/尼昂/杜德利",
+      "tag": {
+        "title": "首轮29号秀~卡拉班：射术精湛的康大冠军四号位 能给国王带来什么",
+        "url": "https://news.zhibo8.com/nba/2026-06-24/6a3b6f1c20095native.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Alex_Karaban.jpg",
+        "card_path": "nba_images/Alex_Karaban.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Alex_Karaban.png",
+        "avatar_path": "nba_avatar/Alex_Karaban.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "alexkaraban"
+        ]
+      }
+    },
+    {
+      "draft_pick": 30,
+      "pid": "rookie-2026-30-koa-peat",
+      "chinese_name": "科阿·皮特",
+      "english_name": "Koa Peat",
+      "position": "大前锋",
+      "selected_team": "太阳",
+      "university_team": "亚利桑那大学",
+      "player_template": "阿隆·戈登/PJ·华盛顿/赛迪斯·杨",
+      "tag": {
+        "title": "国青大满贯选手~科阿·皮特：成熟前场润滑剂 投篮拉胯行情暴跌",
+        "url": "https://news.zhibo8.com/nba/2026-06-16/6a2d3dcd50b6dnative.htm"
+      },
+      "asset_targets": {
+        "card_dir": "nba_images",
+        "card_filename": "Koa_Peat.jpg",
+        "card_path": "nba_images/Koa_Peat.jpg",
+        "avatar_dir": "nba_avatar",
+        "avatar_filename": "Koa_Peat.png",
+        "avatar_path": "nba_avatar/Koa_Peat.png",
+        "accepted_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "match_keys": [
+          "koapeat"
+        ]
+      }
+    }
+  ]
+}

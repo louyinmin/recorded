@@ -10,12 +10,18 @@ import unicodedata
 import urllib.parse
 import urllib.request
 from datetime import datetime
+from html.parser import HTMLParser
 
 from flask import current_app, g
 
 
 SINA_API_URL = 'https://slamdunk.sports.sina.com.cn/api'
 SINA_PLAYER_PAGE = 'https://slamdunk.sports.sina.com.cn/player?pid={pid}'
+ZHIBO8_2026_ROOKIES_URL = 'https://news.zhibo8.com/nba/2026-06-24/6a3b1f07f33eenative.htm'
+ROOKIE_2026_TEAM_TID = 'rookies-2026'
+ROOKIE_2026_TEAM_MARKET = '2026'
+ROOKIE_2026_TEAM_NAME = '新秀'
+ROOKIE_2026_TEAM_FULL_NAME = '2026 新秀'
 DEFAULT_TIMEOUT = 20
 DEFAULT_CONCURRENCY = 8
 MAX_CONCURRENCY = 16
@@ -120,6 +126,7 @@ def init_nba_db(db_path):
                 source_updated_at TEXT NOT NULL DEFAULT '',
                 raw_info_json TEXT NOT NULL DEFAULT '{}',
                 raw_stats_json TEXT NOT NULL DEFAULT '{}',
+                extension_json TEXT NOT NULL DEFAULT '{}',
                 image_path TEXT NOT NULL DEFAULT '',
                 image_filename TEXT NOT NULL DEFAULT '',
                 image_url TEXT NOT NULL DEFAULT '',
@@ -172,6 +179,7 @@ def migrate_nba_db(conn):
         'team_image_url': "TEXT NOT NULL DEFAULT ''",
         'team_image_missing': 'INTEGER NOT NULL DEFAULT 1',
         'team_image_checked_at': "TEXT NOT NULL DEFAULT ''",
+        'extension_json': "TEXT NOT NULL DEFAULT '{}'",
     }
     for name, definition in columns.items():
         if not has_column(conn, 'nba_players', name):
@@ -182,13 +190,15 @@ def row_to_player(row):
     if row is None:
         return None
     item = dict(row)
+    extension = load_json_object(item.get('extension_json'), {})
     for key in ('age', 'experience', 'height_cm', 'weight_kg'):
         if item.get(key) is not None:
             item[key] = int(item[key])
     for key in ('salary_wan_usd', 'avg_points', 'avg_rebounds', 'avg_assists', 'avg_steals', 'avg_blocks'):
         if item.get(key) is not None:
             item[key] = float(item[key])
-    item['source'] = 'sina_nba'
+    item['source'] = extension.get('source') or 'sina_nba'
+    item['extension'] = extension
     item['team'] = {
         'tid': item.get('team_tid') or '',
         'market': item.get('team_market') or '',
@@ -238,6 +248,7 @@ def row_to_player(row):
     }
     item.pop('raw_info_json', None)
     item.pop('raw_stats_json', None)
+    item.pop('extension_json', None)
     item.pop('image_path', None)
     item.pop('image_filename', None)
     item.pop('image_url', None)
@@ -272,6 +283,16 @@ def to_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def load_json_object(raw, default_value):
+    try:
+        value = json.loads(raw or '{}')
+    except (TypeError, json.JSONDecodeError):
+        return dict(default_value)
+    if not isinstance(value, dict):
+        return dict(default_value)
+    return value
 
 
 def normalize_name(first_name, last_name, separator):
@@ -420,6 +441,313 @@ def fetch_sina_json(params, timeout=DEFAULT_TIMEOUT):
     return data
 
 
+class Zhibo8ParagraphParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_p = False
+        self.in_a = False
+        self.current_text = []
+        self.current_links = []
+        self.link_href = ''
+        self.link_text = []
+        self.paragraphs = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'p':
+            self.in_p = True
+            self.current_text = []
+            self.current_links = []
+        elif tag == 'a' and self.in_p:
+            self.in_a = True
+            self.link_href = attrs.get('href') or ''
+            self.link_text = []
+
+    def handle_endtag(self, tag):
+        if tag == 'a' and self.in_a:
+            text = normalize_whitespace(''.join(self.link_text))
+            if text or self.link_href:
+                self.current_links.append({
+                    'url': self.link_href,
+                    'title': text,
+                })
+            self.in_a = False
+            self.link_href = ''
+            self.link_text = []
+        elif tag == 'p' and self.in_p:
+            self.paragraphs.append({
+                'text': normalize_whitespace(''.join(self.current_text)),
+                'links': list(self.current_links),
+            })
+            self.in_p = False
+            self.current_text = []
+            self.current_links = []
+
+    def handle_data(self, data):
+        if self.in_p:
+            self.current_text.append(data)
+        if self.in_a:
+            self.link_text.append(data)
+
+
+def normalize_whitespace(value):
+    return re.sub(r'\s+', ' ', str(value or '').replace('\xa0', ' ')).strip()
+
+
+def fetch_zhibo8_html(url, timeout=DEFAULT_TIMEOUT):
+    request = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'text/html,application/xhtml+xml',
+        },
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        charset = response.headers.get_content_charset() or 'utf-8'
+        return response.read().decode(charset, errors='ignore')
+
+
+def parse_zhibo8_paragraphs(html):
+    parser = Zhibo8ParagraphParser()
+    parser.feed(html or '')
+    return parser.paragraphs
+
+
+def zhibo8_absolute_url(url):
+    if not url:
+        return ''
+    if url.startswith('//'):
+        return 'https:' + url
+    return urllib.parse.urljoin(ZHIBO8_2026_ROOKIES_URL, url)
+
+
+def parse_2026_rookie_summary_line(text):
+    match = re.match(r'^(\d+)、(.+?)\s+(\S+)\s+(.+)$', normalize_whitespace(text))
+    if not match:
+        return None
+    pick = to_int(match.group(1))
+    if not pick:
+        return None
+    selection_text = match.group(4).strip()
+    return {
+        'draft_pick': pick,
+        'listed_name': match.group(2).strip(),
+        'listed_position': match.group(3).strip(),
+        'selection_text': selection_text,
+        'selected_team': final_selected_team(selection_text),
+    }
+
+
+def final_selected_team(selection_text):
+    text = normalize_whitespace(selection_text)
+    trade_targets = re.findall(r'(?:送往|送去|送至|交易去|交易至|交易到|转送|送给|加盟)([\u4e00-\u9fa5A-Za-z0-9]+)', text)
+    if trade_targets:
+        return cleanup_team_name(trade_targets[-1])
+    return cleanup_team_name(re.split(r'[（(]', text, 1)[0])
+
+
+def cleanup_team_name(value):
+    return re.sub(r'[，,。.；;：:、\s].*$', '', str(value or '')).strip()
+
+
+def parse_2026_rookie_summaries(html):
+    paragraphs = parse_zhibo8_paragraphs(html)
+    summaries = []
+    for index, paragraph in enumerate(paragraphs):
+        summary = parse_2026_rookie_summary_line(paragraph['text'])
+        if not summary:
+            continue
+        tag = {}
+        for next_paragraph in paragraphs[index + 1:index + 4]:
+            if next_paragraph['links']:
+                link = next_paragraph['links'][0]
+                tag = {
+                    'title': link.get('title') or next_paragraph['text'],
+                    'url': zhibo8_absolute_url(link.get('url') or ''),
+                }
+                break
+            if parse_2026_rookie_summary_line(next_paragraph['text']):
+                break
+        summary['tag'] = tag
+        summaries.append(summary)
+    return summaries
+
+
+def parse_2026_rookie_detail(html):
+    paragraphs = parse_zhibo8_paragraphs(html)
+    fields = {}
+    stats_text = ''
+    previous_label = ''
+    for paragraph in paragraphs:
+        text = paragraph['text']
+        if not text:
+            continue
+        if '：' in text:
+            key, value = text.split('：', 1)
+            key = key.strip()
+            value = value.strip()
+            if key == '数据统计':
+                previous_label = key
+                if value:
+                    stats_text = value
+                continue
+            if key and value:
+                fields[key] = value
+                previous_label = ''
+                continue
+        if previous_label == '数据统计' and not stats_text:
+            stats_text = text
+            previous_label = ''
+    chinese_name, english_name = split_rookie_name(fields.get('姓名', ''))
+    university_team = fields.get('大学球队') or fields.get('球队') or ''
+    return {
+        'chinese_name': chinese_name,
+        'english_name': english_name,
+        'birthdate': fields.get('出生日期') or '',
+        'position': fields.get('位置') or '',
+        'university_team': university_team,
+        'height': fields.get('身高') or fields.get('裸足身高') or '',
+        'weight': fields.get('体重') or '',
+        'wingspan': fields.get('臂展') or '',
+        'player_template': fields.get('球员模板') or '',
+        'stats_text': stats_text,
+    }
+
+
+def split_rookie_name(value):
+    value = normalize_whitespace(value)
+    match = re.match(r'^(.+?)（(.+?)）$', value)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+    return value, ''
+
+
+def parse_metric_cm(value):
+    match = re.search(r'（(\d+)米(\d+)）', str(value or ''))
+    if match:
+        return int(match.group(1)) * 100 + int(match.group(2))
+    match = re.search(r'（(\d+)cm）', str(value or ''), re.I)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def parse_metric_kg(value):
+    match = re.search(r'（(\d+)公斤）', str(value or ''))
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def rookie_pid(pick, english_name, tag_url):
+    source = english_name or tag_url or str(pick)
+    safe = re.sub(r'[^a-z0-9]+', '-', strip_accents(source).lower()).strip('-')
+    if not safe:
+        safe = 'pick-{}'.format(pick)
+    return 'rookie-2026-{:02d}-{}'.format(pick, safe[:48])
+
+
+def build_2026_rookie_record(summary, detail, tag_url):
+    now = utcnow_iso()
+    chinese_name = detail.get('chinese_name') or summary.get('listed_name') or ''
+    english_name = detail.get('english_name') or ''
+    english_parts = [part for part in re.split(r'\s+', english_name) if part]
+    extension = {
+        'source': 'zhibo8_2026_rookies',
+        'rookie': {
+            'draft_year': 2026,
+            'draft_pick': summary['draft_pick'],
+            'listed_name': summary.get('listed_name') or '',
+            'listed_position': summary.get('listed_position') or '',
+            'selection_text': summary.get('selection_text') or '',
+            'selected_team': summary.get('selected_team') or '',
+            'tag': summary.get('tag') or {},
+            'university_team': detail.get('university_team') or '',
+            'height': detail.get('height') or '',
+            'weight': detail.get('weight') or '',
+            'wingspan': detail.get('wingspan') or '',
+            'player_template': detail.get('player_template') or '',
+            'stats_text': detail.get('stats_text') or '',
+        },
+    }
+    return {
+        'pid': rookie_pid(summary['draft_pick'], english_name, tag_url),
+        'first_name': english_parts[0] if english_parts else '',
+        'last_name': ' '.join(english_parts[1:]) if len(english_parts) > 1 else '',
+        'first_name_cn': chinese_name,
+        'last_name_cn': '',
+        'chinese_name': chinese_name,
+        'english_name': english_name,
+        'team_tid': ROOKIE_2026_TEAM_TID,
+        'team_market': ROOKIE_2026_TEAM_MARKET,
+        'team_name': ROOKIE_2026_TEAM_NAME,
+        'team_full_name': ROOKIE_2026_TEAM_FULL_NAME,
+        'jersey_number': str(summary['draft_pick']),
+        'primary_position': detail.get('position') or summary.get('listed_position') or '',
+        'position': detail.get('position') or summary.get('listed_position') or '',
+        'birthdate': detail.get('birthdate') or '',
+        'age': None,
+        'nation': '',
+        'college': detail.get('university_team') or '',
+        'experience': None,
+        'draft_year': '2026',
+        'draft_round': '1',
+        'draft_pick': str(summary['draft_pick']),
+        'height_cm': parse_metric_cm(detail.get('height')),
+        'weight_kg': parse_metric_kg(detail.get('weight')),
+        'wingspan': detail.get('wingspan') or '',
+        'standing_reach': '',
+        'salary_wan_usd': None,
+        'current_salary': '',
+        'avg_points': None,
+        'avg_rebounds': None,
+        'avg_assists': None,
+        'avg_steals': None,
+        'avg_blocks': None,
+        'source_url': tag_url,
+        'source_updated_at': now,
+        'raw_info_json': json.dumps({'summary': summary, 'detail': detail}, ensure_ascii=False, sort_keys=True),
+        'raw_stats_json': '{}',
+        'extension_json': json.dumps(extension, ensure_ascii=False, sort_keys=True),
+        'created_at': now,
+        'updated_at': now,
+    }
+
+
+def collect_2026_rookies(draft_url=ZHIBO8_2026_ROOKIES_URL):
+    draft_html = fetch_zhibo8_html(draft_url)
+    records = []
+    errors = []
+    for summary in parse_2026_rookie_summaries(draft_html):
+        tag_url = (summary.get('tag') or {}).get('url') or ''
+        if not tag_url:
+            errors.append({'draft_pick': summary['draft_pick'], 'error': 'missing rookie detail link'})
+            continue
+        try:
+            detail = parse_2026_rookie_detail(fetch_zhibo8_html(tag_url))
+            records.append(build_2026_rookie_record(summary, detail, tag_url))
+        except Exception as exc:
+            errors.append({'draft_pick': summary['draft_pick'], 'url': tag_url, 'error': str(exc)})
+    return records, errors
+
+
+def sync_2026_rookies(conn, draft_url=ZHIBO8_2026_ROOKIES_URL):
+    started = time.time()
+    records, errors = collect_2026_rookies(draft_url)
+    for player in records:
+        upsert_player(conn, player)
+    conn.commit()
+    return {
+        'source_url': draft_url,
+        'team_full_name': ROOKIE_2026_TEAM_FULL_NAME,
+        'requested_count': len(records) + len(errors),
+        'succeeded_count': len(records),
+        'failed_count': len(errors),
+        'errors': errors,
+        'elapsed_seconds': round(time.time() - started, 3),
+    }
+
+
 def sina_data(payload):
     return payload.get('result', {}).get('data') or {}
 
@@ -527,6 +855,7 @@ def build_player_record(info_payload, leaders_payload):
         'source_updated_at': info_payload.get('result', {}).get('timestamp') or now,
         'raw_info_json': json.dumps(info_payload, ensure_ascii=False, sort_keys=True),
         'raw_stats_json': json.dumps(leaders_payload, ensure_ascii=False, sort_keys=True),
+        'extension_json': '{}',
         'created_at': now,
         'updated_at': now,
     }
@@ -551,14 +880,14 @@ def upsert_player(conn, player):
             birthdate, age, nation, college, experience, draft_year, draft_round, draft_pick,
             height_cm, weight_kg, wingspan, standing_reach, salary_wan_usd, current_salary,
             avg_points, avg_rebounds, avg_assists, avg_steals, avg_blocks, source_url,
-            source_updated_at, raw_info_json, raw_stats_json, created_at, updated_at
+            source_updated_at, raw_info_json, raw_stats_json, extension_json, created_at, updated_at
         ) VALUES (
             :pid, :first_name, :last_name, :first_name_cn, :last_name_cn, :chinese_name, :english_name,
             :team_tid, :team_market, :team_name, :team_full_name, :jersey_number, :primary_position, :position,
             :birthdate, :age, :nation, :college, :experience, :draft_year, :draft_round, :draft_pick,
             :height_cm, :weight_kg, :wingspan, :standing_reach, :salary_wan_usd, :current_salary,
             :avg_points, :avg_rebounds, :avg_assists, :avg_steals, :avg_blocks, :source_url,
-            :source_updated_at, :raw_info_json, :raw_stats_json, :created_at, :updated_at
+            :source_updated_at, :raw_info_json, :raw_stats_json, :extension_json, :created_at, :updated_at
         )
         ON CONFLICT(pid) DO UPDATE SET
             first_name=excluded.first_name,
@@ -597,6 +926,7 @@ def upsert_player(conn, player):
             source_updated_at=excluded.source_updated_at,
             raw_info_json=excluded.raw_info_json,
             raw_stats_json=excluded.raw_stats_json,
+            extension_json=excluded.extension_json,
             updated_at=excluded.updated_at
         ''',
         values,

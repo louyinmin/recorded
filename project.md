@@ -256,7 +256,10 @@ CREATE TABLE categories (
 | `/api/nba/sync/images` | POST | 按球员英文名匹配 `nba_images` 目录下的球星卡图片 |
 | `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
 | `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
+| `/api/nba/sync/rookies-2026` | POST | 从直播吧 2026 首轮选秀页面采集新秀并归到“2026 新秀”球队分类 |
 | `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
+
+2026 新秀的选中球队、详情标签、大学球队、体测、模板和数据统计保存在 `extension.rookie`，不覆盖现役球员球队字段。
 
 NBA 用户配置 `config` 字段包含 `associated_home_player_pid` 球星卡 PID 数组、`current_home_player_pid` 当前首页球员 PID 或 `null`、`search_default_player_pid` 搜索页固定球员 PID 数组。
 
