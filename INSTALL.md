@@ -193,6 +193,7 @@ POST /api/wechat/session
 ```text
 GET /api/nba/user-config
 PATCH /api/nba/user-config
+GET /api/nba/players/batch?pids=player_pid_1,player_pid_2
 GET /api/timing/plan-config
 PUT /api/timing/plan-config
 PATCH /api/timing/plan-config/default-task-duration
@@ -208,6 +209,20 @@ NBA 用户配置请求和响应中的 `config` 结构：
   "associated_home_player_pid": ["player_pid_1", "player_pid_2"],
   "current_home_player_pid": "player_pid_2",
   "search_default_player_pid": ["player_pid_3"]
+}
+```
+
+`GET /api/nba/user-config` also returns additive `homeCards` metadata for the NBA Mini Program home cache:
+
+```json
+{
+  "homeCards": {
+    "pids": ["player_pid_1", "player_pid_2"],
+    "currentPid": "player_pid_2",
+    "configUpdatedAt": "2026-06-19T00:00:00",
+    "playersUpdatedAt": "2026-06-20T08:30:00",
+    "dataVersion": "home_8f3c0d9a1b2c"
+  }
 }
 ```
 

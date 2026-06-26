@@ -11,8 +11,11 @@ from wechat_backend.service import (
 )
 
 from .service import (
+    MAX_BATCH_PLAYER_PIDS,
     get_nba_db,
     get_player,
+    home_cards_metadata,
+    list_players_batch,
     list_filter_options,
     list_missing_avatars,
     list_missing_images,
@@ -75,6 +78,7 @@ def read_user_config():
         'app': NBA_APP,
         'config': config,
         'updatedAt': updated_at,
+        'homeCards': home_cards_metadata(get_nba_db(), NBA_APP, config, updated_at),
     })
 
 
@@ -94,6 +98,7 @@ def update_user_config():
         'app': NBA_APP,
         'config': config,
         'updatedAt': updated_at,
+        'homeCards': home_cards_metadata(get_nba_db(), NBA_APP, config, updated_at),
     })
 
 
@@ -128,6 +133,16 @@ def search_players():
         name_only=True,
     )
     return jsonify({'items': items, 'total': total})
+
+
+@nba_bp.route('/players/batch', methods=['GET'])
+def players_batch():
+    raw_pids = request.args.get('pids', '')
+    try:
+        result = list_players_batch(get_nba_db(), raw_pids)
+    except ValueError:
+        return jsonify({'message': 'too many pids', 'limit': MAX_BATCH_PLAYER_PIDS}), 400
+    return jsonify(result)
 
 
 @nba_bp.route('/filters', methods=['GET'])

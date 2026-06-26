@@ -190,6 +190,53 @@ The response is one player object, using the same player structure shown in `Lis
 }
 ```
 
+### Batch Get Player Details
+
+```http
+GET /api/nba/players/batch?pids={pid1},{pid2}
+```
+
+Returns full player detail objects using the same shape as `GET /api/nba/players/{pid}`.
+Requested PIDs are trimmed, empty values are ignored, and duplicates are removed while preserving the first occurrence order.
+
+#### Query Parameters
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `pids` | string | Yes | Comma-separated player PIDs. Max `50` unique PIDs. |
+
+#### Example
+
+```http
+GET /api/nba/players/batch?pids=player_pid_1,player_pid_2
+```
+
+#### Success Response
+
+```json
+{
+  "items": [
+    {
+      "pid": "player_pid_1",
+      "chinese_name": "Player One",
+      "english_name": "Player One",
+      "updated_at": "2026-06-20T08:30:00"
+    }
+  ],
+  "missingPids": ["unknown_player_pid"],
+  "dataVersion": "home_8f3c0d9a1b2c"
+}
+```
+
+#### Too Many PIDs Response
+
+```json
+{
+  "message": "too many pids",
+  "limit": 50
+}
+```
+
 ### Get Filter Options
 
 ```http

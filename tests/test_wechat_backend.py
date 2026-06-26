@@ -41,6 +41,20 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.addCleanup(lambda: setattr(service, 'exchange_wechat_code', original_service))
         self.addCleanup(lambda: setattr(routes, 'exchange_wechat_code', original_routes))
 
+    def insert_nba_player(self, pid, updated_at, chinese_name='测试球员', english_name='Test Player'):
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            conn.execute(
+                '''
+                INSERT INTO nba_players (pid, chinese_name, english_name, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ''',
+                (pid, chinese_name, english_name, updated_at, updated_at),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def test_session_requires_code(self):
         response = self.client.post('/api/wechat/session', json={})
 
@@ -327,6 +341,74 @@ class WeChatBackendTestCase(unittest.TestCase):
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.get_json(), {'message': 'invalid nba user config'})
+
+    def test_nba_user_config_returns_home_cards_metadata_and_version(self):
+        def fake_exchange(appid, secret, code):
+            return {
+                'openid': 'home-cache-openid',
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+        self.insert_nba_player('player-a', '2026-06-20T08:20:00', '球员A', 'Player A')
+        self.insert_nba_player('player-b', '2026-06-20T08:30:00', '球员B', 'Player B')
+
+        session = self.client.post('/api/nba/wechat/session', json={'code': 'home-cache'})
+        token = session.get_json()['sessionToken']
+        headers = {'Authorization': 'Bearer ' + token}
+
+        default_config = self.client.get('/api/nba/user-config', headers=headers)
+        self.assertEqual(default_config.status_code, 200)
+        default_home_cards = default_config.get_json()['homeCards']
+        self.assertEqual(default_home_cards['pids'], [])
+        self.assertIsNone(default_home_cards['currentPid'])
+        self.assertIsNone(default_home_cards['configUpdatedAt'])
+        self.assertIsNone(default_home_cards['playersUpdatedAt'])
+        self.assertTrue(default_home_cards['dataVersion'].startswith('home_'))
+
+        updated = self.client.patch(
+            '/api/nba/user-config',
+            json={'config': {
+                'associated_home_player_pid': ['player-a', 'player-b'],
+                'current_home_player_pid': 'player-b',
+            }},
+            headers=headers,
+        )
+        self.assertEqual(updated.status_code, 200)
+
+        response = self.client.get('/api/nba/user-config', headers=headers)
+        payload = response.get_json()
+        home_cards = payload['homeCards']
+        self.assertEqual(home_cards['pids'], ['player-a', 'player-b'])
+        self.assertEqual(home_cards['currentPid'], 'player-b')
+        self.assertEqual(home_cards['configUpdatedAt'], payload['updatedAt'])
+        self.assertEqual(home_cards['playersUpdatedAt'], '2026-06-20T08:30:00')
+
+        repeat = self.client.get('/api/nba/user-config', headers=headers)
+        self.assertEqual(repeat.get_json()['homeCards']['dataVersion'], home_cards['dataVersion'])
+
+        current_changed = self.client.patch(
+            '/api/nba/user-config',
+            json={'config': {'current_home_player_pid': 'player-a'}},
+            headers=headers,
+        )
+        self.assertNotEqual(
+            current_changed.get_json()['homeCards']['dataVersion'],
+            home_cards['dataVersion'],
+        )
+
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            conn.execute(
+                "UPDATE nba_players SET jersey_number='8', updated_at='2026-06-20T09:00:00' WHERE pid='player-a'"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        player_changed = self.client.get('/api/nba/user-config', headers=headers).get_json()['homeCards']
+        self.assertEqual(player_changed['playersUpdatedAt'], '2026-06-20T09:00:00')
+        self.assertNotEqual(player_changed['dataVersion'], current_changed.get_json()['homeCards']['dataVersion'])
 
     def test_nba_user_config_reads_legacy_home_player_string_as_list(self):
         def fake_exchange(appid, secret, code):

@@ -1,6 +1,7 @@
 """Services for collecting and serving Sina NBA player data."""
 
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,7 @@ ROOKIE_2026_TEAM_FULL_NAME = '2026 新秀'
 DEFAULT_TIMEOUT = 20
 DEFAULT_CONCURRENCY = 8
 MAX_CONCURRENCY = 16
+MAX_BATCH_PLAYER_PIDS = 50
 TEAM_IMAGE_NAMES_BY_FULL_NAME = {
     '亚特兰大老鹰': 'Atlanta Hawks',
     '波士顿凯尔特人': 'Boston Celtics',
@@ -265,6 +267,92 @@ def row_to_player(row):
     item.pop('team_image_missing', None)
     item.pop('team_image_checked_at', None)
     return item
+
+
+def normalize_player_pid_list(value):
+    if value is None:
+        return []
+    if isinstance(value, str):
+        source = value.split(',')
+    else:
+        source = value
+    if not isinstance(source, list):
+        raise ValueError('invalid player pid list')
+    seen = set()
+    pids = []
+    for item in source:
+        if not isinstance(item, str):
+            raise ValueError('invalid player pid list')
+        pid = item.strip()
+        if pid and pid not in seen:
+            seen.add(pid)
+            pids.append(pid)
+    return pids
+
+
+def normalize_player_pid(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError('invalid player pid')
+    return value.strip() or None
+
+
+def home_cards_hash(payload):
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    return 'home_' + hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]
+
+
+def player_render_version(row):
+    if row is None:
+        return None
+    extension = load_json_object(row['extension_json'], {})
+    return {
+        'pid': row['pid'],
+        'updated_at': row['updated_at'],
+        'chinese_name': row['chinese_name'],
+        'english_name': row['english_name'],
+        'first_name': row['first_name'],
+        'last_name': row['last_name'],
+        'first_name_cn': row['first_name_cn'],
+        'last_name_cn': row['last_name_cn'],
+        'jersey_number': row['jersey_number'],
+        'primary_position': row['primary_position'],
+        'position': row['position'],
+        'team_tid': row['team_tid'],
+        'team_market': row['team_market'],
+        'team_name': row['team_name'],
+        'team_full_name': row['team_full_name'],
+        'team_image_filename': row['team_image_filename'],
+        'team_image_url': row['team_image_url'],
+        'team_image_missing': bool(row['team_image_missing']),
+        'birthdate': row['birthdate'],
+        'age': row['age'],
+        'nation': row['nation'],
+        'college': row['college'],
+        'experience': row['experience'],
+        'draft_year': row['draft_year'],
+        'draft_round': row['draft_round'],
+        'draft_pick': row['draft_pick'],
+        'height_cm': row['height_cm'],
+        'weight_kg': row['weight_kg'],
+        'wingspan': row['wingspan'],
+        'standing_reach': row['standing_reach'],
+        'current_salary': row['current_salary'],
+        'salary_wan_usd': row['salary_wan_usd'],
+        'avg_points': row['avg_points'],
+        'avg_rebounds': row['avg_rebounds'],
+        'avg_assists': row['avg_assists'],
+        'avg_steals': row['avg_steals'],
+        'avg_blocks': row['avg_blocks'],
+        'extension': extension,
+        'image_filename': row['image_filename'],
+        'image_url': row['image_url'],
+        'image_missing': bool(row['image_missing']),
+        'avatar_filename': row['avatar_filename'],
+        'avatar_url': row['avatar_url'],
+        'avatar_missing': bool(row['avatar_missing']),
+    }
 
 
 def to_int(value):
@@ -1237,6 +1325,83 @@ def list_filter_options(conn):
 def get_player(conn, pid):
     row = conn.execute('SELECT * FROM nba_players WHERE pid=?', (pid,)).fetchone()
     return row_to_player(row)
+
+
+def get_player_rows_by_pids(conn, pids):
+    pids = normalize_player_pid_list(pids)
+    if not pids:
+        return {}
+    placeholders = ','.join('?' for _ in pids)
+    rows = conn.execute(
+        'SELECT * FROM nba_players WHERE pid IN ({})'.format(placeholders),
+        pids,
+    ).fetchall()
+    return {row['pid']: row for row in rows}
+
+
+def home_cards_metadata(conn, app, config, config_updated_at):
+    config = config or {}
+    pids = normalize_player_pid_list(config.get('associated_home_player_pid'))
+    current_pid = normalize_player_pid(config.get('current_home_player_pid'))
+    player_rows = get_player_rows_by_pids(conn, pids)
+    ordered_versions = [
+        player_render_version(player_rows.get(pid))
+        for pid in pids
+    ]
+    updated_values = [
+        player_rows[pid]['updated_at']
+        for pid in pids
+        if pid in player_rows and player_rows[pid]['updated_at']
+    ]
+    players_updated_at = max(updated_values) if updated_values else None
+    data_version = home_cards_hash({
+        'scope': 'homeCards',
+        'app': app,
+        'pids': pids,
+        'currentPid': current_pid,
+        'configUpdatedAt': config_updated_at,
+        'playersUpdatedAt': players_updated_at,
+        # Include render fingerprints so non-max player changes and missing-state changes
+        # cannot be hidden behind an unchanged aggregate timestamp.
+        'players': ordered_versions,
+    })
+    return {
+        'pids': pids,
+        'currentPid': current_pid,
+        'configUpdatedAt': config_updated_at,
+        'playersUpdatedAt': players_updated_at,
+        'dataVersion': data_version,
+    }
+
+
+def list_players_batch(conn, pids):
+    pids = normalize_player_pid_list(pids)
+    if len(pids) > MAX_BATCH_PLAYER_PIDS:
+        raise ValueError('too many pids')
+    player_rows = get_player_rows_by_pids(conn, pids)
+    items = [
+        row_to_player(player_rows[pid])
+        for pid in pids
+        if pid in player_rows
+    ]
+    missing_pids = [
+        pid
+        for pid in pids
+        if pid not in player_rows
+    ]
+    data_version = home_cards_hash({
+        'scope': 'playersBatch',
+        'pids': pids,
+        'players': [
+            player_render_version(player_rows.get(pid))
+            for pid in pids
+        ],
+    })
+    return {
+        'items': items,
+        'missingPids': missing_pids,
+        'dataVersion': data_version,
+    }
 
 
 def list_missing_images(conn):

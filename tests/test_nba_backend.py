@@ -372,6 +372,50 @@ class NbaBackendTestCase(unittest.TestCase):
         self.assertEqual(payload['total'], 1)
         self.assertEqual(payload['items'][0]['pid'], PLAYER_PID)
 
+    def test_players_batch_returns_details_in_request_order_with_version(self):
+        self.patch_sina_fetch()
+        response = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})
+        self.assertEqual(response.status_code, 200)
+
+        batch = self.client.get(
+            '/api/nba/players/batch?pids={0},missing-player,{1},{0}'.format(PLAYER_PID, SECOND_PID)
+        )
+
+        self.assertEqual(batch.status_code, 200)
+        payload = batch.get_json()
+        self.assertEqual([item['pid'] for item in payload['items']], [PLAYER_PID, SECOND_PID])
+        self.assertEqual(payload['missingPids'], ['missing-player'])
+        self.assertTrue(payload['dataVersion'].startswith('home_'))
+        self.assertEqual(payload['items'][0]['team']['full_name'], '洛杉矶湖人')
+        self.assertEqual(payload['items'][1]['profile']['draft_year'], '2017')
+
+        repeat = self.client.get(
+            '/api/nba/players/batch?pids={0},missing-player,{1},{0}'.format(PLAYER_PID, SECOND_PID)
+        )
+        self.assertEqual(repeat.status_code, 200)
+        self.assertEqual(repeat.get_json()['dataVersion'], payload['dataVersion'])
+
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            conn.execute(
+                "UPDATE nba_players SET jersey_number='11', updated_at='2026-06-20T08:30:00' WHERE pid=?",
+                (SECOND_PID,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        changed = self.client.get('/api/nba/players/batch?pids={},{}'.format(PLAYER_PID, SECOND_PID))
+        self.assertNotEqual(changed.get_json()['dataVersion'], payload['dataVersion'])
+
+    def test_players_batch_rejects_too_many_pids(self):
+        pids = ','.join('player-{}'.format(index) for index in range(51))
+
+        response = self.client.get('/api/nba/players/batch?pids=' + pids)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'message': 'too many pids', 'limit': 50})
+
     def test_players_support_team_position_filters_and_name_search(self):
         self.patch_sina_fetch()
         response = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})

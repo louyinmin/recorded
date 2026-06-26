@@ -243,6 +243,7 @@ CREATE TABLE categories (
 |------|------|------|
 | `/api/nba/players` | GET | 小程序读取球员列表，支持 `q`、`teamTid`、`team`、`position`、`limit`、`offset` |
 | `/api/nba/players/search` | GET | 按中文名或英文名搜索球员，支持 `q`、`keyword`、`name` |
+| `/api/nba/players/batch` | GET | 按 `pids` 批量读取完整球员详情，返回 `missingPids` 和 `dataVersion` |
 | `/api/nba/players/:pid` | GET | 小程序读取单个球员详情 |
 | `/api/nba/filters` | GET | 获取球队和位置筛选项 |
 | `/api/nba/images/:filename` | GET | 展示本地球星卡图片 |
