@@ -470,13 +470,88 @@ class NbaBackendTestCase(unittest.TestCase):
         image = detail.get_json()['image']
         self.assertFalse(image['missing'])
         self.assertEqual(image['filename'], 'Luke_Kennard.jpg')
-        self.assertEqual(image['url'], '/api/nba/images/Luke_Kennard.jpg')
+        self.assertEqual(image['url'], '/api/nba/card-images/Luke_Kennard.jpg')
         self.assertNotIn('path', image)
         self.assertNotIn('image_path', detail.get_json())
+        cards = detail.get_json()['cards']
+        self.assertEqual([card['cardId'] for card in cards], [PLAYER_PID + '_default'])
+        self.assertEqual(cards[0]['image']['filename'], 'Luke_Kennard.jpg')
 
         missing = self.client.get('/api/nba/images/missing')
         self.assertEqual(missing.status_code, 200)
         self.assertEqual(missing.get_json()['items'][0]['pid'], SECOND_PID)
+
+    def test_sync_images_supports_numbered_english_name_cards(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})
+        self.assertEqual(synced.status_code, 200)
+        with open(os.path.join(self.nba_image_dir, 'Luke_Kennard_1.jpg'), 'wb') as handle:
+            handle.write(b'second-card')
+        with open(os.path.join(self.nba_image_dir, 'Luke_Kennard_2.jpg'), 'wb') as handle:
+            handle.write(b'third-card')
+
+        images = self.client.post('/api/nba/sync/images')
+        self.assertEqual(images.status_code, 200)
+        result = images.get_json()['result']
+        self.assertEqual(result['matched_count'], 1)
+        self.assertEqual(result['card_count'], 3)
+        self.assertEqual(result['namingRule']['preferred'], 'English_Name.{ext}, English_Name_1.{ext}, English_Name_2.{ext}')
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        cards = detail.get_json()['cards']
+        self.assertEqual(
+            [card['cardId'] for card in cards],
+            [PLAYER_PID + '_default', PLAYER_PID + '_1', PLAYER_PID + '_2'],
+        )
+        self.assertEqual([card['sortOrder'] for card in cards], [10, 20, 30])
+        self.assertEqual(
+            [card['image']['filename'] for card in cards],
+            ['Luke_Kennard.jpg', 'Luke_Kennard_1.jpg', 'Luke_Kennard_2.jpg'],
+        )
+        self.assertEqual(detail.get_json()['image']['filename'], 'Luke_Kennard.jpg')
+
+    def test_sync_images_supports_multiple_pid_named_cards(self):
+        self.patch_sina_fetch()
+        synced = self.client.post('/api/nba/sync', json={'limitTeams': 1, 'concurrency': 2})
+        self.assertEqual(synced.status_code, 200)
+        os.remove(os.path.join(self.nba_image_dir, 'Luke_Kennard.jpg'))
+        with open(os.path.join(self.nba_image_dir, PLAYER_PID + '_2024_base.jpg'), 'wb') as handle:
+            handle.write(b'base-card')
+        with open(os.path.join(self.nba_image_dir, PLAYER_PID + '_2024_alt.jpg'), 'wb') as handle:
+            handle.write(b'alt-card')
+
+        images = self.client.post('/api/nba/sync/images')
+        self.assertEqual(images.status_code, 200)
+        result = images.get_json()['result']
+        self.assertEqual(result['matched_count'], 1)
+        self.assertEqual(result['card_count'], 2)
+        self.assertEqual(result['namingRule']['pidPreferred'], '{pid}_{season}_{variant}.{ext}')
+
+        detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
+        self.assertEqual(detail.status_code, 200)
+        detail_payload = detail.get_json()
+        self.assertEqual(
+            [card['cardId'] for card in detail_payload['cards']],
+            [PLAYER_PID + '_2024_base', PLAYER_PID + '_2024_alt'],
+        )
+        self.assertEqual([card['sortOrder'] for card in detail_payload['cards']], [10, 20])
+        self.assertEqual(detail_payload['image']['filename'], PLAYER_PID + '_2024_base.jpg')
+
+        cards = self.client.get('/api/nba/players/{}/cards'.format(PLAYER_PID))
+        self.assertEqual(cards.status_code, 200)
+        self.assertEqual(len(cards.get_json()['items']), 2)
+
+        batch = self.client.get('/api/nba/players/batch?pids={}'.format(PLAYER_PID))
+        self.assertEqual(batch.status_code, 200)
+        self.assertEqual(len(batch.get_json()['items'][0]['cards']), 2)
+
+        image = self.client.get('/api/nba/card-images/' + PLAYER_PID + '_2024_base.jpg')
+        try:
+            self.assertEqual(image.status_code, 200)
+            self.assertEqual(image.data, b'base-card')
+        finally:
+            image.close()
 
     def test_sync_avatars_links_headshots_and_marks_missing(self):
         self.patch_sina_fetch()

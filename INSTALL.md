@@ -219,8 +219,14 @@ NBA 用户配置请求和响应中的 `config` 结构：
   "homeCards": {
     "pids": ["player_pid_1", "player_pid_2"],
     "currentPid": "player_pid_2",
+    "currentCardId": "player_pid_2_2024_base",
+    "cardSelection": {
+      "player_pid_1": "player_pid_1_2024_base",
+      "player_pid_2": "player_pid_2_2024_base"
+    },
     "configUpdatedAt": "2026-06-19T00:00:00",
     "playersUpdatedAt": "2026-06-20T08:30:00",
+    "cardsUpdatedAt": "2026-06-20T08:30:00",
     "dataVersion": "home_8f3c0d9a1b2c"
   }
 }

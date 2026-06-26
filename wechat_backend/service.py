@@ -22,6 +22,8 @@ WECHAT_PROJECTS = {NBA_APP, TIMING_PROJECT}
 DEFAULT_NBA_USER_CONFIG = {
     'associated_home_player_pid': [],
     'current_home_player_pid': None,
+    'current_home_card_id': None,
+    'home_player_card_selection': {},
     'search_default_player_pid': [],
 }
 TIMING_DEFAULT_TASK_DURATIONS = {
@@ -400,6 +402,31 @@ def normalize_nba_player_pid_list(value):
     return players
 
 
+def normalize_nba_card_id(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError('invalid nba card id')
+    return value.strip() or None
+
+
+def normalize_nba_player_card_selection(value):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError('invalid nba player card selection')
+    result = {}
+    for raw_pid, raw_card_id in value.items():
+        if not isinstance(raw_pid, str) or not isinstance(raw_card_id, str):
+            raise ValueError('invalid nba player card selection')
+        pid = raw_pid.strip()
+        card_id = raw_card_id.strip()
+        if not pid or not card_id:
+            raise ValueError('invalid nba player card selection')
+        result[pid] = card_id
+    return result
+
+
 def normalize_nba_user_config(config, strict_unknown=True):
     result = dict(DEFAULT_NBA_USER_CONFIG)
     if not isinstance(config, dict):
@@ -415,6 +442,14 @@ def normalize_nba_user_config(config, strict_unknown=True):
     if 'current_home_player_pid' in config:
         result['current_home_player_pid'] = normalize_nba_player_pid(
             config.get('current_home_player_pid')
+        )
+    if 'current_home_card_id' in config:
+        result['current_home_card_id'] = normalize_nba_card_id(
+            config.get('current_home_card_id')
+        )
+    if 'home_player_card_selection' in config:
+        result['home_player_card_selection'] = normalize_nba_player_card_selection(
+            config.get('home_player_card_selection')
         )
     if 'search_default_player_pid' in config:
         result['search_default_player_pid'] = normalize_nba_player_pid_list(

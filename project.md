@@ -243,10 +243,12 @@ CREATE TABLE categories (
 |------|------|------|
 | `/api/nba/players` | GET | 小程序读取球员列表，支持 `q`、`teamTid`、`team`、`position`、`limit`、`offset` |
 | `/api/nba/players/search` | GET | 按中文名或英文名搜索球员，支持 `q`、`keyword`、`name` |
-| `/api/nba/players/batch` | GET | 按 `pids` 批量读取完整球员详情，返回 `missingPids` 和 `dataVersion` |
-| `/api/nba/players/:pid` | GET | 小程序读取单个球员详情 |
+| `/api/nba/players/batch` | GET | Read full player details by `pids`; each item includes ordered `cards`, `missingPids`, and `dataVersion` |
+| `/api/nba/players/:pid` | GET | Read one full player detail; includes ordered `cards` and compatibility `image` |
+| `/api/nba/players/:pid/cards` | GET | Read ordered card variants for one player |
 | `/api/nba/filters` | GET | 获取球队和位置筛选项 |
-| `/api/nba/images/:filename` | GET | 展示本地球星卡图片 |
+| `/api/nba/card-images/:filename` | GET | Serve local player card images from `NBA_IMAGE_DIR` |
+| `/api/nba/images/:filename` | GET | Compatibility alias for local player card images |
 | `/api/nba/images/missing` | GET | 获取未匹配到球星卡图片的球员清单 |
 | `/api/nba/avatars/:filename` | GET | 展示本地球员头像图片 |
 | `/api/nba/avatars/missing` | GET | 获取未匹配到头像图片的球员清单 |
@@ -254,7 +256,7 @@ CREATE TABLE categories (
 | `/api/nba/team-images/missing` | GET | 获取未匹配到球队图标的球队清单 |
 | `/api/nba/user-config` | GET/PATCH | 同步当前微信用户的 NBA 小程序配置 |
 | `/api/nba/sync/player` | POST | 从新浪 NBA 采集并入库单个球员，参数 `pid` |
-| `/api/nba/sync/images` | POST | 按球员英文名匹配 `nba_images` 目录下的球星卡图片 |
+| `/api/nba/sync/images` | POST | Build player card records from `nba_images`; preferred upload names are `English_Name.{ext}`, `English_Name_1.{ext}`, `English_Name_2.{ext}` |
 | `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
 | `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
 | `/api/nba/sync/rookies-2026` | POST | 从直播吧 2026 首轮选秀页面采集新秀并归到“2026 新秀”球队分类 |
@@ -262,7 +264,7 @@ CREATE TABLE categories (
 
 2026 新秀的选中球队、详情标签、大学球队、体测、模板和数据统计保存在 `extension.rookie`，不覆盖现役球员球队字段。
 
-NBA 用户配置 `config` 字段包含 `associated_home_player_pid` 球星卡 PID 数组、`current_home_player_pid` 当前首页球员 PID 或 `null`、`search_default_player_pid` 搜索页固定球员 PID 数组。
+NBA user config contains `associated_home_player_pid`, `current_home_player_pid`, `current_home_card_id`, `home_player_card_selection`, and `search_default_player_pid`.
 
 ### 6.7 Timing 计划配置
 

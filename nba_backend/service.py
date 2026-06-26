@@ -27,6 +27,7 @@ DEFAULT_TIMEOUT = 20
 DEFAULT_CONCURRENCY = 8
 MAX_CONCURRENCY = 16
 MAX_BATCH_PLAYER_PIDS = 50
+VALID_PLAYER_CARD_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp')
 TEAM_IMAGE_NAMES_BY_FULL_NAME = {
     '亚特兰大老鹰': 'Atlanta Hawks',
     '波士顿凯尔特人': 'Boston Celtics',
@@ -151,6 +152,28 @@ def init_nba_db(db_path):
             CREATE INDEX IF NOT EXISTS idx_nba_players_team ON nba_players(team_tid);
             CREATE INDEX IF NOT EXISTS idx_nba_players_chinese_name ON nba_players(chinese_name);
             CREATE INDEX IF NOT EXISTS idx_nba_players_english_name ON nba_players(english_name);
+
+            CREATE TABLE IF NOT EXISTS nba_player_cards (
+                card_id TEXT PRIMARY KEY,
+                pid TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                season TEXT NOT NULL DEFAULT '',
+                series TEXT NOT NULL DEFAULT '',
+                variant TEXT NOT NULL DEFAULT '',
+                rarity TEXT NOT NULL DEFAULT '',
+                sort_order INTEGER NOT NULL DEFAULT 10,
+                image_path TEXT NOT NULL DEFAULT '',
+                image_filename TEXT NOT NULL DEFAULT '',
+                image_url TEXT NOT NULL DEFAULT '',
+                image_missing INTEGER NOT NULL DEFAULT 1,
+                image_checked_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (pid) REFERENCES nba_players(pid) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_nba_player_cards_pid_order
+            ON nba_player_cards(pid, sort_order, created_at, card_id);
             '''
         )
         migrate_nba_db(conn)
@@ -186,9 +209,35 @@ def migrate_nba_db(conn):
     for name, definition in columns.items():
         if not has_column(conn, 'nba_players', name):
             conn.execute('ALTER TABLE nba_players ADD COLUMN {} {}'.format(name, definition))
+    conn.executescript(
+        '''
+        CREATE TABLE IF NOT EXISTS nba_player_cards (
+            card_id TEXT PRIMARY KEY,
+            pid TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            season TEXT NOT NULL DEFAULT '',
+            series TEXT NOT NULL DEFAULT '',
+            variant TEXT NOT NULL DEFAULT '',
+            rarity TEXT NOT NULL DEFAULT '',
+            sort_order INTEGER NOT NULL DEFAULT 10,
+            image_path TEXT NOT NULL DEFAULT '',
+            image_filename TEXT NOT NULL DEFAULT '',
+            image_url TEXT NOT NULL DEFAULT '',
+            image_missing INTEGER NOT NULL DEFAULT 1,
+            image_checked_at TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (pid) REFERENCES nba_players(pid) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_nba_player_cards_pid_order
+        ON nba_player_cards(pid, sort_order, created_at, card_id);
+        '''
+    )
+    backfill_default_player_cards(conn)
 
 
-def row_to_player(row):
+def row_to_player(row, cards=None):
     if row is None:
         return None
     item = dict(row)
@@ -236,12 +285,15 @@ def row_to_player(row):
         'current_salary': item.get('current_salary') or '',
         'salary_wan_usd': item.get('salary_wan_usd'),
     }
-    item['image'] = {
+    legacy_image = {
         'filename': item.get('image_filename') or '',
         'url': item.get('image_url') or '',
         'missing': bool(item.get('image_missing')),
         'checked_at': item.get('image_checked_at') or '',
     }
+    item['image'] = default_player_image(cards, legacy_image) if cards is not None else legacy_image
+    if cards is not None:
+        item['cards'] = cards
     item['avatar'] = {
         'filename': item.get('avatar_filename') or '',
         'url': item.get('avatar_url') or '',
@@ -267,6 +319,74 @@ def row_to_player(row):
     item.pop('team_image_missing', None)
     item.pop('team_image_checked_at', None)
     return item
+
+
+def player_asset_from_card(row):
+    return {
+        'filename': row['image_filename'] or '',
+        'url': row['image_url'] or '',
+        'missing': bool(row['image_missing']),
+        'checked_at': row['image_checked_at'] or '',
+    }
+
+
+def row_to_player_card(row):
+    return {
+        'cardId': row['card_id'],
+        'pid': row['pid'],
+        'title': row['title'] or '',
+        'season': row['season'] or '',
+        'series': row['series'] or '',
+        'variant': row['variant'] or '',
+        'rarity': row['rarity'] or '',
+        'sortOrder': int(row['sort_order']),
+        'image': player_asset_from_card(row),
+        'created_at': row['created_at'] or '',
+        'updated_at': row['updated_at'] or '',
+    }
+
+
+def default_player_image(cards, fallback):
+    cards = cards or []
+    for card in cards:
+        image = card.get('image') or {}
+        if image.get('url') and not image.get('missing'):
+            return image
+    if cards:
+        return cards[0].get('image') or fallback
+    return fallback
+
+
+def backfill_default_player_cards(conn):
+    now = utcnow_iso()
+    conn.execute(
+        '''
+        INSERT OR IGNORE INTO nba_player_cards (
+            card_id, pid, title, season, series, variant, rarity, sort_order,
+            image_path, image_filename, image_url, image_missing, image_checked_at,
+            created_at, updated_at
+        )
+        SELECT
+            pid || '_default',
+            pid,
+            'Default Card',
+            '',
+            'Base',
+            'default',
+            '',
+            10,
+            image_path,
+            image_filename,
+            image_url,
+            image_missing,
+            image_checked_at,
+            COALESCE(NULLIF(created_at, ''), ?),
+            COALESCE(NULLIF(updated_at, ''), ?)
+        FROM nba_players
+        WHERE image_filename != '' OR image_url != '' OR image_checked_at != ''
+        ''',
+        (now, now),
+    )
 
 
 def normalize_player_pid_list(value):
@@ -298,12 +418,59 @@ def normalize_player_pid(value):
     return value.strip() or None
 
 
+def normalize_card_id(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError('invalid card id')
+    return value.strip() or None
+
+
+def normalize_card_selection(value):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError('invalid card selection')
+    result = {}
+    for raw_pid, raw_card_id in value.items():
+        if not isinstance(raw_pid, str) or not isinstance(raw_card_id, str):
+            raise ValueError('invalid card selection')
+        pid = raw_pid.strip()
+        card_id = raw_card_id.strip()
+        if not pid or not card_id:
+            raise ValueError('invalid card selection')
+        result[pid] = card_id
+    return result
+
+
 def home_cards_hash(payload):
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
     return 'home_' + hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]
 
 
-def player_render_version(row):
+def player_card_render_version(card):
+    if card is None:
+        return None
+    return {
+        'cardId': card['card_id'],
+        'pid': card['pid'],
+        'title': card['title'],
+        'season': card['season'],
+        'series': card['series'],
+        'variant': card['variant'],
+        'rarity': card['rarity'],
+        'sortOrder': card['sort_order'],
+        'image': {
+            'filename': card['image_filename'],
+            'url': card['image_url'],
+            'missing': bool(card['image_missing']),
+            'checked_at': card['image_checked_at'],
+        },
+        'updated_at': card['updated_at'],
+    }
+
+
+def player_render_version(row, cards=None):
     if row is None:
         return None
     extension = load_json_object(row['extension_json'], {})
@@ -352,6 +519,10 @@ def player_render_version(row):
         'avatar_filename': row['avatar_filename'],
         'avatar_url': row['avatar_url'],
         'avatar_missing': bool(row['avatar_missing']),
+        'cards': [
+            player_card_render_version(card)
+            for card in (cards or [])
+        ],
     }
 
 
@@ -507,6 +678,266 @@ def match_image_filename(english_name, image_index):
         if filename:
             return filename
     return ''
+
+
+def safe_card_id(value):
+    card_id = re.sub(r'[^A-Za-z0-9_-]+', '_', str(value or '')).strip('_')
+    return card_id or 'card'
+
+
+def card_title(season='', series='', variant=''):
+    parts = [season, series, variant]
+    return ' '.join(part for part in parts if part) or 'Default Card'
+
+
+def parse_pid_card_filename(filename, pid):
+    basename = os.path.basename(str(filename or ''))
+    stem, ext = os.path.splitext(basename)
+    if ext.lower() not in VALID_PLAYER_CARD_EXTENSIONS:
+        return None
+    if stem == pid:
+        suffix = 'default'
+    elif stem.startswith(pid + '_'):
+        suffix = stem[len(pid) + 1:]
+    else:
+        return None
+
+    suffix = suffix.strip('_')
+    if not suffix:
+        suffix = 'default'
+    tokens = [token for token in suffix.split('_') if token]
+    if tokens == ['default']:
+        return {
+            'card_id': safe_card_id(pid + '_default'),
+            'title': 'Default Card',
+            'season': '',
+            'series': 'Base',
+            'variant': 'default',
+            'rarity': '',
+            'sort_order': 10,
+        }
+
+    season = tokens[0] if tokens else ''
+    variant = tokens[-1] if len(tokens) > 1 else 'default'
+    series = ' '.join(tokens[1:-1]) if len(tokens) > 2 else ''
+    return {
+        'card_id': safe_card_id(stem),
+        'title': card_title(season, series, variant),
+        'season': season,
+        'series': series,
+        'variant': variant,
+        'rarity': '',
+        'sort_order': 20,
+    }
+
+
+def parse_english_card_filename(filename, english_name, pid):
+    basename = os.path.basename(str(filename or ''))
+    stem, ext = os.path.splitext(basename)
+    if ext.lower() not in VALID_PLAYER_CARD_EXTENSIONS:
+        return None
+
+    suffix_number = None
+    base_stem = stem
+    match = re.match(r'^(.+)_([1-9][0-9]*)$', stem)
+    if match:
+        base_stem = match.group(1)
+        suffix_number = int(match.group(2))
+
+    if not image_name_variants(base_stem).intersection(image_name_variants(english_name)):
+        return None
+
+    if suffix_number is None:
+        return {
+            'card_id': safe_card_id(pid + '_default'),
+            'title': 'Default Card',
+            'season': '',
+            'series': 'Base',
+            'variant': 'default',
+            'rarity': '',
+            'sort_order': 10,
+        }
+
+    return {
+        'card_id': safe_card_id('{}_{}'.format(pid, suffix_number)),
+        'title': 'Card {}'.format(suffix_number + 1),
+        'season': '',
+        'series': 'Base',
+        'variant': str(suffix_number),
+        'rarity': '',
+        'sort_order': (suffix_number + 1) * 10,
+    }
+
+
+def player_card_upload_naming_rule():
+    return {
+        'preferred': 'English_Name.{ext}, English_Name_1.{ext}, English_Name_2.{ext}',
+        'default': 'English_Name.{ext}',
+        'numbered': 'English_Name_{n}.{ext}',
+        'pidPreferred': '{pid}_{season}_{variant}.{ext}',
+        'pidDefault': '{pid}_default.{ext}',
+        'extended': '{pid}_{season}_{series}_{variant}.{ext}',
+        'notes': [
+            'English_Name.{ext} is the default card.',
+            'English_Name_1.{ext} is the second card; English_Name_2.{ext} is the third card.',
+            'Keep the same base English name used by the existing default card.',
+            'The backend cardId remains pid-based internally to avoid duplicate player names colliding.',
+        ],
+    }
+
+
+def collect_pid_card_files(image_dir, pids):
+    cards_by_pid = {pid: [] for pid in pids}
+    if not image_dir or not os.path.isdir(image_dir):
+        return cards_by_pid
+    for filename in sorted(os.listdir(image_dir)):
+        path = os.path.join(image_dir, filename)
+        if not os.path.isfile(path):
+            continue
+        for pid in pids:
+            card = parse_pid_card_filename(filename, pid)
+            if card:
+                card['filename'] = filename
+                cards_by_pid[pid].append(card)
+                break
+    def card_sort_key(card):
+        variant = str(card.get('variant') or '').lower()
+        variant_rank = {'default': 0, 'base': 1}.get(variant, 2)
+        return card['sort_order'], variant_rank, card['filename'], card['card_id']
+
+    for cards in cards_by_pid.values():
+        cards.sort(key=card_sort_key)
+        has_default = any(card['variant'] == 'default' for card in cards)
+        non_default_index = 0
+        for card in cards:
+            if card['variant'] == 'default':
+                card['sort_order'] = 10
+            elif card['sort_order'] == 20:
+                non_default_index += 1
+                card['sort_order'] = (non_default_index + (1 if has_default else 0)) * 10
+    return cards_by_pid
+
+
+def collect_english_card_files(image_dir, rows):
+    cards_by_pid = {row['pid']: [] for row in rows}
+    if not image_dir or not os.path.isdir(image_dir):
+        return cards_by_pid
+    for filename in sorted(os.listdir(image_dir)):
+        path = os.path.join(image_dir, filename)
+        if not os.path.isfile(path):
+            continue
+        for row in rows:
+            card = parse_english_card_filename(filename, row['english_name'], row['pid'])
+            if card:
+                card['filename'] = filename
+                cards_by_pid[row['pid']].append(card)
+                break
+    for cards in cards_by_pid.values():
+        cards.sort(key=lambda card: (card['sort_order'], card['filename'], card['card_id']))
+    return cards_by_pid
+
+
+def player_card_record(row, card, image_dir, url_prefix, now):
+    filename = card['filename']
+    image_path = os.path.abspath(os.path.join(image_dir, filename))
+    image_url = url_prefix.rstrip('/') + '/' + urllib.parse.quote(filename)
+    return {
+        'card_id': card['card_id'],
+        'pid': row['pid'],
+        'title': card['title'],
+        'season': card['season'],
+        'series': card['series'],
+        'variant': card['variant'],
+        'rarity': card['rarity'],
+        'sort_order': card['sort_order'],
+        'image_path': image_path,
+        'image_filename': filename,
+        'image_url': image_url,
+        'image_missing': 0,
+        'image_checked_at': now,
+        'created_at': now,
+        'updated_at': now,
+    }
+
+
+def legacy_default_card(row, filename, image_dir, url_prefix, now):
+    return player_card_record(
+        row,
+        {
+            'card_id': safe_card_id(row['pid'] + '_default'),
+            'title': 'Default Card',
+            'season': '',
+            'series': 'Base',
+            'variant': 'default',
+            'rarity': '',
+            'sort_order': 10,
+            'filename': filename,
+        },
+        image_dir,
+        url_prefix,
+        now,
+    )
+
+
+def insert_player_card(conn, record):
+    conn.execute(
+        '''
+        INSERT INTO nba_player_cards (
+            card_id, pid, title, season, series, variant, rarity, sort_order,
+            image_path, image_filename, image_url, image_missing, image_checked_at,
+            created_at, updated_at
+        ) VALUES (
+            :card_id, :pid, :title, :season, :series, :variant, :rarity, :sort_order,
+            :image_path, :image_filename, :image_url, :image_missing, :image_checked_at,
+            :created_at, :updated_at
+        )
+        ON CONFLICT(card_id) DO UPDATE SET
+            pid=excluded.pid,
+            title=excluded.title,
+            season=excluded.season,
+            series=excluded.series,
+            variant=excluded.variant,
+            rarity=excluded.rarity,
+            sort_order=excluded.sort_order,
+            image_path=excluded.image_path,
+            image_filename=excluded.image_filename,
+            image_url=excluded.image_url,
+            image_missing=excluded.image_missing,
+            image_checked_at=excluded.image_checked_at,
+            updated_at=excluded.updated_at
+        ''',
+        record,
+    )
+
+
+def set_player_legacy_image_from_card(conn, pid, card_record, now):
+    if card_record:
+        conn.execute(
+            '''
+            UPDATE nba_players
+            SET image_path=?, image_filename=?, image_url=?, image_missing=0,
+                image_checked_at=?, updated_at=?
+            WHERE pid=?
+            ''',
+            (
+                card_record['image_path'],
+                card_record['image_filename'],
+                card_record['image_url'],
+                card_record['image_checked_at'],
+                now,
+                pid,
+            ),
+        )
+        return
+    conn.execute(
+        '''
+        UPDATE nba_players
+        SET image_path='', image_filename='', image_url='', image_missing=1,
+            image_checked_at=?, updated_at=?
+        WHERE pid=?
+        ''',
+        (now, now, pid),
+    )
 
 
 def fetch_sina_json(params, timeout=DEFAULT_TIMEOUT):
@@ -1141,8 +1572,77 @@ def sync_player_assets(conn, asset_dir, column_prefix, url_prefix):
     return result
 
 
-def sync_player_images(conn, image_dir, url_prefix='/api/nba/images'):
-    return sync_player_assets(conn, image_dir, 'image', url_prefix)
+def sync_player_images(conn, image_dir, url_prefix='/api/nba/card-images'):
+    image_index, collisions = collect_image_index(image_dir)
+    now = utcnow_iso()
+    rows = conn.execute(
+        '''
+        SELECT pid, chinese_name, english_name
+        FROM nba_players
+        ORDER BY team_full_name ASC, chinese_name ASC
+        '''
+    ).fetchall()
+    cards_by_pid = collect_pid_card_files(image_dir, [row['pid'] for row in rows])
+    english_cards_by_pid = collect_english_card_files(image_dir, rows)
+    matched = 0
+    card_count = 0
+    missing = []
+
+    for row in rows:
+        existing_created_at = {
+            existing['card_id']: existing['created_at']
+            for existing in conn.execute(
+                'SELECT card_id, created_at FROM nba_player_cards WHERE pid=?',
+                (row['pid'],),
+            ).fetchall()
+        }
+        records = [
+            player_card_record(row, card, image_dir, url_prefix, now)
+            for card in english_cards_by_pid.get(row['pid'], []) + cards_by_pid.get(row['pid'], [])
+        ]
+        legacy_filename = match_image_filename(row['english_name'], image_index)
+        if legacy_filename and not any(record['image_filename'] == legacy_filename for record in records):
+            default_card_id = safe_card_id(row['pid'] + '_default')
+            if not any(record['card_id'] == default_card_id for record in records):
+                records.insert(0, legacy_default_card(row, legacy_filename, image_dir, url_prefix, now))
+
+        for record in records:
+            record['created_at'] = existing_created_at.get(record['card_id'], record['created_at'])
+        records.sort(key=lambda record: (record['sort_order'], record['created_at'], record['card_id']))
+        conn.execute('DELETE FROM nba_player_cards WHERE pid=?', (row['pid'],))
+        for record in records:
+            insert_player_card(conn, record)
+
+        first_valid = next((record for record in records if not record['image_missing']), records[0] if records else None)
+        set_player_legacy_image_from_card(conn, row['pid'], first_valid, now)
+
+        if records:
+            matched += 1
+            card_count += len(records)
+            continue
+        missing.append({
+            'pid': row['pid'],
+            'chinese_name': row['chinese_name'],
+            'english_name': row['english_name'],
+        })
+
+    conn.commit()
+    asset_count = len(set(image_index.values()))
+    return {
+        'total': len(rows),
+        'asset_count': asset_count,
+        'image_count': asset_count,
+        'card_count': card_count,
+        'matched_count': matched,
+        'missing_count': len(missing),
+        'missing': missing,
+        'collisions': [
+            {'key': key, 'filenames': sorted(value)}
+            for key, value in sorted(collisions.items())
+        ],
+        'checked_at': now,
+        'namingRule': player_card_upload_naming_rule(),
+    }
 
 
 def sync_player_avatars(conn, avatar_dir, url_prefix='/api/nba/avatars'):
@@ -1272,6 +1772,33 @@ def list_players(conn, query='', team_tid='', team='', position='', limit=50, of
     return total, [row_to_player(row) for row in rows]
 
 
+def get_player_card_rows_by_pids(conn, pids):
+    pids = normalize_player_pid_list(pids)
+    if not pids:
+        return {}
+    placeholders = ','.join('?' for _ in pids)
+    rows = conn.execute(
+        '''
+        SELECT *
+        FROM nba_player_cards
+        WHERE pid IN ({})
+        ORDER BY pid ASC, sort_order ASC, created_at ASC, card_id ASC
+        '''.format(placeholders),
+        pids,
+    ).fetchall()
+    cards_by_pid = {pid: [] for pid in pids}
+    for row in rows:
+        cards_by_pid.setdefault(row['pid'], []).append(row)
+    return cards_by_pid
+
+
+def get_player_cards(conn, pid):
+    return [
+        row_to_player_card(row)
+        for row in get_player_card_rows_by_pids(conn, [pid]).get(pid, [])
+    ]
+
+
 def list_filter_options(conn):
     team_rows = conn.execute(
         '''
@@ -1324,7 +1851,9 @@ def list_filter_options(conn):
 
 def get_player(conn, pid):
     row = conn.execute('SELECT * FROM nba_players WHERE pid=?', (pid,)).fetchone()
-    return row_to_player(row)
+    if not row:
+        return None
+    return row_to_player(row, get_player_cards(conn, pid))
 
 
 def get_player_rows_by_pids(conn, pids):
@@ -1343,9 +1872,12 @@ def home_cards_metadata(conn, app, config, config_updated_at):
     config = config or {}
     pids = normalize_player_pid_list(config.get('associated_home_player_pid'))
     current_pid = normalize_player_pid(config.get('current_home_player_pid'))
+    current_card_id = normalize_card_id(config.get('current_home_card_id'))
+    card_selection = normalize_card_selection(config.get('home_player_card_selection'))
     player_rows = get_player_rows_by_pids(conn, pids)
+    card_rows = get_player_card_rows_by_pids(conn, pids)
     ordered_versions = [
-        player_render_version(player_rows.get(pid))
+        player_render_version(player_rows.get(pid), card_rows.get(pid, []))
         for pid in pids
     ]
     updated_values = [
@@ -1353,14 +1885,24 @@ def home_cards_metadata(conn, app, config, config_updated_at):
         for pid in pids
         if pid in player_rows and player_rows[pid]['updated_at']
     ]
+    card_updated_values = [
+        card['updated_at']
+        for pid in pids
+        for card in card_rows.get(pid, [])
+        if card['updated_at']
+    ]
     players_updated_at = max(updated_values) if updated_values else None
+    cards_updated_at = max(card_updated_values) if card_updated_values else None
     data_version = home_cards_hash({
         'scope': 'homeCards',
         'app': app,
         'pids': pids,
         'currentPid': current_pid,
+        'currentCardId': current_card_id,
+        'cardSelection': card_selection,
         'configUpdatedAt': config_updated_at,
         'playersUpdatedAt': players_updated_at,
+        'cardsUpdatedAt': cards_updated_at,
         # Include render fingerprints so non-max player changes and missing-state changes
         # cannot be hidden behind an unchanged aggregate timestamp.
         'players': ordered_versions,
@@ -1368,8 +1910,11 @@ def home_cards_metadata(conn, app, config, config_updated_at):
     return {
         'pids': pids,
         'currentPid': current_pid,
+        'currentCardId': current_card_id,
+        'cardSelection': card_selection,
         'configUpdatedAt': config_updated_at,
         'playersUpdatedAt': players_updated_at,
+        'cardsUpdatedAt': cards_updated_at,
         'dataVersion': data_version,
     }
 
@@ -1379,8 +1924,12 @@ def list_players_batch(conn, pids):
     if len(pids) > MAX_BATCH_PLAYER_PIDS:
         raise ValueError('too many pids')
     player_rows = get_player_rows_by_pids(conn, pids)
+    card_rows = get_player_card_rows_by_pids(conn, pids)
     items = [
-        row_to_player(player_rows[pid])
+        row_to_player(player_rows[pid], [
+            row_to_player_card(card)
+            for card in card_rows.get(pid, [])
+        ])
         for pid in pids
         if pid in player_rows
     ]
@@ -1393,7 +1942,7 @@ def list_players_batch(conn, pids):
         'scope': 'playersBatch',
         'pids': pids,
         'players': [
-            player_render_version(player_rows.get(pid))
+            player_render_version(player_rows.get(pid), card_rows.get(pid, []))
             for pid in pids
         ],
     })

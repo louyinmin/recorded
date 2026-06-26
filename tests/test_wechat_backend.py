@@ -55,6 +55,39 @@ class WeChatBackendTestCase(unittest.TestCase):
         finally:
             conn.close()
 
+    def insert_nba_player_card(self, pid, card_id, updated_at, filename='card.jpg', sort_order=10):
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            conn.execute(
+                '''
+                INSERT INTO nba_player_cards (
+                    card_id, pid, title, season, series, variant, rarity, sort_order,
+                    image_path, image_filename, image_url, image_missing, image_checked_at,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    card_id,
+                    pid,
+                    'Test Card',
+                    '2024',
+                    'Base',
+                    'base',
+                    '',
+                    sort_order,
+                    '/tmp/' + filename,
+                    filename,
+                    '/api/nba/card-images/' + filename,
+                    0,
+                    updated_at,
+                    updated_at,
+                    updated_at,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def test_session_requires_code(self):
         response = self.client.post('/api/wechat/session', json={})
 
@@ -287,6 +320,8 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(default_config.get_json()['config'], {
             'associated_home_player_pid': [],
             'current_home_player_pid': None,
+            'current_home_card_id': None,
+            'home_player_card_selection': {},
             'search_default_player_pid': [],
         })
 
@@ -296,6 +331,11 @@ class WeChatBackendTestCase(unittest.TestCase):
                 'config': {
                     'associated_home_player_pid': [' player-a ', '', 'player-b', 'player-a'],
                     'current_home_player_pid': ' player-b ',
+                    'current_home_card_id': ' card-b ',
+                    'home_player_card_selection': {
+                        ' player-a ': ' card-a ',
+                        'player-b': 'card-b',
+                    },
                     'search_default_player_pid': ['p1', '', 'p2', 'p1', '  p3  '],
                 },
             },
@@ -305,6 +345,11 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(updated.get_json()['config'], {
             'associated_home_player_pid': ['player-a', 'player-b'],
             'current_home_player_pid': 'player-b',
+            'current_home_card_id': 'card-b',
+            'home_player_card_selection': {
+                'player-a': 'card-a',
+                'player-b': 'card-b',
+            },
             'search_default_player_pid': ['p1', 'p2', 'p3'],
         })
         conn = sqlite3.connect(self.wechat_db_path)
@@ -331,6 +376,8 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(isolated.get_json()['config'], {
             'associated_home_player_pid': [],
             'current_home_player_pid': None,
+            'current_home_card_id': None,
+            'home_player_card_selection': {},
             'search_default_player_pid': [],
         })
 
@@ -362,8 +409,11 @@ class WeChatBackendTestCase(unittest.TestCase):
         default_home_cards = default_config.get_json()['homeCards']
         self.assertEqual(default_home_cards['pids'], [])
         self.assertIsNone(default_home_cards['currentPid'])
+        self.assertIsNone(default_home_cards['currentCardId'])
+        self.assertEqual(default_home_cards['cardSelection'], {})
         self.assertIsNone(default_home_cards['configUpdatedAt'])
         self.assertIsNone(default_home_cards['playersUpdatedAt'])
+        self.assertIsNone(default_home_cards['cardsUpdatedAt'])
         self.assertTrue(default_home_cards['dataVersion'].startswith('home_'))
 
         updated = self.client.patch(
@@ -371,6 +421,11 @@ class WeChatBackendTestCase(unittest.TestCase):
             json={'config': {
                 'associated_home_player_pid': ['player-a', 'player-b'],
                 'current_home_player_pid': 'player-b',
+                'current_home_card_id': 'player-b-default',
+                'home_player_card_selection': {
+                    'player-a': 'player-a-default',
+                    'player-b': 'player-b-default',
+                },
             }},
             headers=headers,
         )
@@ -381,8 +436,14 @@ class WeChatBackendTestCase(unittest.TestCase):
         home_cards = payload['homeCards']
         self.assertEqual(home_cards['pids'], ['player-a', 'player-b'])
         self.assertEqual(home_cards['currentPid'], 'player-b')
+        self.assertEqual(home_cards['currentCardId'], 'player-b-default')
+        self.assertEqual(home_cards['cardSelection'], {
+            'player-a': 'player-a-default',
+            'player-b': 'player-b-default',
+        })
         self.assertEqual(home_cards['configUpdatedAt'], payload['updatedAt'])
         self.assertEqual(home_cards['playersUpdatedAt'], '2026-06-20T08:30:00')
+        self.assertIsNone(home_cards['cardsUpdatedAt'])
 
         repeat = self.client.get('/api/nba/user-config', headers=headers)
         self.assertEqual(repeat.get_json()['homeCards']['dataVersion'], home_cards['dataVersion'])
@@ -409,6 +470,62 @@ class WeChatBackendTestCase(unittest.TestCase):
         player_changed = self.client.get('/api/nba/user-config', headers=headers).get_json()['homeCards']
         self.assertEqual(player_changed['playersUpdatedAt'], '2026-06-20T09:00:00')
         self.assertNotEqual(player_changed['dataVersion'], current_changed.get_json()['homeCards']['dataVersion'])
+
+    def test_nba_home_cards_cache_version_tracks_card_render_data(self):
+        def fake_exchange(appid, secret, code):
+            return {
+                'openid': 'home-card-cache-openid',
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+        self.insert_nba_player('player-a', '2026-06-20T08:20:00', '球员A', 'Player A')
+        self.insert_nba_player_card(
+            'player-a',
+            'player-a-2024-base',
+            '2026-06-20T08:30:00',
+            'player-a_2024_base.jpg',
+        )
+
+        session = self.client.post('/api/nba/wechat/session', json={'code': 'home-card-cache'})
+        token = session.get_json()['sessionToken']
+        headers = {'Authorization': 'Bearer ' + token}
+        updated = self.client.patch(
+            '/api/nba/user-config',
+            json={'config': {
+                'associated_home_player_pid': ['player-a'],
+                'current_home_player_pid': 'player-a',
+                'current_home_card_id': 'player-a-2024-base',
+                'home_player_card_selection': {'player-a': 'player-a-2024-base'},
+            }},
+            headers=headers,
+        )
+        self.assertEqual(updated.status_code, 200)
+
+        first_home_cards = self.client.get('/api/nba/user-config', headers=headers).get_json()['homeCards']
+        self.assertEqual(first_home_cards['cardsUpdatedAt'], '2026-06-20T08:30:00')
+
+        repeat_home_cards = self.client.get('/api/nba/user-config', headers=headers).get_json()['homeCards']
+        self.assertEqual(repeat_home_cards['dataVersion'], first_home_cards['dataVersion'])
+
+        conn = sqlite3.connect(self.nba_db_path)
+        try:
+            conn.execute(
+                '''
+                UPDATE nba_player_cards
+                SET image_url='/api/nba/card-images/player-a_2024_alt.jpg',
+                    image_filename='player-a_2024_alt.jpg',
+                    updated_at='2026-06-20T09:10:00'
+                WHERE card_id='player-a-2024-base'
+                '''
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        card_changed = self.client.get('/api/nba/user-config', headers=headers).get_json()['homeCards']
+        self.assertEqual(card_changed['cardsUpdatedAt'], '2026-06-20T09:10:00')
+        self.assertNotEqual(card_changed['dataVersion'], first_home_cards['dataVersion'])
 
     def test_nba_user_config_reads_legacy_home_player_string_as_list(self):
         def fake_exchange(appid, secret, code):
@@ -456,6 +573,8 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(response.get_json()['config'], {
             'associated_home_player_pid': ['old-home-player'],
             'current_home_player_pid': None,
+            'current_home_card_id': None,
+            'home_player_card_selection': {},
             'search_default_player_pid': ['p1'],
         })
 

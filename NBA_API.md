@@ -170,7 +170,7 @@ For non-empty queries, the response shape is the same as `GET /api/nba/players`.
 GET /api/nba/players/{pid}
 ```
 
-Returns a single player record.
+Returns a single full player record. Full player responses include `cards`, an ordered list of card variants owned by the player. `image` remains available for backward compatibility and is projected from the first available card image.
 
 #### Example
 
@@ -180,7 +180,7 @@ GET /api/nba/players/a537047d-c29f-4dfe-99b0-3bac4e258dc7
 
 #### Success Response
 
-The response is one player object, using the same player structure shown in `List Players`.
+The response is one player object, using the same player structure shown in `List Players`, plus ordered `cards`.
 
 #### Not Found Response
 
@@ -220,11 +220,64 @@ GET /api/nba/players/batch?pids=player_pid_1,player_pid_2
       "pid": "player_pid_1",
       "chinese_name": "Player One",
       "english_name": "Player One",
+      "image": {
+        "filename": "player_pid_1_2024_base.jpg",
+        "url": "/api/nba/card-images/player_pid_1_2024_base.jpg",
+        "missing": false
+      },
+      "cards": [
+        {
+          "cardId": "player_pid_1_2024_base",
+          "pid": "player_pid_1",
+          "title": "2024 base",
+          "season": "2024",
+          "series": "",
+          "variant": "base",
+          "rarity": "",
+          "sortOrder": 10,
+          "image": {
+            "filename": "player_pid_1_2024_base.jpg",
+            "url": "/api/nba/card-images/player_pid_1_2024_base.jpg",
+            "missing": false
+          }
+        }
+      ],
       "updated_at": "2026-06-20T08:30:00"
     }
   ],
   "missingPids": ["unknown_player_pid"],
   "dataVersion": "home_8f3c0d9a1b2c"
+}
+```
+
+### Get Player Cards
+
+```http
+GET /api/nba/players/{pid}/cards
+```
+
+Returns the ordered card variants for one player.
+
+#### Success Response
+
+```json
+{
+  "pid": "player_pid_1",
+  "items": [
+    {
+      "cardId": "player_pid_1_2024_base",
+      "pid": "player_pid_1",
+      "title": "2024 base",
+      "season": "2024",
+      "variant": "base",
+      "sortOrder": 10,
+      "image": {
+        "url": "/api/nba/card-images/player_pid_1_2024_base.jpg",
+        "missing": false
+      }
+    }
+  ],
+  "updatedAt": "2026-06-20T08:30:00"
 }
 ```
 
@@ -275,16 +328,17 @@ Returns team and position options for UI filter controls.
 
 ```http
 GET /api/nba/images/{filename}
+GET /api/nba/card-images/{filename}
 ```
 
-Serves a player card image from the server-side `NBA_IMAGE_DIR`.
+Serves a player card image from the server-side `NBA_IMAGE_DIR`. New card URLs use `/api/nba/card-images/{filename}`. `/api/nba/images/{filename}` remains available for older clients.
 
 The Mini Program should use the `image.url` value returned by the player APIs.
 
 #### Example
 
 ```http
-GET /api/nba/images/Luke_Kennard.jpg
+GET /api/nba/card-images/player_pid_1_2024_base.jpg
 ```
 
 ### Get Player Avatar
@@ -496,7 +550,33 @@ Content-Type: application/json
 X-NBA-Sync-Token: your-token
 ```
 
-Matches player card files under `NBA_IMAGE_DIR` by English player name, updates `image.url`, and marks missing images.
+Builds `nba_player_cards` records from files under `NBA_IMAGE_DIR`, updates the compatibility `image.*` fields from the first available card, and marks players with no card image as missing.
+
+Preferred upload naming when the uploader cannot easily confirm `pid`:
+
+```text
+English_Name.{ext}
+English_Name_1.{ext}
+English_Name_2.{ext}
+```
+
+Example:
+
+```text
+A_J_Lawson.jpg
+A_J_Lawson_1.jpg
+A_J_Lawson_2.jpg
+```
+
+`English_Name.{ext}` is the default card. `_1` is the second card, `_2` is the third card, and so on. Keep the same base English name used by the existing default card.
+
+The backend still generates internal `cardId` values from `pid` plus the numeric suffix to avoid duplicate player names colliding. `pid`-based filenames are also supported for automated pipelines:
+
+```text
+{pid}_{season}_{variant}.{ext}
+{pid}_{season}_{series}_{variant}.{ext}
+{pid}_default.{ext}
+```
 
 The request body cannot override the image directory. The server always uses `NBA_IMAGE_DIR`.
 
@@ -508,12 +588,19 @@ The request body cannot override the image directory. The server always uses `NB
   "result": {
     "total": 537,
     "asset_count": 587,
-    "avatar_count": 587,
+    "image_count": 587,
+    "card_count": 620,
     "matched_count": 537,
     "missing_count": 0,
     "missing": [],
     "collisions": [],
-    "checked_at": "2026-06-15T02:46:02"
+    "checked_at": "2026-06-15T02:46:02",
+    "namingRule": {
+      "preferred": "English_Name.{ext}, English_Name_1.{ext}, English_Name_2.{ext}",
+      "default": "English_Name.{ext}",
+      "numbered": "English_Name_{n}.{ext}",
+      "pidPreferred": "{pid}_{season}_{variant}.{ext}"
+    }
   }
 }
 ```

@@ -14,6 +14,7 @@ from .service import (
     MAX_BATCH_PLAYER_PIDS,
     get_nba_db,
     get_player,
+    get_player_cards,
     home_cards_metadata,
     list_players_batch,
     list_filter_options,
@@ -158,9 +159,28 @@ def player_detail(pid):
     return jsonify(item)
 
 
+@nba_bp.route('/players/<pid>/cards', methods=['GET'])
+def player_cards(pid):
+    item = get_player(get_nba_db(), pid)
+    if not item:
+        return jsonify({'error': '球员不存在'}), 404
+    cards = get_player_cards(get_nba_db(), pid)
+    updated_values = [card.get('updated_at') for card in cards if card.get('updated_at')]
+    return jsonify({
+        'pid': pid,
+        'items': cards,
+        'updatedAt': max(updated_values) if updated_values else None,
+    })
+
+
 @nba_bp.route('/images/missing', methods=['GET'])
 def missing_images():
     return jsonify({'items': list_missing_images(get_nba_db())})
+
+
+@nba_bp.route('/card-images/<path:filename>', methods=['GET'])
+def player_card_image(filename):
+    return send_from_directory(current_app.config['NBA_IMAGE_DIR'], filename)
 
 
 @nba_bp.route('/images/<path:filename>', methods=['GET'])
