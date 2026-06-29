@@ -275,6 +275,19 @@ NBA user config contains `associated_home_player_pid`, `current_home_player_pid`
 | `/api/timing/plan-config/custom-plans` | POST | 新增自定义计划 |
 | `/api/timing/plan-config/custom-plans/:planId` | PUT/DELETE | 更新或删除自定义计划 |
 
+### 6.8 Timing 任务配置与统计
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/timing/task-config` | GET/PUT | 读取或整份替换当前微信用户的任务页配置 |
+| `/api/timing/task-config/tasks` | POST | 新增任务页任务 |
+| `/api/timing/task-config/tasks/:taskId` | PUT/DELETE | 更新或删除任务页任务 |
+| `/api/timing/stats` | GET | 按 `startDate` 和 `endDate` 读取当前微信用户的统计记录 |
+| `/api/timing/stats/:date` | PUT | 按日期保存当前微信用户的统计记录 |
+| `/api/timing/stats` | DELETE | 按 `startDate` 和 `endDate` 软删除当前微信用户的统计记录 |
+
+任务配置中的 `type` 仅支持 `regular` 和 `special`；统计记录按微信用户和日期隔离保存。
+
 ---
 
 ## 7. 安全设计

@@ -3,6 +3,7 @@
 import functools
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
 import urllib.parse
@@ -33,6 +34,7 @@ TIMING_DEFAULT_TASK_DURATIONS = {
     'play_game': 1800,
 }
 TIMING_TASK_TYPES = {'study', 'relax', 'rest'}
+TIMING_CONFIG_TASK_TYPES = {'regular', 'special'}
 
 
 class WeChatCodeExchangeError(Exception):
@@ -63,6 +65,10 @@ def gen_config_id(prefix='cfg'):
 
 def gen_plan_id():
     return 'plan_' + uuid.uuid4().hex[:16]
+
+
+def gen_task_id():
+    return 'task_' + uuid.uuid4().hex[:16]
 
 
 def hash_session_token(token):
@@ -202,6 +208,34 @@ def init_wechat_db(db_path):
                 deleted_at TEXT,
                 FOREIGN KEY (user_id) REFERENCES wechat_users(id) ON DELETE CASCADE,
                 UNIQUE (project, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS timing_task_configs (
+                id TEXT PRIMARY KEY,
+                project TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                wechat_openid TEXT NOT NULL DEFAULT '',
+                task_config_json TEXT NOT NULL DEFAULT '{}',
+                version INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                deleted_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES wechat_users(id) ON DELETE CASCADE,
+                UNIQUE (project, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS timing_stat_records (
+                id TEXT PRIMARY KEY,
+                project TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                wechat_openid TEXT NOT NULL DEFAULT '',
+                record_date TEXT NOT NULL,
+                stats_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                deleted_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES wechat_users(id) ON DELETE CASCADE,
+                UNIQUE (project, user_id, record_date)
             );
             '''
         )
@@ -652,3 +686,296 @@ def save_timing_plan_config(conn, user, config, current_row=None):
     )
     conn.commit()
     return normalized, next_version, now
+
+
+def timing_task_default_config():
+    return {'tasks': []}
+
+
+def validate_timing_time(value):
+    value = str(value or '').strip()
+    if not re.match(r'^\d{2}:\d{2}$', value):
+        raise ValueError('invalid timing task config')
+    hour, minute = [int(part) for part in value.split(':')]
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise ValueError('invalid timing task config')
+    return value
+
+
+def timing_minutes(value):
+    hour, minute = [int(part) for part in value.split(':')]
+    return hour * 60 + minute
+
+
+def normalize_timing_task(task, now, existing=None, assign_id=False, order_fallback=0):
+    existing = existing or {}
+    title = str(task.get('title', existing.get('title', '')) or '').strip()
+    if not title or len(title) > 20:
+        raise ValueError('invalid timing task config')
+
+    start_time = validate_timing_time(task.get('startTime', existing.get('startTime', '')))
+    end_time = validate_timing_time(task.get('endTime', existing.get('endTime', '')))
+    if timing_minutes(end_time) <= timing_minutes(start_time):
+        raise ValueError('invalid timing task config')
+
+    task_type = str(task.get('type', existing.get('type', '')) or '').strip()
+    if task_type not in TIMING_CONFIG_TASK_TYPES:
+        raise ValueError('invalid timing task config')
+
+    order = task.get('order', existing.get('order', order_fallback))
+    if not is_int(order) or order < 0:
+        raise ValueError('invalid timing task config')
+
+    enabled = task.get('enabled', existing.get('enabled', True))
+    if not isinstance(enabled, bool):
+        raise ValueError('invalid timing task config')
+
+    task_id = str(task.get('id') or existing.get('id') or '').strip()
+    if not task_id and assign_id:
+        task_id = gen_task_id()
+    if not task_id:
+        raise ValueError('invalid timing task config')
+
+    created_at = str(existing.get('createdAt') or task.get('createdAt') or now)
+    updated_at = str(task.get('updatedAt') or existing.get('updatedAt') or now)
+    return {
+        'id': task_id,
+        'title': title,
+        'startTime': start_time,
+        'endTime': end_time,
+        'type': task_type,
+        'order': order,
+        'enabled': enabled,
+        'createdAt': created_at,
+        'updatedAt': updated_at,
+    }
+
+
+def normalize_timing_task_config(config, now):
+    if not isinstance(config, dict):
+        raise ValueError('invalid timing task config')
+    tasks = config.get('tasks', [])
+    if not isinstance(tasks, list):
+        raise ValueError('invalid timing task config')
+    normalized_tasks = []
+    seen_ids = set()
+    for index, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            raise ValueError('invalid timing task config')
+        normalized = normalize_timing_task(task, now, assign_id=True, order_fallback=index)
+        if normalized['id'] in seen_ids:
+            raise ValueError('invalid timing task config')
+        seen_ids.add(normalized['id'])
+        normalized_tasks.append(normalized)
+    return {'tasks': sorted(normalized_tasks, key=lambda item: item['order'])}
+
+
+def get_timing_task_row(conn, user_id):
+    return conn.execute(
+        '''
+        SELECT * FROM timing_task_configs
+        WHERE project=? AND user_id=? AND deleted_at IS NULL
+        ''',
+        (TIMING_PROJECT, user_id),
+    ).fetchone()
+
+
+def get_timing_task_config(conn, user):
+    row = get_timing_task_row(conn, user['id'])
+    if not row:
+        return timing_task_default_config(), 0, None
+    config = load_json_object(row['task_config_json'], timing_task_default_config())
+    return normalize_timing_task_config(config, row['updated_at']), int(row['version']), row['updated_at']
+
+
+def assert_timing_task_version(row, requested_version):
+    if requested_version is None:
+        return
+    if not is_int(requested_version):
+        raise ValueError('invalid timing task config')
+    current_version = int(row['version']) if row else 0
+    if requested_version != current_version:
+        raise RuntimeError(current_version)
+
+
+def save_timing_task_config(conn, user, config, current_row=None):
+    current_version = int(current_row['version']) if current_row else 0
+    next_version = current_version + 1
+    now = utcnow_iso()
+    normalized = normalize_timing_task_config(config, now)
+    conn.execute(
+        '''
+        INSERT INTO timing_task_configs (
+            id, project, user_id, wechat_openid, task_config_json, version, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(project, user_id) DO UPDATE SET
+            wechat_openid=excluded.wechat_openid,
+            task_config_json=excluded.task_config_json,
+            version=excluded.version,
+            updated_at=excluded.updated_at,
+            deleted_at=NULL
+        ''',
+        (
+            gen_config_id('ttcfg'),
+            TIMING_PROJECT,
+            user['id'],
+            user['wechat_openid'],
+            json.dumps(normalized, ensure_ascii=False, separators=(',', ':')),
+            next_version,
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    return normalized, next_version, now
+
+
+def validate_date_text(value):
+    value = str(value or '').strip()
+    try:
+        datetime.strptime(value, '%Y-%m-%d')
+    except ValueError as exc:
+        raise ValueError('invalid timing stats record') from exc
+    return value
+
+
+def normalize_non_negative_int(value):
+    if not is_int(value) or value < 0:
+        raise ValueError('invalid timing stats record')
+    return value
+
+
+def normalize_task_ids(value):
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError('invalid timing stats record')
+    seen = set()
+    task_ids = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError('invalid timing stats record')
+        task_id = item.strip()
+        if task_id and task_id not in seen:
+            seen.add(task_id)
+            task_ids.append(task_id)
+    return task_ids
+
+
+def normalize_custom_task_stats(value):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError('invalid timing stats record')
+    result = {}
+    for task_id, stats in value.items():
+        task_id = str(task_id or '').strip()
+        if not task_id:
+            continue
+        if not isinstance(stats, dict):
+            raise ValueError('invalid timing stats record')
+        last_result = stats.get('lastResult')
+        if last_result not in (None, '', 'good', 'bad'):
+            raise ValueError('invalid timing stats record')
+        last_completed_at = stats.get('lastCompletedAt')
+        if last_completed_at is not None and (not is_int(last_completed_at) or last_completed_at < 0):
+            raise ValueError('invalid timing stats record')
+        item = {
+            'goodCount': normalize_non_negative_int(stats.get('goodCount', 0)),
+            'badCount': normalize_non_negative_int(stats.get('badCount', 0)),
+        }
+        if last_result:
+            item['lastResult'] = last_result
+        if last_completed_at is not None:
+            item['lastCompletedAt'] = last_completed_at
+        result[task_id] = item
+    return result
+
+
+def normalize_timing_stats_record(record, expected_date=None):
+    if not isinstance(record, dict):
+        raise ValueError('invalid timing stats record')
+    record_date = validate_date_text(record.get('date') or expected_date)
+    if expected_date and record_date != expected_date:
+        raise ValueError('invalid timing stats record')
+    return {
+        'date': record_date,
+        'totalTasks': normalize_non_negative_int(record.get('totalTasks', 0)),
+        'completedTasks': normalize_non_negative_int(record.get('completedTasks', 0)),
+        'stars': normalize_non_negative_int(record.get('stars', 0)),
+        'taskIds': normalize_task_ids(record.get('taskIds', [])),
+        'customTaskGoodCount': normalize_non_negative_int(record.get('customTaskGoodCount', 0)),
+        'customTaskBadCount': normalize_non_negative_int(record.get('customTaskBadCount', 0)),
+        'customTaskStats': normalize_custom_task_stats(record.get('customTaskStats', {})),
+    }
+
+
+def upsert_timing_stats_record(conn, user, record_date, record):
+    record_date = validate_date_text(record_date)
+    normalized = normalize_timing_stats_record(record, record_date)
+    now = utcnow_iso()
+    conn.execute(
+        '''
+        INSERT INTO timing_stat_records (
+            id, project, user_id, wechat_openid, record_date, stats_json, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(project, user_id, record_date) DO UPDATE SET
+            wechat_openid=excluded.wechat_openid,
+            stats_json=excluded.stats_json,
+            updated_at=excluded.updated_at,
+            deleted_at=NULL
+        ''',
+        (
+            gen_config_id('tsrec'),
+            TIMING_PROJECT,
+            user['id'],
+            user['wechat_openid'],
+            record_date,
+            json.dumps(normalized, ensure_ascii=False, separators=(',', ':')),
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    return normalized, now
+
+
+def list_timing_stats_records(conn, user, start_date, end_date):
+    start_date = validate_date_text(start_date)
+    end_date = validate_date_text(end_date)
+    if end_date < start_date:
+        raise ValueError('invalid timing stats record')
+    rows = conn.execute(
+        '''
+        SELECT stats_json
+        FROM timing_stat_records
+        WHERE project=? AND user_id=? AND deleted_at IS NULL
+          AND record_date>=? AND record_date<=?
+        ORDER BY record_date ASC
+        ''',
+        (TIMING_PROJECT, user['id'], start_date, end_date),
+    ).fetchall()
+    records = []
+    for row in rows:
+        record = load_json_object(row['stats_json'], {})
+        records.append(normalize_timing_stats_record(record))
+    return records
+
+
+def delete_timing_stats_records(conn, user, start_date, end_date):
+    start_date = validate_date_text(start_date)
+    end_date = validate_date_text(end_date)
+    if end_date < start_date:
+        raise ValueError('invalid timing stats record')
+    now = utcnow_iso()
+    cursor = conn.execute(
+        '''
+        UPDATE timing_stat_records
+        SET deleted_at=?, updated_at=?
+        WHERE project=? AND user_id=? AND deleted_at IS NULL
+          AND record_date>=? AND record_date<=?
+        ''',
+        (now, now, TIMING_PROJECT, user['id'], start_date, end_date),
+    )
+    conn.commit()
+    return cursor.rowcount, now

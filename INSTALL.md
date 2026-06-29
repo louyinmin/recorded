@@ -200,6 +200,14 @@ PATCH /api/timing/plan-config/default-task-duration
 POST /api/timing/plan-config/custom-plans
 PUT /api/timing/plan-config/custom-plans/:planId
 DELETE /api/timing/plan-config/custom-plans/:planId
+GET /api/timing/task-config
+PUT /api/timing/task-config
+POST /api/timing/task-config/tasks
+PUT /api/timing/task-config/tasks/:taskId
+DELETE /api/timing/task-config/tasks/:taskId
+GET /api/timing/stats?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+PUT /api/timing/stats/:date
+DELETE /api/timing/stats?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 ```
 
 NBA 用户配置请求和响应中的 `config` 结构：

@@ -669,6 +669,208 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(final.status_code, 200)
         self.assertEqual(final.get_json()['config']['customPlans'], [])
 
+    def test_timing_task_config_crud_and_version_conflicts(self):
+        def fake_exchange(appid, secret, code):
+            return {
+                'openid': 'task-openid',
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+
+        session = self.client.post('/api/timing/wechat/session', json={'code': 'task'})
+        self.assertEqual(session.status_code, 200)
+        headers = {'Authorization': 'Bearer ' + session.get_json()['sessionToken']}
+
+        initial = self.client.get('/api/timing/task-config', headers=headers)
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.get_json()['version'], 0)
+        self.assertEqual(initial.get_json()['config'], {'tasks': []})
+
+        created = self.client.post(
+            '/api/timing/task-config/tasks',
+            json={
+                'title': '  Read ',
+                'startTime': '08:00',
+                'endTime': '08:30',
+                'type': 'regular',
+                'order': 0,
+                'version': 0,
+                'ignored': 'field',
+            },
+            headers=headers,
+        )
+        self.assertEqual(created.status_code, 200)
+        created_payload = created.get_json()
+        task_id = created_payload['task']['id']
+        self.assertEqual(created_payload['version'], 1)
+        self.assertEqual(created_payload['task']['title'], 'Read')
+        self.assertEqual(created_payload['task']['enabled'], True)
+        self.assertTrue(task_id.startswith('task_'))
+
+        stale = self.client.post(
+            '/api/timing/task-config/tasks',
+            json={
+                'title': 'Walk',
+                'startTime': '09:00',
+                'endTime': '09:30',
+                'type': 'special',
+                'order': 1,
+                'version': 0,
+            },
+            headers=headers,
+        )
+        self.assertEqual(stale.status_code, 409)
+        self.assertEqual(stale.get_json(), {'message': 'config version conflict', 'version': 1})
+
+        updated = self.client.put(
+            '/api/timing/task-config/tasks/' + task_id,
+            json={
+                'title': 'Read more',
+                'startTime': '08:10',
+                'endTime': '08:50',
+                'type': 'special',
+                'order': 2,
+                'enabled': False,
+                'version': 1,
+            },
+            headers=headers,
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.get_json()['version'], 2)
+        self.assertEqual(updated.get_json()['task']['enabled'], False)
+        self.assertEqual(updated.get_json()['task']['type'], 'special')
+
+        invalid = self.client.post(
+            '/api/timing/task-config/tasks',
+            json={
+                'title': 'Bad time',
+                'startTime': '10:00',
+                'endTime': '09:00',
+                'type': 'regular',
+                'order': 3,
+                'version': 2,
+            },
+            headers=headers,
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.get_json(), {'message': 'invalid timing task config'})
+
+        deleted = self.client.delete(
+            '/api/timing/task-config/tasks/' + task_id,
+            json={'version': 2},
+            headers=headers,
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.get_json()['version'], 3)
+
+        final = self.client.get('/api/timing/task-config', headers=headers)
+        self.assertEqual(final.status_code, 200)
+        self.assertEqual(final.get_json()['config'], {'tasks': []})
+
+    def test_timing_stats_records_are_date_ranged_and_user_scoped(self):
+        def fake_exchange(appid, secret, code):
+            return {
+                'openid': 'stats-openid-' + code,
+                'unionid': '',
+            }
+
+        self.patch_code_exchange(fake_exchange)
+
+        first_session = self.client.post('/api/timing/wechat/session', json={'code': 'one'})
+        second_session = self.client.post('/api/timing/wechat/session', json={'code': 'two'})
+        self.assertEqual(first_session.status_code, 200)
+        self.assertEqual(second_session.status_code, 200)
+        first_headers = {'Authorization': 'Bearer ' + first_session.get_json()['sessionToken']}
+        second_headers = {'Authorization': 'Bearer ' + second_session.get_json()['sessionToken']}
+
+        saved = self.client.put(
+            '/api/timing/stats/2026-06-29',
+            json={'record': {
+                'date': '2026-06-29',
+                'totalTasks': 4,
+                'completedTasks': 3,
+                'stars': 2,
+                'taskIds': ['task_a', 'task_b', 'task_a', ''],
+                'customTaskGoodCount': 2,
+                'customTaskBadCount': 1,
+                'customTaskStats': {
+                    ' task_a ': {
+                        'goodCount': 2,
+                        'badCount': 0,
+                        'lastResult': 'good',
+                        'lastCompletedAt': 1782720000000,
+                    },
+                    'task_b': {
+                        'goodCount': 0,
+                        'badCount': 1,
+                        'lastResult': 'bad',
+                    },
+                },
+            }},
+            headers=first_headers,
+        )
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.get_json()['record'], {
+            'date': '2026-06-29',
+            'totalTasks': 4,
+            'completedTasks': 3,
+            'stars': 2,
+            'taskIds': ['task_a', 'task_b'],
+            'customTaskGoodCount': 2,
+            'customTaskBadCount': 1,
+            'customTaskStats': {
+                'task_a': {
+                    'goodCount': 2,
+                    'badCount': 0,
+                    'lastResult': 'good',
+                    'lastCompletedAt': 1782720000000,
+                },
+                'task_b': {
+                    'goodCount': 0,
+                    'badCount': 1,
+                    'lastResult': 'bad',
+                },
+            },
+        })
+
+        listed = self.client.get(
+            '/api/timing/stats?startDate=2026-06-01&endDate=2026-06-30',
+            headers=first_headers,
+        )
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(len(listed.get_json()['records']), 1)
+        self.assertEqual(listed.get_json()['records'][0]['date'], '2026-06-29')
+
+        isolated = self.client.get(
+            '/api/timing/stats?startDate=2026-06-01&endDate=2026-06-30',
+            headers=second_headers,
+        )
+        self.assertEqual(isolated.status_code, 200)
+        self.assertEqual(isolated.get_json()['records'], [])
+
+        mismatch = self.client.put(
+            '/api/timing/stats/2026-06-30',
+            json={'record': {'date': '2026-06-29'}},
+            headers=first_headers,
+        )
+        self.assertEqual(mismatch.status_code, 400)
+        self.assertEqual(mismatch.get_json(), {'message': 'invalid timing stats record'})
+
+        deleted = self.client.delete(
+            '/api/timing/stats?startDate=2026-06-01&endDate=2026-06-30',
+            headers=first_headers,
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.get_json()['deletedCount'], 1)
+
+        after_delete = self.client.get(
+            '/api/timing/stats?startDate=2026-06-01&endDate=2026-06-30',
+            headers=first_headers,
+        )
+        self.assertEqual(after_delete.status_code, 200)
+        self.assertEqual(after_delete.get_json()['records'], [])
+
 
 if __name__ == '__main__':
     unittest.main()
