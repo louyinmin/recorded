@@ -1,0 +1,410 @@
+# 旅游记账系统 (Recorded) - 项目基础上下文
+
+> 本文档是 SDD 流程的基础上下文文件，描述项目技术栈、架构、业务域等核心信息。
+
+---
+
+## 1. 项目概述
+
+**项目名称**: recorded  
+**项目类型**: 轻量级双模块管理系统（旅游记账 + 到期管理）  
+**架构风格**: 前后端分离  
+**部署方式**: 单机部署（支持一键部署脚本）
+
+### 1.1 核心价值主张
+
+在同一套轻量级服务器资源上提供两个互不干扰的实用工具：
+
+- 旅游记账：将复杂的旅行财务管理简化为“一次旅行一个页面”
+- 到期管理：集中管理会员、订阅、云服务与到期提醒
+
+### 1.2 目标用户
+
+- 个人旅行者
+- 家庭出行
+- 朋友结伴旅行
+- 学生群体
+- 企业团队
+
+---
+
+## 2. 技术栈
+
+### 2.1 后端技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Python | 3.x | 编程语言 |
+| Flask | - | Web 框架 |
+| SQLite | - | 数据库 |
+| Nginx | - | 反向代理/静态资源服务 |
+
+### 2.2 前端技术栈
+
+| 技术 | 用途 |
+|------|------|
+| HTML5 | 页面结构 |
+| CSS3 | 样式设计 |
+| JavaScript (ES6+) | 交互逻辑 |
+| LocalStorage | 本地存储（Token） |
+
+### 2.3 部署技术栈
+
+| 技术 | 用途 |
+|------|------|
+| Bash | 部署脚本 |
+| Nginx | 生产环境服务器 |
+| systemd | 服务管理 |
+
+---
+
+## 3. 系统架构
+
+### 3.1 整体架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        客户端层                              │
+│              (浏览器 / 移动端 / 微信浏览器)                   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Nginx 反向代理                          │
+│         (静态资源服务 + API 请求转发 + 安全防护)              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Flask 应用服务                           │
+│   (旅游记账 API + 到期管理 API + 各自独立的认证与业务逻辑)     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     SQLite 数据库                            │
+│                   (data.db 单文件存储)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 架构特点
+
+- **前后端分离**: 前端纯静态页面，通过 AJAX 调用后端 API
+- **轻量级部署**: 单文件数据库，无需独立数据库服务器
+- **移动端优先**: 专门为移动设备和微信浏览器优化
+- **零配置**: 开箱即用，一键部署
+
+---
+
+## 4. 业务域
+
+项目当前包含两个独立业务域：
+
+- **旅游记账领域**
+- **到期管理领域**
+
+### 4.1 核心领域模型
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      旅游记账领域                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │   旅行      │◄───────►│  记账记录    │                   │
+│   │  (Trip)     │  1 : N  │  (Record)   │                   │
+│   └─────────────┘         └─────────────┘                   │
+│          │                          │                       │
+│          │                          │                       │
+│          ▼                          ▼                       │
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │  支付人      │         │   分类      │                   │
+│   │  (Payer)    │         │ (Category)  │                   │
+│   └─────────────┘         └─────────────┘                   │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 业务实体
+
+| 实体 | 说明 | 核心属性 |
+|------|------|----------|
+| **旅行 (Trip)** | 一次旅行的基本信息 | 名称、起止日期、备注 |
+| **记账记录 (Record)** | 具体的费用支出 | 类别、金额、支付人、日期、备注 |
+| **支付人 (Payer)** | 费用支付者名单 | 姓名 |
+| **分类 (Category)** | 费用类型 | 名称 |
+
+### 4.3 业务场景
+
+1. **旅行创建** - 用户创建新的旅行计划
+2. **费用记录** - 在旅行中添加各项支出
+3. **统计分析** - 查看按支付人/类别的费用分布
+4. **数据导出** - 导出 CSV 格式的账单
+
+---
+
+## 5. 数据库设计
+
+### 5.1 表结构
+
+```sql
+-- 旅行表
+CREATE TABLE trips (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    start_date TEXT,
+    end_date TEXT,
+    note TEXT,
+    created_at TEXT
+);
+
+-- 记账记录表
+CREATE TABLE records (
+    id TEXT PRIMARY KEY,
+    trip_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL,
+    payer TEXT NOT NULL,
+    date TEXT,
+    note TEXT,
+    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+);
+
+-- 支付人表
+CREATE TABLE payers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL
+);
+
+-- 分类表
+CREATE TABLE categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL
+);
+```
+
+### 5.2 默认分类
+
+- 交通工具（飞机/动车/自驾）
+- 住宿
+- 餐费
+- 打车
+
+---
+
+## 6. API 设计
+
+### 6.1 认证相关
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/login` | POST | 用户登录，获取 Token |
+| `/api/wechat/session` | POST | 兼容登录入口，必须传 `app` 来选择小程序密钥 |
+| `/api/nba/wechat/session` | POST | NBA 小程序微信登录，使用 NBA AppID/AppSecret，返回 `app=nba` |
+| `/api/timing/wechat/session` | POST | Timing 小程序微信登录，使用 Timing AppID/AppSecret，返回 `app=timing` |
+| `/api/password` | POST | 兼容保留，固定返回 403（请到续费雷达修改密码） |
+
+### 6.2 旅行管理
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/trips` | GET | 获取旅行列表 |
+| `/api/trips` | POST | 创建新旅行 |
+| `/api/trips/:id` | GET | 获取旅行详情 |
+| `/api/trips/:id` | PUT | 更新旅行信息 |
+| `/api/trips/:id` | DELETE | 删除旅行 |
+
+### 6.3 记账记录
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/trips/:id/records` | POST | 添加记账记录 |
+| `/api/records/:id` | PUT | 更新记录 |
+| `/api/records/:id` | DELETE | 删除记录 |
+
+### 6.4 基础数据
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/payers` | GET/POST | 支付人管理 |
+| `/api/categories` | GET/POST | 分类管理 |
+
+### 6.5 导出
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/trips/:id/export` | GET | 导出 CSV |
+
+### 6.6 NBA 球员数据
+
+接口调用细节见 [NBA API](../../projects/nba_api/docs/api.md)。
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/nba/players` | GET | 小程序读取球员列表，支持 `q`、`teamTid`、`team`、`position`、`limit`、`offset` |
+| `/api/nba/players/search` | GET | 按中文名或英文名搜索球员，支持 `q`、`keyword`、`name` |
+| `/api/nba/players/batch` | GET | Read full player details by `pids`; each item includes ordered `cards`, `missingPids`, and `dataVersion` |
+| `/api/nba/players/:pid` | GET | Read one full player detail; includes ordered `cards` and compatibility `image` |
+| `/api/nba/players/:pid/cards` | GET | Read ordered card variants for one player |
+| `/api/nba/filters` | GET | 获取球队和位置筛选项 |
+| `/api/nba/card-images/:filename` | GET | Serve local player card images from `NBA_IMAGE_DIR` |
+| `/api/nba/images/:filename` | GET | Compatibility alias for local player card images |
+| `/api/nba/images/missing` | GET | 获取未匹配到球星卡图片的球员清单 |
+| `/api/nba/avatars/:filename` | GET | 展示本地球员头像图片 |
+| `/api/nba/avatars/missing` | GET | 获取未匹配到头像图片的球员清单 |
+| `/api/nba/team-images/:filename` | GET | 展示本地球队图标图片 |
+| `/api/nba/team-images/missing` | GET | 获取未匹配到球队图标的球队清单 |
+| `/api/nba/user-config` | GET/PATCH | 同步当前微信用户的 NBA 小程序配置 |
+| `/api/nba/sync/player` | POST | 从新浪 NBA 采集并入库单个球员，参数 `pid` |
+| `/api/nba/sync/images` | POST | Build player card records from `nba_images`; preferred upload names are `English_Name.{ext}`, `English_Name_1.{ext}`, `English_Name_2.{ext}` |
+| `/api/nba/sync/avatars` | POST | 按球员英文名匹配 `nba_avatar` 目录下的头像图片 |
+| `/api/nba/sync/team-images` | POST | 按球队名称匹配 `nba_team_images` 目录下的球队图标 |
+| `/api/nba/sync/rookies-2026` | POST | 从直播吧 2026 首轮选秀页面采集新秀并归到“2026 新秀”球队分类 |
+| `/api/nba/sync` | POST | 从新浪 NBA 入口采集球队、完整名单并并发同步球员详情 |
+
+2026 新秀的选中球队、详情标签、大学球队、体测、模板和数据统计保存在 `extension.rookie`，不覆盖现役球员球队字段。
+
+NBA user config contains `associated_home_player_pid`, `current_home_player_pid`, `current_home_card_id`, `home_player_card_selection`, and `search_default_player_pid`.
+
+### 6.7 Timing 计划配置
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/timing/plan-config` | GET/PUT | 读取或整份替换当前微信用户的 Timing 计划配置 |
+| `/api/timing/plan-config/default-task-duration` | PATCH | 更新内置首页任务的默认时长 |
+| `/api/timing/plan-config/custom-plans` | POST | 新增自定义计划 |
+| `/api/timing/plan-config/custom-plans/:planId` | PUT/DELETE | 更新或删除自定义计划 |
+
+### 6.8 Timing 任务配置与统计
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/timing/task-config` | GET/PUT | 读取或整份替换当前微信用户的任务页配置 |
+| `/api/timing/task-config/tasks` | POST | 新增任务页任务 |
+| `/api/timing/task-config/tasks/:taskId` | PUT/DELETE | 更新或删除任务页任务 |
+| `/api/timing/stats` | GET | 按 `startDate` 和 `endDate` 读取当前微信用户的统计记录 |
+| `/api/timing/stats/:date` | PUT | 按日期保存当前微信用户的统计记录 |
+| `/api/timing/stats` | DELETE | 按 `startDate` 和 `endDate` 软删除当前微信用户的统计记录 |
+
+任务配置中的 `type` 仅支持 `regular` 和 `special`；统计记录按微信用户和日期隔离保存。
+
+---
+
+## 7. 安全设计
+
+### 7.1 认证机制
+
+- **统一账号**: 旅行记账与续费雷达共用 `expiry_users` 账号体系
+- **Token 认证**: 登录后返回会话 Token，后续请求通过 `Authorization: Bearer <token>` 传递
+- **会话存储**: Token 存储在 `expiry_sessions` 表中，旅行记账与续费雷达共用会话体系
+
+### 7.2 安全措施
+
+- Nginx 限制敏感文件访问（.db, .py, .sh）
+- SQL 参数绑定防止 SQL 注入
+- 输入数据严格验证
+
+---
+
+## 8. 部署架构
+
+### 8.1 部署流程
+
+```bash
+# 一键部署脚本
+./run_server.sh
+```
+
+部署步骤：
+1. 安装系统依赖 (Python3, pip, nginx)
+2. 创建 Python 虚拟环境并安装 Flask
+3. 初始化数据库结构
+4. 配置 Nginx 反向代理
+5. 启动 Flask 后端服务
+6. 重启 Nginx 服务
+
+### 8.2 环境要求
+
+- **操作系统**: Ubuntu 22.04 LTS
+- **Python 版本**: Python 3.x
+- **内存**: 至少 512MB RAM
+- **存储**: 约 50MB 可用空间
+- **网络**: 开放 80 端口
+
+---
+
+## 9. 项目结构
+
+```
+recorded/
+├── app.py                         # Flask entrypoint, Travel API, route compatibility
+├── home.html                      # Unified browser entry page
+├── requirements.txt               # Python dependencies
+├── nginx.conf                     # Nginx config template
+├── run_server.sh                  # Deployment script
+├── redeploy.sh                    # Redeploy script
+├── run_expiry_reminder.sh         # Expiry reminder runner
+├── projects/
+│   ├── life_atlas/                # Life Atlas frontend, backend, docs
+│   ├── travel_accounting/         # Travel Accounting frontend, docs
+│   ├── expiry_radar/              # Expiry Radar frontend, backend, docs
+│   ├── nba_api/                   # NBA Mini Program backend, docs, manifests
+│   ├── timing_api/                # Timing Mini Program backend, docs
+│   └── shared/                    # Shared frontend assets and WeChat backend
+├── docs/
+│   ├── architecture/              # Cross-project architecture notes
+│   └── operations/                # Deployment and operation notes
+├── expiry_backend/                # Compatibility package entry
+├── life_backend/                  # Compatibility package entry
+├── nba_backend/                   # Compatibility package entry
+├── timing_backend/                # Compatibility package entry
+├── wechat_backend/                # Compatibility package entry
+└── .qoder/
+    └── repowiki/         # AI 生成的知识库
+        └── zh/
+            └── content/  # 详细文档
+```
+
+---
+
+## 10. 扩展性考虑
+
+### 10.1 水平扩展
+
+- 当前架构适合单机部署
+- 可通过负载均衡扩展
+- SQLite 可迁移至 PostgreSQL/MySQL
+
+### 10.2 功能扩展
+
+- 多用户支持和团队协作
+- 更丰富的统计分析
+- 移动端原生应用
+- 云端同步和备份
+- 第三方支付集成
+
+---
+
+## 11. 参考文档
+
+详细文档请查看 `.qoder/repowiki/zh/content/` 目录：
+
+- [项目概述](../../.qoder/repowiki/zh/content/项目概述/项目概述.md)
+- [快速开始](../../.qoder/repowiki/zh/content/快速开始.md)
+- [系统架构/整体设计](../../.qoder/repowiki/zh/content/系统架构/整体设计.md)
+- [数据库设计](../../.qoder/repowiki/zh/content/数据库设计.md)
+- [API接口文档](../../.qoder/repowiki/zh/content/API接口文档/)
+- [前端页面详解](../../.qoder/repowiki/zh/content/前端页面详解/)
+- [核心功能实现](../../.qoder/repowiki/zh/content/核心功能实现/)
+- [部署指南](../../.qoder/repowiki/zh/content/部署指南.md)
+
+---
+
+## 12. 默认访问信息
+
+- **管理员初始化**: 首次部署创建 `lou` 作为续费雷达管理员
+- **部署后访问**: 脚本会输出现场访问地址
+
+---
+
+*本文档由 Qoder AI 自动生成，基于代码库扫描分析*

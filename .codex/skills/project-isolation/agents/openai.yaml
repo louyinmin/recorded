@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Isolation"
+  short_description: "Keep Recorded project changes inside the right product boundary."
+  default_prompt: "Use this skill before changing Recorded project files so product-specific and shared files stay separated."

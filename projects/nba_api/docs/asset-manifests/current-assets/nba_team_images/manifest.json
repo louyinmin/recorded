@@ -1,0 +1,452 @@
+[
+  {
+    "team": "Atlanta Hawks",
+    "abbreviation": "ATL",
+    "slug": "hawks",
+    "teamId": 1610612737,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612737/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Atlanta_Hawks.svg",
+    "format": "svg",
+    "bytes": 1882,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Atlanta_Hawks.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Boston Celtics",
+    "abbreviation": "BOS",
+    "slug": "celtics",
+    "teamId": 1610612738,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Boston_Celtics.svg",
+    "format": "svg",
+    "bytes": 31426,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Boston_Celtics.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Brooklyn Nets",
+    "abbreviation": "BKN",
+    "slug": "nets",
+    "teamId": 1610612751,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612751/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Brooklyn_Nets.svg",
+    "format": "svg",
+    "bytes": 6207,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Brooklyn_Nets.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Charlotte Hornets",
+    "abbreviation": "CHA",
+    "slug": "hornets",
+    "teamId": 1610612766,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612766/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Charlotte_Hornets.svg",
+    "format": "svg",
+    "bytes": 9095,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Charlotte_Hornets.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Chicago Bulls",
+    "abbreviation": "CHI",
+    "slug": "bulls",
+    "teamId": 1610612741,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612741/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Chicago_Bulls.svg",
+    "format": "svg",
+    "bytes": 8876,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Chicago_Bulls.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Cleveland Cavaliers",
+    "abbreviation": "CLE",
+    "slug": "cavaliers",
+    "teamId": 1610612739,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612739/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Cleveland_Cavaliers.svg",
+    "format": "svg",
+    "bytes": 1212,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Cleveland_Cavaliers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Dallas Mavericks",
+    "abbreviation": "DAL",
+    "slug": "mavericks",
+    "teamId": 1610612742,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612742/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Dallas_Mavericks.svg",
+    "format": "svg",
+    "bytes": 11931,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Dallas_Mavericks.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Denver Nuggets",
+    "abbreviation": "DEN",
+    "slug": "nuggets",
+    "teamId": 1610612743,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612743/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Denver_Nuggets.svg",
+    "format": "svg",
+    "bytes": 2916,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Denver_Nuggets.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Detroit Pistons",
+    "abbreviation": "DET",
+    "slug": "pistons",
+    "teamId": 1610612765,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612765/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Detroit_Pistons.svg",
+    "format": "svg",
+    "bytes": 5623,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Detroit_Pistons.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Golden State Warriors",
+    "abbreviation": "GSW",
+    "slug": "warriors",
+    "teamId": 1610612744,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612744/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Golden_State_Warriors.svg",
+    "format": "svg",
+    "bytes": 3171,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Golden_State_Warriors.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Houston Rockets",
+    "abbreviation": "HOU",
+    "slug": "rockets",
+    "teamId": 1610612745,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612745/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Houston_Rockets.svg",
+    "format": "svg",
+    "bytes": 4452,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Houston_Rockets.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Indiana Pacers",
+    "abbreviation": "IND",
+    "slug": "pacers",
+    "teamId": 1610612754,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612754/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Indiana_Pacers.svg",
+    "format": "svg",
+    "bytes": 2562,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Indiana_Pacers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "LA Clippers",
+    "abbreviation": "LAC",
+    "slug": "clippers",
+    "teamId": 1610612746,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612746/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/LA_Clippers.svg",
+    "format": "svg",
+    "bytes": 4262,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/LA_Clippers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Los Angeles Lakers",
+    "abbreviation": "LAL",
+    "slug": "lakers",
+    "teamId": 1610612747,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612747/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Los_Angeles_Lakers.svg",
+    "format": "svg",
+    "bytes": 12296,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Los_Angeles_Lakers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Memphis Grizzlies",
+    "abbreviation": "MEM",
+    "slug": "grizzlies",
+    "teamId": 1610612763,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612763/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Memphis_Grizzlies.svg",
+    "format": "svg",
+    "bytes": 3282,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Memphis_Grizzlies.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Miami Heat",
+    "abbreviation": "MIA",
+    "slug": "heat",
+    "teamId": 1610612748,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612748/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Miami_Heat.svg",
+    "format": "svg",
+    "bytes": 6159,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Miami_Heat.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Milwaukee Bucks",
+    "abbreviation": "MIL",
+    "slug": "bucks",
+    "teamId": 1610612749,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612749/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Milwaukee_Bucks.svg",
+    "format": "svg",
+    "bytes": 5336,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Milwaukee_Bucks.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Minnesota Timberwolves",
+    "abbreviation": "MIN",
+    "slug": "timberwolves",
+    "teamId": 1610612750,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612750/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Minnesota_Timberwolves.svg",
+    "format": "svg",
+    "bytes": 6917,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Minnesota_Timberwolves.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "New Orleans Pelicans",
+    "abbreviation": "NOP",
+    "slug": "pelicans",
+    "teamId": 1610612740,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612740/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/New_Orleans_Pelicans.svg",
+    "format": "svg",
+    "bytes": 15595,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/New_Orleans_Pelicans.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "New York Knicks",
+    "abbreviation": "NYK",
+    "slug": "knicks",
+    "teamId": 1610612752,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612752/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/New_York_Knicks.svg",
+    "format": "svg",
+    "bytes": 7473,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/New_York_Knicks.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Oklahoma City Thunder",
+    "abbreviation": "OKC",
+    "slug": "thunder",
+    "teamId": 1610612760,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612760/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Oklahoma_City_Thunder.svg",
+    "format": "svg",
+    "bytes": 8885,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Oklahoma_City_Thunder.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Orlando Magic",
+    "abbreviation": "ORL",
+    "slug": "magic",
+    "teamId": 1610612753,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612753/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Orlando_Magic.svg",
+    "format": "svg",
+    "bytes": 5155,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Orlando_Magic.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Philadelphia 76ers",
+    "abbreviation": "PHI",
+    "slug": "sixers",
+    "teamId": 1610612755,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612755/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Philadelphia_76ers.svg",
+    "format": "svg",
+    "bytes": 3400,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Philadelphia_76ers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Phoenix Suns",
+    "abbreviation": "PHX",
+    "slug": "suns",
+    "teamId": 1610612756,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612756/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Phoenix_Suns.svg",
+    "format": "svg",
+    "bytes": 2459,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Phoenix_Suns.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Portland Trail Blazers",
+    "abbreviation": "POR",
+    "slug": "blazers",
+    "teamId": 1610612757,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612757/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Portland_Trail_Blazers.svg",
+    "format": "svg",
+    "bytes": 2051,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Portland_Trail_Blazers.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Sacramento Kings",
+    "abbreviation": "SAC",
+    "slug": "kings",
+    "teamId": 1610612758,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612758/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Sacramento_Kings.svg",
+    "format": "svg",
+    "bytes": 3669,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Sacramento_Kings.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "San Antonio Spurs",
+    "abbreviation": "SAS",
+    "slug": "spurs",
+    "teamId": 1610612759,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612759/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/San_Antonio_Spurs.svg",
+    "format": "svg",
+    "bytes": 1912,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/San_Antonio_Spurs.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Toronto Raptors",
+    "abbreviation": "TOR",
+    "slug": "raptors",
+    "teamId": 1610612761,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612761/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Toronto_Raptors.svg",
+    "format": "svg",
+    "bytes": 10023,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Toronto_Raptors.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Utah Jazz",
+    "abbreviation": "UTA",
+    "slug": "jazz",
+    "teamId": 1610612762,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612762/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Utah_Jazz.svg",
+    "format": "svg",
+    "bytes": 1492,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Utah_Jazz.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  },
+  {
+    "team": "Washington Wizards",
+    "abbreviation": "WAS",
+    "slug": "wizards",
+    "teamId": 1610612764,
+    "sourceImage": "https://cdn.nba.com/logos/nba/1610612764/primary/L/logo.svg",
+    "file": "/Users/mark/codex/recorded/nba_team_images/Washington_Wizards.svg",
+    "format": "svg",
+    "bytes": 3156,
+    "pngFile": "/Users/mark/codex/recorded/nba_team_images/Washington_Wizards.png",
+    "pngSize": [
+      512,
+      512
+    ]
+  }
+]

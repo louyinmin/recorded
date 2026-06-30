@@ -21,7 +21,22 @@ from expiry_backend.service import (
     verify_password,
 )
 
-BASE_DIR = os.environ.get('RECORDED_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.environ.get('RECORDED_BASE_DIR', APP_DIR)
+PROJECTS_DIR = os.path.join(APP_DIR, 'projects')
+LIFE_FRONTEND_DIR = os.path.join(PROJECTS_DIR, 'life_atlas', 'frontend')
+TRAVEL_FRONTEND_DIR = os.path.join(PROJECTS_DIR, 'travel_accounting', 'frontend')
+EXPIRY_FRONTEND_DIR = os.path.join(PROJECTS_DIR, 'expiry_radar', 'frontend')
+SHARED_FRONTEND_DIR = os.path.join(PROJECTS_DIR, 'shared', 'frontend')
+STATIC_PAGE_FILES = {
+    'home.html': os.path.join(APP_DIR, 'home.html'),
+    'login.html': os.path.join(LIFE_FRONTEND_DIR, 'login.html'),
+    'life.html': os.path.join(LIFE_FRONTEND_DIR, 'life.html'),
+    'travel-login.html': os.path.join(TRAVEL_FRONTEND_DIR, 'travel-login.html'),
+    'trips.html': os.path.join(TRAVEL_FRONTEND_DIR, 'trips.html'),
+    'trip.html': os.path.join(TRAVEL_FRONTEND_DIR, 'trip.html'),
+    'settings.html': os.path.join(TRAVEL_FRONTEND_DIR, 'settings.html'),
+}
 app = Flask(__name__, static_folder=None)
 
 DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
@@ -725,19 +740,84 @@ def export_trip_excel(trip_id):
 
 # ===== 静态文件服务（无 Nginx 时 Flask 自身托管） =====
 
+@app.route('/life/assets/<path:filename>')
+def serve_life_assets(filename):
+    return send_from_directory(os.path.join(LIFE_FRONTEND_DIR, 'assets'), filename)
+
+
+@app.route('/travel/assets/<path:filename>')
+def serve_travel_assets(filename):
+    return send_from_directory(os.path.join(TRAVEL_FRONTEND_DIR, 'assets'), filename)
+
+
+@app.route('/shared/assets/<path:filename>')
+def serve_shared_assets(filename):
+    return send_from_directory(os.path.join(SHARED_FRONTEND_DIR, 'assets'), filename)
+
+
+@app.route('/expiry/assets/<path:filename>')
+def serve_expiry_assets(filename):
+    return send_from_directory(os.path.join(EXPIRY_FRONTEND_DIR, 'assets'), filename)
+
+
+@app.route('/assets/uploads/<path:filename>')
+def serve_uploaded_assets(filename):
+    return send_from_directory(os.path.join(BASE_DIR, 'assets', 'uploads'), filename)
+
+
+def send_static_file(path):
+    return send_from_directory(os.path.dirname(path), os.path.basename(path))
+
+
+def resolve_legacy_asset(filename):
+    asset_map = {
+        'css/life.css': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'css', 'life.css'),
+        'css/style.css': os.path.join(SHARED_FRONTEND_DIR, 'assets', 'css', 'style.css'),
+        'js/life-account.js': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'js', 'life-account.js'),
+        'js/life-sync.js': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'js', 'life-sync.js'),
+        'js/life.js': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'js', 'life.js'),
+        'js/login.js': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'js', 'login.js'),
+        'js/common.js': os.path.join(TRAVEL_FRONTEND_DIR, 'assets', 'js', 'common.js'),
+        'js/travel-login.js': os.path.join(TRAVEL_FRONTEND_DIR, 'assets', 'js', 'travel-login.js'),
+        'js/trips.js': os.path.join(TRAVEL_FRONTEND_DIR, 'assets', 'js', 'trips.js'),
+        'js/trip.js': os.path.join(TRAVEL_FRONTEND_DIR, 'assets', 'js', 'trip.js'),
+        'js/settings.js': os.path.join(TRAVEL_FRONTEND_DIR, 'assets', 'js', 'settings.js'),
+        'img/life-login-hero-left.png': os.path.join(LIFE_FRONTEND_DIR, 'assets', 'img', 'life-login-hero-left.png'),
+    }
+    if filename.startswith('icons/life/'):
+        return os.path.join(LIFE_FRONTEND_DIR, 'assets', filename)
+    return asset_map.get(filename)
+
+
+@app.route('/assets/<path:filename>')
+def serve_legacy_assets(filename):
+    path = resolve_legacy_asset(filename)
+    if path:
+        return send_static_file(path)
+    return send_from_directory(os.path.join(APP_DIR, 'assets'), filename)
+
+
+@app.route('/expiry/<path:filename>')
+def serve_expiry_static(filename):
+    return send_from_directory(EXPIRY_FRONTEND_DIR, filename)
+
+
 @app.route('/<path:filename>')
 def serve_static(filename):
-    return send_from_directory(BASE_DIR, filename)
+    path = STATIC_PAGE_FILES.get(filename)
+    if path:
+        return send_static_file(path)
+    return send_from_directory(APP_DIR, filename)
 
 @app.route('/')
 def serve_index():
-    return send_from_directory(BASE_DIR, 'home.html')
+    return send_from_directory(APP_DIR, 'home.html')
 
 
 @app.route('/expiry')
 @app.route('/expiry/')
 def serve_expiry_index():
-    return send_from_directory(os.path.join(BASE_DIR, 'expiry'), 'login.html')
+    return send_from_directory(EXPIRY_FRONTEND_DIR, 'login.html')
 
 # ===== 启动 =====
 

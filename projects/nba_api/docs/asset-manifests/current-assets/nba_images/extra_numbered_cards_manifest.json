@@ -1,0 +1,850 @@
+[
+  {
+    "player": "LaMelo Ball",
+    "base": "LaMelo_Ball",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/LaMelo_Ball_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/LaMelo_Ball_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "LaMelo Ball #153 [Rookie] 2020 Panini Donruss Optic",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2020-panini-donruss-optic/lamelo-ball-153",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr3fjvdruzeswwqxnv/1600.jpg"
+  },
+  {
+    "player": "LaMelo Ball",
+    "base": "LaMelo_Ball",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/LaMelo_Ball_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/LaMelo_Ball_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "LaMelo Ball #102 2020 Panini Recon",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2020-panini-recon/lamelo-ball-102",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr65x5yc4odvc67cdm/1600.jpg"
+  },
+  {
+    "player": "Trae Young",
+    "base": "Trae_Young",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Trae_Young_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Trae_Young_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Trae Young #198 [Rookie] 2018 Panini Donruss Optic",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2018-panini-donruss-optic/trae-young-198",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrjilmlqmlh6gzu2mm/1600.jpg"
+  },
+  {
+    "player": "Trae Young",
+    "base": "Trae_Young",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Trae_Young_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Trae_Young_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Trae Young #117 2023 Panini Hoops",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2023-panini-hoops/trae-young-117",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/lak4bw6tjrgsgptv/1600.jpg"
+  },
+  {
+    "player": "Paolo Banchero",
+    "base": "Paolo_Banchero",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Paolo_Banchero_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Paolo_Banchero_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Paolo Banchero [Purple Winter] #281 2022 Panini Hoops",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2022-panini-hoops/paolo-banchero-purple-winter-281",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrjfgnwlaxroy2hiuh/1600.jpg"
+  },
+  {
+    "player": "Paolo Banchero",
+    "base": "Paolo_Banchero",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Paolo_Banchero_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Paolo_Banchero_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Paolo Banchero [Holo] #8B-9 2025 Topps 8-Bit Ballers",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-8-bit-ballers/paolo-banchero-holo-8b-9",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrwh2yvkqtzeulvo5s/1600.jpg"
+  },
+  {
+    "player": "Jalen Brunson",
+    "base": "Jalen_Brunson",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Jalen_Brunson_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jalen_Brunson_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jalen Brunson [Silver Prizm] #250 2018 Panini Prizm",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2018-panini-prizm/jalen-brunson-silver-prizm-250",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr332se23y7kc6zobw/1600.jpg"
+  },
+  {
+    "player": "Jalen Brunson",
+    "base": "Jalen_Brunson",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Jalen_Brunson_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jalen_Brunson_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jalen Brunson #PD-13 2025 Topps Chrome Patented",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome-patented/jalen-brunson-pd-13",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/htnwxb3vsjwuri2f/1600.jpg"
+  },
+  {
+    "player": "Joel Embiid",
+    "base": "Joel_Embiid",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Joel_Embiid_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Joel_Embiid_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Joel Embiid [Premium] #131 2024 Panini NBA Hoops",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-nba-hoops/joel-embiid-premium-131",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corretuicbtlg2lrzgji/1600.jpg"
+  },
+  {
+    "player": "Joel Embiid",
+    "base": "Joel_Embiid",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Joel_Embiid_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Joel_Embiid_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Joel Embiid #17 2023 Panini Hoops Skyview",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2023-panini-hoops-skyview/joel-embiid-17",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrwenxcmzifm7ltt2g/1600.jpg"
+  },
+  {
+    "player": "Jaylen Brown",
+    "base": "Jaylen_Brown",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Jaylen_Brown_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jaylen_Brown_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jaylen Brown #29 2024 Panini Select",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-select/jaylen-brown-29",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr4ylneand3qzhntlf/1600.jpg"
+  },
+  {
+    "player": "Jaylen Brown",
+    "base": "Jaylen_Brown",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Jaylen_Brown_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jaylen_Brown_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jaylen Brown #BB-40 2025 Topps Big Box Baller",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-big-box-baller/jaylen-brown-bb-40",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrja4qtfwu4wrxyfzd/1600.jpg"
+  },
+  {
+    "player": "Jayson Tatum",
+    "base": "Jayson_Tatum",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Jayson_Tatum_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jayson_Tatum_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jayson Tatum #4 2024 Panini Donruss Optic Downtown",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-optic-downtown/jayson-tatum-4",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr5o7zawazzfgq2nl5/1600.jpg"
+  },
+  {
+    "player": "Jayson Tatum",
+    "base": "Jayson_Tatum",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Jayson_Tatum_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Jayson_Tatum_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Jayson Tatum #284 2024 Panini Haunted Hoops",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-haunted-hoops/jayson-tatum-284",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/correjsguvhzjaajcga3/1600.jpg"
+  },
+  {
+    "player": "Donovan Mitchell",
+    "base": "Donovan_Mitchell",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Donovan_Mitchell_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Donovan_Mitchell_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Donovan Mitchell #BB-33 2025 Topps Big Box Baller",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-big-box-baller/donovan-mitchell-bb-33",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrgwkhq2x4uxmq4ab3/1600.jpg"
+  },
+  {
+    "player": "Donovan Mitchell",
+    "base": "Donovan_Mitchell",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Donovan_Mitchell_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Donovan_Mitchell_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Donovan Mitchell #117 [Rookie] 2017 Panini Prizm",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2017-panini-prizm/donovan-mitchell-117",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr3zryk47rx33xlfme/1600.jpg"
+  },
+  {
+    "player": "Tyrese Haliburton",
+    "base": "Tyrese_Haliburton",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Tyrese_Haliburton_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Tyrese_Haliburton_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Tyrese Haliburton #162 [Rookie] 2020 Panini Donruss Optic",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2020-panini-donruss-optic/tyrese-haliburton-162",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrvjszcenvbxt6cpyb/1600.jpg"
+  },
+  {
+    "player": "Tyrese Haliburton",
+    "base": "Tyrese_Haliburton",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Tyrese_Haliburton_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Tyrese_Haliburton_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Tyrese Haliburton #BB-39 2025 Topps Big Box Baller",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-big-box-baller/tyrese-haliburton-bb-39",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/correesdrf6aysrtqidb/1600.jpg"
+  },
+  {
+    "player": "Cade Cunningham",
+    "base": "Cade_Cunningham",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Cade_Cunningham_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Cade_Cunningham_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Cade Cunningham [Orange] #121 2021 Panini Chronicles Draft Picks",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2021-panini-chronicles-draft-picks/cade-cunningham-orange-121",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/6skxwskhwfcer5oy/1600.jpg"
+  },
+  {
+    "player": "Cade Cunningham",
+    "base": "Cade_Cunningham",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Cade_Cunningham_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Cade_Cunningham_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Cade Cunningham [Silver Autograph] #8 2024 Panini Prizm Black",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-prizm-black/cade-cunningham-silver-autograph-8",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr2mwwz4ivzijtrjpf/1600.jpg"
+  },
+  {
+    "player": "Giannis Antetokounmpo",
+    "base": "Giannis_Antetokounmpo",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Giannis_Antetokounmpo_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Giannis_Antetokounmpo_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Giannis Antetokounmpo #8 2024 Panini Donruss Optic Downtown",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-optic-downtown/giannis-antetokounmpo-8",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrvh5qf73hovotcshw/1600.jpg"
+  },
+  {
+    "player": "Giannis Antetokounmpo",
+    "base": "Giannis_Antetokounmpo",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Giannis_Antetokounmpo_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Giannis_Antetokounmpo_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Giannis Antetokounmpo #BB-30 2025 Topps Big Box Baller",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-big-box-baller/giannis-antetokounmpo-bb-30",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/2kp6a3cuuaxo5weu/1600.jpg"
+  },
+  {
+    "player": "Anthony Edwards",
+    "base": "Anthony_Edwards",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Anthony_Edwards_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Anthony_Edwards_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Anthony Edwards #13 2024 Panini Donruss Bomb Squad",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-bomb-squad/anthony-edwards-13",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/jj2pcv2b5dmbszq6/1600.jpg"
+  },
+  {
+    "player": "Anthony Edwards",
+    "base": "Anthony_Edwards",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Anthony_Edwards_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Anthony_Edwards_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Anthony Edwards #UV-7 2025 Topps Chrome Ultra Violet All-Stars",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome-ultra-violet-all-stars/anthony-edwards-uv-7",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corruubfqswnm4q65cd4/1600.jpg"
+  },
+  {
+    "player": "Nikola Jokic",
+    "base": "Nikola_Jokic",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Nikola_Jokic_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Nikola_Jokic_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Nikola Jokic #95 2025 Topps Signature Class",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-signature-class/nikola-jokic-95",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/bw7rfe24nvkumcmn/1600.jpg"
+  },
+  {
+    "player": "Nikola Jokic",
+    "base": "Nikola_Jokic",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Nikola_Jokic_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Nikola_Jokic_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Nikola Jokic #25 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/nikola-jokic-25",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/se5qvqvfkqacnhsv/1600.jpg"
+  },
+  {
+    "player": "Kevin Durant",
+    "base": "Kevin_Durant",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Kevin_Durant_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kevin_Durant_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kevin Durant [Superfractor] #155 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/kevin-durant-superfractor-155",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrdzh4xty2woxngdpa/1600.jpg"
+  },
+  {
+    "player": "Kevin Durant",
+    "base": "Kevin_Durant",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Kevin_Durant_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kevin_Durant_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kevin Durant #UV-3 2025 Topps Chrome Ultra Violet All-Stars",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome-ultra-violet-all-stars/kevin-durant-uv-3",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/phe226qcut5qi3g3/1600.jpg"
+  },
+  {
+    "player": "Kevin Durant",
+    "base": "Kevin_Durant",
+    "num": 3,
+    "file": "/Users/mark/codex/recorded/nba_images/Kevin_Durant_3.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kevin_Durant_3.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kevin Durant #210 2019 Panini Prizm",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2019-panini-prizm/kevin-durant-210",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corriq7z2krmlkapi4l5/1600.jpg"
+  },
+  {
+    "player": "Victor Wembanyama",
+    "base": "Victor_Wembanyama",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Victor_Wembanyama_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Victor_Wembanyama_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Victor Wembanyama #220 [Rookie] 2023 Panini Donruss",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2023-panini-donruss/victor-wembanyama-220",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr2aj64gnhalzon7mp/1600.jpg"
+  },
+  {
+    "player": "Victor Wembanyama",
+    "base": "Victor_Wembanyama",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Victor_Wembanyama_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Victor_Wembanyama_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Victor Wembanyama [Rookie Of The Year] #VW-6 [Rookie] 2023 Topps Now",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2023-topps-now/victor-wembanyama-rookie-of-the-year-vw-6",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/tnifyxb3scj6ymbu/1600.jpg"
+  },
+  {
+    "player": "Victor Wembanyama",
+    "base": "Victor_Wembanyama",
+    "num": 3,
+    "file": "/Users/mark/codex/recorded/nba_images/Victor_Wembanyama_3.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Victor_Wembanyama_3.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Victor Wembanyama [Refractor] #221 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/victor-wembanyama-refractor-221",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/wztemnw3weqt4424/1600.jpg"
+  },
+  {
+    "player": "Dylan Harper",
+    "base": "Dylan_Harper",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Dylan_Harper_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Dylan_Harper_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Dylan Harper [Refractor] #252 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/dylan-harper-refractor-252",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/measdvh62nvw2sxv/1600.jpg"
+  },
+  {
+    "player": "Dylan Harper",
+    "base": "Dylan_Harper",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Dylan_Harper_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Dylan_Harper_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Dylan Harper #NA-DH 2025 Topps New Applicants Autograph",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-new-applicants-autograph/dylan-harper-na-dh",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/warrii2r5hmi2qmp/1600.jpg"
+  },
+  {
+    "player": "Anthony Davis",
+    "base": "Anthony_Davis",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Anthony_Davis_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Anthony_Davis_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Anthony Davis [Winter] #75 2023 Panini Revolution",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2023-panini-revolution/anthony-davis-winter-75",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corriurz7i4xmsusfepw/1600.jpg"
+  },
+  {
+    "player": "Anthony Davis",
+    "base": "Anthony_Davis",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Anthony_Davis_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Anthony_Davis_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Anthony Davis [Holo Foil] #169 2025 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps/anthony-davis-holo-foil-169",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrt2fswwjccktx7udi/1600.jpg"
+  },
+  {
+    "player": "Kyrie Irving",
+    "base": "Kyrie_Irving",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Kyrie_Irving_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kyrie_Irving_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kyrie Irving #201 [Rookie] 2012 Panini Prizm",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2012-panini-prizm/kyrie-irving-201",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/ot3iba4xblao3f2e/1600.jpg"
+  },
+  {
+    "player": "Kyrie Irving",
+    "base": "Kyrie_Irving",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Kyrie_Irving_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kyrie_Irving_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kyrie Irving [Winter] #3 2024 Panini Donruss Pass The Rock",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-pass-the-rock/kyrie-irving-winter-3",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corryadcl2p5ge3h3qa3/1600.jpg"
+  },
+  {
+    "player": "Stephen Curry",
+    "base": "Stephen_Curry",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Stephen_Curry_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Stephen_Curry_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Stephen Curry [White Geometric Refractor] #201 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/stephen-curry-white-geometric-refractor-201",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrmzufgu2phlmupazb/1600.jpg"
+  },
+  {
+    "player": "Stephen Curry",
+    "base": "Stephen_Curry",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Stephen_Curry_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Stephen_Curry_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Stephen Curry #1 2024 Panini Donruss Bomb Squad",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-bomb-squad/stephen-curry-1",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrxx7s4omc72ghybai/1600.jpg"
+  },
+  {
+    "player": "Stephen Curry",
+    "base": "Stephen_Curry",
+    "num": 3,
+    "file": "/Users/mark/codex/recorded/nba_images/Stephen_Curry_3.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Stephen_Curry_3.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Stephen Curry #234 [Rookie] 2009 Upper Deck",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2009-upper-deck/stephen-curry-234",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrcpocms4kjo7nwt47/1600.jpg"
+  },
+  {
+    "player": "LeBron James",
+    "base": "LeBron_James",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/LeBron_James_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/LeBron_James_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "LeBron James #221 [Rookie] 2003 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2003-topps/lebron-james-221",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrave7qgyhvjx5dkoo/1600.jpg"
+  },
+  {
+    "player": "LeBron James",
+    "base": "LeBron_James",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/LeBron_James_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/LeBron_James_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "LeBron James [X-Fractor] #127 2025 Topps Chrome",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome/lebron-james-x-fractor-127",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrswdfmo7qvyj7s5u7/1600.jpg"
+  },
+  {
+    "player": "LeBron James",
+    "base": "LeBron_James",
+    "num": 3,
+    "file": "/Users/mark/codex/recorded/nba_images/LeBron_James_3.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/LeBron_James_3.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "LeBron James [Collection] #221 [Rookie] 2003 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2003-topps/lebron-james-collection-221",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/wkorugujpybny5i6/1600.jpg"
+  },
+  {
+    "player": "Luka Doncic",
+    "base": "Luka_Doncic",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Luka_Doncic_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Luka_Doncic_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Luka Doncic #280 [Rookie] 2018 Panini Prizm",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2018-panini-prizm/luka-doncic-280",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrb3x62mjviz7hqvce/1600.jpg"
+  },
+  {
+    "player": "Luka Doncic",
+    "base": "Luka_Doncic",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Luka_Doncic_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Luka_Doncic_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Luka Doncic #1 2024 Panini Donruss Optic Downtown",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2024-panini-donruss-optic-downtown/luka-doncic-1",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrtbnsmihshdwyp2ig/1600.jpg"
+  },
+  {
+    "player": "Luka Doncic",
+    "base": "Luka_Doncic",
+    "num": 3,
+    "file": "/Users/mark/codex/recorded/nba_images/Luka_Doncic_3.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Luka_Doncic_3.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Luka Doncic #LD-LAL 2025 Panini Instant",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-panini-instant/luka-doncic-ld-lal",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrqzfucfm7nr6zqljr/1600.jpg"
+  },
+  {
+    "player": "Kawhi Leonard",
+    "base": "Kawhi_Leonard",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Kawhi_Leonard_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kawhi_Leonard_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kawhi Leonard [Teal Refractor] #AC-1 2025 Topps Chrome Activators",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome-activators/kawhi-leonard-teal-refractor-ac-1",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrdmqtvvgb3cac77s7/1600.jpg"
+  },
+  {
+    "player": "Kawhi Leonard",
+    "base": "Kawhi_Leonard",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Kawhi_Leonard_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Kawhi_Leonard_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Kawhi Leonard [Gold] #142 2025 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps/kawhi-leonard-gold-142",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/uahs7slydp63ki24/1600.jpg"
+  },
+  {
+    "player": "James Harden",
+    "base": "James_Harden",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/James_Harden_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/James_Harden_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "James Harden [Gold Refractor] #AC-8 2025 Topps Chrome Activators",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps-chrome-activators/james-harden-gold-refractor-ac-8",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr7l3wqrzmzv5e3yhk/1600.jpg"
+  },
+  {
+    "player": "James Harden",
+    "base": "James_Harden",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/James_Harden_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/James_Harden_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "James Harden #12 2020 Panini Donruss Optic My House",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2020-panini-donruss-optic-my-house/james-harden-12",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corr7pvqcotwh5hgqcil/1600.jpg"
+  },
+  {
+    "player": "Russell Westbrook",
+    "base": "Russell_Westbrook",
+    "num": 1,
+    "file": "/Users/mark/codex/recorded/nba_images/Russell_Westbrook_1.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Russell_Westbrook_1.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Russell Westbrook #199 [Rookie] 2008 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2008-topps/russell-westbrook-199",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/corrfiqtdoclb3icfz5b/1600.jpg"
+  },
+  {
+    "player": "Russell Westbrook",
+    "base": "Russell_Westbrook",
+    "num": 2,
+    "file": "/Users/mark/codex/recorded/nba_images/Russell_Westbrook_2.jpg",
+    "rawFile": "/Users/mark/Documents/Codex/2026-06-12/nba/work/raw_extra_cards_batch_1600/Russell_Westbrook_2.jpg",
+    "size": [
+      512,
+      716
+    ],
+    "source": "sportscardspro_extra_numbered_cards",
+    "sourceSize": "1600",
+    "title": "Russell Westbrook #104 2025 Topps",
+    "detailPage": "https://www.sportscardspro.com/game/basketball-cards-2025-topps/russell-westbrook-104",
+    "sourceImage": "https://storage.googleapis.com/images.pricecharting.com/eujximgnokn2mojt/1600.jpg"
+  }
+]

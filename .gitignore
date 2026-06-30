@@ -54,6 +54,12 @@ nba_avatar/
 nba_avatar*.zip
 nba_team_images/
 nba_team_images*.zip
+!projects/nba_api/docs/asset-manifests/
+!projects/nba_api/docs/asset-manifests/current-assets/
+!projects/nba_api/docs/asset-manifests/current-assets/nba_images/
+!projects/nba_api/docs/asset-manifests/current-assets/nba_avatar/
+!projects/nba_api/docs/asset-manifests/current-assets/nba_team_images/
+!projects/nba_api/docs/asset-manifests/**/*.json
 
 # 密码文件
 .password
