@@ -163,6 +163,11 @@
     return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   }
 
+  function currentTimeValue() {
+    var now = new Date();
+    return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  }
+
   function weekdayCN(date) {
     var labels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
     return labels[date.getDay()];
@@ -3189,7 +3194,7 @@
       day: day,
       date: moodDateValue(year, month, day),
       weekday: moodWeekdayText(year, month, day),
-      time: '09:30',
+      time: currentTimeValue(),
       score: 75,
       weather: '微晴',
       sleep: 7.5,
@@ -3210,7 +3215,7 @@
     return '<section class="life-mood-card life-mood-editor-card">' +
       '<form id="lifeMoodForm" class="life-form life-mood-form">' +
         '<div class="life-form-title"><h2>' + (state.moodFormMode === 'edit' ? '编辑情绪记录' : '新增情绪记录') + '</h2><p>情绪天气站的记录在这里完成新增、修改和删除；添加一刻的跨模块新增稍后统一处理。</p></div>' +
-        '<div class="life-three-grid"><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(dateValue) + '"></label><label>记录时间<input class="life-input" type="time" name="time" value="' + escapeHtml(item.time || '09:30') + '"></label><label>状态（按分数自动）<select class="life-select" name="weather" data-mood-score-weather disabled>' + ['晴朗','微晴','多云','阴雨','低落'].map(function(weather) { return '<option value="' + weather + '"' + (moodState.label === weather ? ' selected' : '') + '>' + weather + '</option>'; }).join('') + '</select></label></div>' +
+        '<div class="life-three-grid"><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(dateValue) + '"></label><label>记录时间<input class="life-input" type="time" name="time" value="' + escapeHtml(item.time || currentTimeValue()) + '"></label><label>状态（按分数自动）<select class="life-select" name="weather" data-mood-score-weather disabled>' + ['晴朗','微晴','多云','阴雨','低落'].map(function(weather) { return '<option value="' + weather + '"' + (moodState.label === weather ? ' selected' : '') + '>' + weather + '</option>'; }).join('') + '</select></label></div>' +
         '<div class="life-mood-form-score"><div><strong>情绪分数 <span data-mood-score-value>' + item.score + '</span>/100</strong><p>只有进入新增或编辑表单时才允许调整分数。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="score" value="' + item.score + '" data-mood-score-range></div>' +
         '<div class="life-four-grid"><label>睡眠（小时）<input class="life-input" type="number" step="0.1" min="0" max="16" name="sleep" value="' + escapeHtml(item.sleep) + '"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="pressure" value="' + escapeHtml(item.pressure) + '"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="energy" value="' + escapeHtml(item.energy) + '"></label><label>感受<input class="life-input" name="feeling" value="' + escapeHtml(item.feeling) + '"></label></div>' +
         renderMoodNoteField(item) +
@@ -3432,7 +3437,7 @@
       day: parsed.day,
       date: moodDateValue(parsed.year, parsed.month, parsed.day),
       weekday: moodWeekdayText(parsed.year, parsed.month, parsed.day),
-      time: form.elements.time.value || '09:30',
+      time: form.elements.time.value || currentTimeValue(),
       score: score,
       weather: moodStateByScore(score).label,
       sleep: Number(form.elements.sleep.value || 0),
