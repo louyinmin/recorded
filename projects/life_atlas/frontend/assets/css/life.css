@@ -3753,6 +3753,27 @@ body[data-life-view="timeline"] .life-card-title {
   font-size: 12px;
 }
 
+.life-mood-note-field {
+  display: grid;
+  gap: 8px;
+  color: #526460;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.life-mood-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.life-mood-note-head .life-chip {
+  border: 0;
+  cursor: pointer;
+}
+
 .life-mood-form-actions,
 .life-mood-side-actions {
   display: flex;

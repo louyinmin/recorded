@@ -2711,7 +2711,7 @@
         '<section class="life-decision-form-section"><h3>当时情绪</h3><div class="life-three-grid"><label>情绪状态<input class="life-input" name="emotionName" value="' + escapeHtml(emotion.name) + '" placeholder="偏紧张"></label><label>期待比例<input class="life-input" type="number" min="0" max="100" name="emotionExpectation" value="' + escapeHtml(emotion.expectation) + '" placeholder="60"></label><label>焦虑比例<input class="life-input" type="number" min="0" max="100" name="emotionAnxiety" value="' + escapeHtml(emotion.anxiety) + '" placeholder="40"></label></div><label>关键词<input class="life-input" name="emotionKeywords" value="' + escapeHtml(emotion.keywords.join('、')) + '" placeholder="不确定、兴奋、担心、期待"></label></section>' +
         '<section class="life-decision-form-section"><h3>可选方案</h3><div class="life-decision-options-grid">' + buildDecisionOptionRow('A', optionA) + buildDecisionOptionRow('B', optionB) + '</div></section>' +
         '<div class="life-two-grid"><label>选择理由<textarea class="life-textarea" name="reason" placeholder="一行一个理由">' + escapeHtml((source.reason || []).join('\n')) + '</textarea></label><label>风险<textarea class="life-textarea" name="risks" placeholder="一行一个风险">' + escapeHtml((source.risks || []).join('\n')) + '</textarea></label></div>' +
-        renderTimelineLinkControls(mode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', mode === 'edit' && !!linkedMoment) +
+        renderTimelineLinkControls(mode === 'edit' ? !!linkedMoment : false, linkedMoment ? linkedMoment.privacy : '仅自己可见', mode === 'edit' && !!linkedMoment) +
         '<div class="life-decision-form-actions">' + (mode === 'edit' ? '<button class="life-danger-btn" type="button" data-decision-action="delete-decision">删除决定</button>' : '') + '<button class="life-secondary-btn" type="button" data-decision-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (mode === 'edit' ? '保存修改' : '保存决定') + '</button></div>' +
       '</form>' +
     '</article>';
@@ -3145,24 +3145,43 @@
     return allMoodRecords().filter(function(item) { return item.id === id; })[0] || null;
   }
 
-  function nextAvailableMoodDay() {
+  function moodSelectedDateParts() {
     var daysInMonth = new Date(state.moodYear, state.moodMonth + 1, 0).getDate();
-    var start = Math.min(Math.max(state.selectedMoodDay, 1), daysInMonth);
-    for (var offset = 0; offset < daysInMonth; offset += 1) {
-      var day = ((start + offset - 1) % daysInMonth) + 1;
-      if (!moodRecordForMonth(day, state.moodYear, state.moodMonth)) return day;
-    }
-    return start;
+    return {
+      year: Number(state.moodYear),
+      month: Number(state.moodMonth),
+      day: Math.min(Math.max(Number(state.selectedMoodDay) || 1, 1), daysInMonth)
+    };
+  }
+
+  function moodNotePresets() {
+    return ['工作日常', '休息日常'];
+  }
+
+  function renderMoodNoteField(item) {
+    var note = item.note || '';
+    return '<div class="life-mood-note-field"><div class="life-mood-note-head"><span>记录内容</span><div class="life-chip-row">' +
+      moodNotePresets().map(function(preset) {
+        return '<button class="life-chip ' + (note === preset ? 'active' : '') + '" type="button" data-mood-note-preset="' + escapeHtml(preset) + '">' + escapeHtml(preset) + '</button>';
+      }).join('') +
+      '</div></div><textarea class="life-textarea" name="note" placeholder="今天的情绪发生了什么？">' + escapeHtml(note) + '</textarea></div>';
+  }
+
+  function syncMoodNotePresetButtons(form) {
+    if (!form || !form.elements.note) return;
+    var value = form.elements.note.value.trim();
+    Array.prototype.forEach.call(form.querySelectorAll('[data-mood-note-preset]'), function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-mood-note-preset') === value);
+    });
   }
 
   function moodDraftRecord() {
     var source = state.moodFormMode === 'edit' ? findMoodRecordById(state.moodEditingId) : null;
     if (source) return source;
-    var now = todayISO();
-    var nowParts = now.split('-');
-    var year = Number(nowParts[0]) || state.moodYear;
-    var month = (Number(nowParts[1]) || (state.moodMonth + 1)) - 1;
-    var day = Number(nowParts[2]) || state.selectedMoodDay;
+    var selected = moodSelectedDateParts();
+    var year = selected.year;
+    var month = selected.month;
+    var day = selected.day;
     return {
       id: moodDateId(year, month, day),
       year: year,
@@ -3171,13 +3190,13 @@
       date: moodDateValue(year, month, day),
       weekday: moodWeekdayText(year, month, day),
       time: '09:30',
-      score: 70,
+      score: 75,
       weather: '微晴',
-      sleep: 7,
-      pressure: 40,
-      energy: 70,
+      sleep: 7.5,
+      pressure: 25,
+      energy: 75,
       feeling: '平静',
-      note: '',
+      note: moodNotePresets()[0],
       tags: ['情绪记录']
     };
   }
@@ -3194,9 +3213,9 @@
         '<div class="life-three-grid"><label>记录日期<input class="life-input" type="date" name="date" value="' + escapeHtml(dateValue) + '"></label><label>记录时间<input class="life-input" type="time" name="time" value="' + escapeHtml(item.time || '09:30') + '"></label><label>状态（按分数自动）<select class="life-select" name="weather" data-mood-score-weather disabled>' + ['晴朗','微晴','多云','阴雨','低落'].map(function(weather) { return '<option value="' + weather + '"' + (moodState.label === weather ? ' selected' : '') + '>' + weather + '</option>'; }).join('') + '</select></label></div>' +
         '<div class="life-mood-form-score"><div><strong>情绪分数 <span data-mood-score-value>' + item.score + '</span>/100</strong><p>只有进入新增或编辑表单时才允许调整分数。</p></div><input class="life-confidence-slider" type="range" min="0" max="100" name="score" value="' + item.score + '" data-mood-score-range></div>' +
         '<div class="life-four-grid"><label>睡眠（小时）<input class="life-input" type="number" step="0.1" min="0" max="16" name="sleep" value="' + escapeHtml(item.sleep) + '"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="pressure" value="' + escapeHtml(item.pressure) + '"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="energy" value="' + escapeHtml(item.energy) + '"></label><label>感受<input class="life-input" name="feeling" value="' + escapeHtml(item.feeling) + '"></label></div>' +
-        '<label>记录内容<textarea class="life-textarea" name="note" placeholder="今天的情绪发生了什么？">' + escapeHtml(item.note) + '</textarea></label>' +
+        renderMoodNoteField(item) +
         '<label>标签<input class="life-input" name="tags" value="' + escapeHtml((item.tags || []).join('，')) + '" placeholder="用逗号分隔，例如：睡眠不足，工作压力"></label>' +
-        renderTimelineLinkControls(state.moodFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.moodFormMode === 'edit' && !!linkedMoment) +
+        renderTimelineLinkControls(state.moodFormMode === 'edit' ? !!linkedMoment : false, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.moodFormMode === 'edit' && !!linkedMoment) +
         '<div class="life-mood-form-actions">' + (state.moodFormMode === 'edit' ? '<button class="life-danger-btn" type="button" data-mood-action="delete-record">删除记录</button>' : '') + '<button class="life-secondary-btn" type="button" data-mood-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (state.moodFormMode === 'edit' ? '保存修改' : '保存记录') + '</button></div>' +
       '</form>' +
     '</section>';
@@ -3377,7 +3396,6 @@
     state.moodFormMode = 'create';
     state.moodEditingId = '';
     state.moodRangeMenu = null;
-    state.selectedMoodDay = nextAvailableMoodDay();
     renderMood();
   }
 
@@ -3830,7 +3848,7 @@
         '<div class="life-two-grid"><label>重要日期<textarea class="life-textarea" name="dates" placeholder="一行一个日期">' + escapeHtml((item.dates || []).join('\n')) + '</textarea></label><label>最近聊到<textarea class="life-textarea" name="notes" placeholder="一行一条最近记录">' + escapeHtml((item.notes || []).join('\n')) + '</textarea></label></div>' +
         '<div class="life-two-grid life-media-main-grid">' + renderRelationshipMediaSummary('共同记忆', item.memories, 'memory', state.relationshipFormMode === 'edit' ? 'view-memories' : '') + '<label class="life-memo-editor">我的备注<textarea class="life-textarea" name="memo" placeholder="写下真实的相处提醒、偏好或边界">' + escapeHtml(item.memo || '') + '</textarea></label></div>' +
         '<div class="life-two-grid life-media-pair-grid">' + renderRelationshipMediaSummary('送的礼物', item.gifts, 'gift', state.relationshipFormMode === 'edit' ? 'view-gifts' : '') + renderRelationshipMediaSummary('一起去过的地方', item.places, 'place', state.relationshipFormMode === 'edit' ? 'view-places' : '') + '</div>' +
-        renderTimelineLinkControls(state.relationshipFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.relationshipFormMode === 'edit' && !!linkedMoment) +
+        renderTimelineLinkControls(state.relationshipFormMode === 'edit' ? !!linkedMoment : false, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.relationshipFormMode === 'edit' && !!linkedMoment) +
         '<div class="life-relationship-form-actions">' + (state.relationshipFormMode === 'edit' ? '<button class="life-danger-btn" type="button" data-relationship-action="delete">删除关系</button>' : '') + '<button class="life-secondary-btn" type="button" data-relationship-action="cancel-form">取消</button><button class="life-primary-btn" type="submit">' + (state.relationshipFormMode === 'edit' ? '保存修改' : '保存关系') + '</button></div>' +
       '</form></section>';
   }
@@ -4367,7 +4385,7 @@
       '<label>替代方案<textarea class="life-textarea" name="alternatives" placeholder="一行一个替代方案">' + escapeHtml((source.alternatives || []).join('\n')) + '</textarea></label>' +
       '<label>下一步计划<textarea class="life-textarea" name="plan" placeholder="一行一个计划">' + escapeHtml((source.plan || []).join('\n')) + '</textarea></label>' +
       '<label>想象拥有后的生活<textarea class="life-textarea" name="future" placeholder="可选：写下拥有后的真实使用场景">' + escapeHtml(source.future || '') + '</textarea></label>' +
-      renderTimelineLinkControls(state.wishFormMode === 'edit' ? !!linkedMoment : true, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.wishFormMode === 'edit' && !!linkedMoment) +
+      renderTimelineLinkControls(state.wishFormMode === 'edit' ? !!linkedMoment : false, linkedMoment ? linkedMoment.privacy : '仅自己可见', state.wishFormMode === 'edit' && !!linkedMoment) +
       '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-wish-action="cancel-form">取消</button>' + (state.wishFormMode === 'edit' ? '<button class="life-secondary-btn danger" type="button" data-wish-action="delete">删除愿望</button>' : '') + '<button class="life-primary-btn" type="submit">保存愿望</button></footer></form>';
   }
 
@@ -4885,7 +4903,7 @@
 
   function addTitleForType(type, form) {
     if (type === '决定') return addValue(form, 'decisionTitle', '是否接受新的 Offer？');
-    if (type === '情绪') return addSelectedMood(form) + ' ' + addValue(form, 'moodScore', '78') + ' 分';
+    if (type === '情绪') return addSelectedMood(form) + ' ' + addValue(form, 'moodScore', '75') + ' 分';
     if (type === '关系') {
       var person = addValue(form, 'relationshipName', addValue(form, 'people', ''));
       return person ? '和 ' + person + ' 的互动' : '未命名关系互动';
@@ -4958,7 +4976,7 @@
   function renderAddWorkbenchPanels() {
     return '<section class="life-add-module-panel life-add-memory-panel" data-add-module="记忆"><label>选择心情' + renderAddMoodPicker(false) + '</label><input type="hidden" name="memoryTitle" value="今天在江边散步"></section>' +
       '<section class="life-add-module-panel life-add-theme-orange is-hidden" data-add-module="决定"><div class="life-add-inline-title">' + addTypeIcon('决定') + '<strong>决策信息</strong><span>记录选择、信心和复盘计划</span></div><label>决定背景（可选）<input class="life-input" name="decisionTitle" value="是否接受新工作的 Offer？"></label>' + renderDecisionOptionEditor() + '<div class="life-two-grid"><label>我的倾向<select class="life-select" name="decisionChoice"><option>A. 接受 Offer</option><option>B. 暂不接受</option><option>C. 继续观望</option></select></label><label>复盘计划<input class="life-input" type="date" name="decisionReviewDate" value="' + escapeHtml(decisionReviewDefault) + '"></label></div><label class="life-range-line">信心<input type="range" min="0" max="100" name="decisionConfidence" value="70"><b>70/100</b></label><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label></section>' +
-      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="情绪"><label>选择心情' + renderAddMoodPicker(false) + '</label><label class="life-range-line">强度<input type="range" min="0" max="100" name="moodScore" value="78"><b>78/100</b></label><div class="life-three-grid"><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label></div><div class="life-add-chip-group"><span>身体信号</span><button type="button">精力充沛</button><button type="button">肩颈酸痛</button><button type="button">睡眠不足</button><button type="button">专注良好</button></div></section>' +
+      '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="情绪"><label>选择心情' + renderAddMoodPicker(false) + '</label><label class="life-range-line">强度<input type="range" min="0" max="100" name="moodScore" value="75"><b>75/100</b></label><div class="life-three-grid"><label>睡眠<input class="life-input" name="moodSleep" value="7.5"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="25"></label><label>触发因素<input class="life-input" name="moodTriggers" value="工作日常"></label></div><div class="life-add-chip-group"><span>身体信号</span><button type="button">精力充沛</button><button type="button">肩颈酸痛</button><button type="button">睡眠不足</button><button type="button">专注良好</button></div></section>' +
       '<section class="life-add-module-panel life-add-theme-purple is-hidden" data-add-module="关系"><div class="life-add-inline-title">' + addTypeIcon('关系') + '<strong>关系信息</strong><span>更新联系人互动、温度和预计提醒</span></div><div class="life-two-grid"><label>选择 / 搜索人物<input class="life-input" name="relationshipName" placeholder="例如：张敏（大学同学）"></label><label>上次联系<input class="life-input" name="relationshipLast" placeholder="' + escapeHtml(baseDate) + '（微信）"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" placeholder="写下真实聊到的内容"></label><div class="life-two-grid"><label>预计下次日期<input class="life-input" type="date" name="relationshipNextDate" value="' + escapeHtml(relationshipNextDefault) + '"></label><label class="life-heart-line">关系温度<input type="range" min="0" max="100" name="relationshipScore" value="80"><span>4/5</span></label></div></section>' +
       '<section class="life-add-module-panel life-add-theme-rose is-hidden" data-add-module="愿望"><div class="life-add-inline-title">' + addTypeIcon('愿望') + '<strong>愿望信息</strong><span>记录想要程度和冷却计划</span></div><div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" placeholder="例如：相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" placeholder="例如：¥12,999"></label></div><label class="life-range-line">当前想要程度<input type="range" min="0" max="100" name="wishDesire" value="65" style="accent-color:' + wishDesireColor(65) + '" data-add-wish-desire-range><b>65%</b></label><div class="life-add-radio-box"><label><input type="radio" name="wishStatus" value="愿望冷却中" checked> 继续冷却</label><label><input type="radio" name="wishStatus" value="可以决定"> 可以决定了</label></div><label>替代方案<input class="life-input" name="wishAlternatives" placeholder="一行或分号分隔多个替代方案"></label></section>' +
       '<section class="life-add-module-panel life-add-theme-green is-hidden" data-add-module="健康"><div class="life-add-inline-title">' + addTypeIcon('健康') + '<strong>健康信息</strong><span>记录身体状态和后续提醒</span></div><div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="' + escapeHtml(healthReminderDefault) + '"></label></section>' +
@@ -5034,7 +5052,7 @@
     var body = {
       '记忆': '<div class="life-two-grid"><label>记忆标题<input class="life-input" name="memoryTitle" value="今天在江边散步"></label><label>归档到<select class="life-select" name="memoryBucket"><option>时间河流（默认）</option><option>本月值得记住</option></select></label></div>',
       '决定': '<div class="life-two-grid"><label>决定标题<input class="life-input" name="decisionTitle" value="是否接受新的 Offer？"></label><label>我的倾向<select class="life-select" name="decisionChoice"><option>接受 Offer</option><option>暂不接受</option><option>继续观望</option></select></label></div><div class="life-two-grid"><label>信心 <input class="life-input" type="number" min="0" max="100" name="decisionConfidence" value="70"></label><label>复盘日期<input class="life-input" type="date" name="decisionReviewDate" value="' + escapeHtml(addMonthsToDate(baseDate, 6)) + '"></label></div><label>关键风险 / 顾虑<input class="life-input" name="decisionRisks" value="适应期压力大；家庭时间可能减少。"></label>',
-      '情绪': '<div class="life-three-grid"><label>心情评分<input class="life-input" type="number" min="0" max="100" name="moodScore" value="78"></label><label>睡眠<input class="life-input" name="moodSleep" value="7.2"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="35"></label></div><label>触发因素<input class="life-input" name="moodTriggers" value="阳光, 散步, 独处"></label>',
+      '情绪': '<div class="life-three-grid"><label>心情评分<input class="life-input" type="number" min="0" max="100" name="moodScore" value="75"></label><label>睡眠<input class="life-input" name="moodSleep" value="7.5"></label><label>压力<input class="life-input" type="number" min="0" max="100" name="moodPressure" value="25"></label></div><label>触发因素<input class="life-input" name="moodTriggers" value="工作日常"></label>',
       '关系': '<div class="life-two-grid"><label>人物<input class="life-input" name="relationshipName" placeholder="例如：张敏"></label><label>关系温度<input class="life-input" type="number" min="0" max="100" name="relationshipScore" value="80"></label></div><div class="life-two-grid"><label>上次联系<input class="life-input" name="relationshipLast" placeholder="例如：今天"></label><label>预计下次日期<input class="life-input" type="date" name="relationshipNextDate" value="' + escapeHtml(addDateDays(baseDate, 7)) + '"></label></div><label>最近聊到<input class="life-input" name="relationshipNote" placeholder="写下真实聊到的内容"></label>',
       '愿望': '<div class="life-three-grid"><label>愿望名称<input class="life-input" name="wishName" placeholder="例如：相机 Sony A7C II"></label><label>冷却期<input class="life-input" type="number" min="0" name="wishDays" value="21"></label><label>价格<input class="life-input" name="wishPrice" placeholder="例如：¥12,999"></label></div><div class="life-two-grid"><label>当前想要程度<input class="life-input" type="number" min="0" max="100" name="wishDesire" value="65"></label><label>状态<select class="life-select" name="wishStatus"><option>愿望冷却中</option><option>可以决定</option></select></label></div><label>替代方案<input class="life-input" name="wishAlternatives" placeholder="一行或分号分隔多个替代方案"></label>',
       '健康': '<div class="life-three-grid"><label>睡眠<input class="life-input" name="healthSleep" value="7.2 小时"></label><label>精力<input class="life-input" type="number" min="0" max="100" name="healthEnergy" value="80"></label><label>运动<input class="life-input" name="healthExercise" value="散步 40 分钟"></label></div><label>身体信号<input class="life-input" name="healthSignal" value="下午有点累，注意休息。"></label><label>后续提醒<input class="life-input" type="date" name="healthReminder" value="' + escapeHtml(baseDate) + '"></label>',
@@ -5181,22 +5199,23 @@
 
   function saveAddMood(form, moment, dateParts) {
     var store = getMoodStore();
-    var score = Number(addValue(form, 'moodScore', '78'));
+    var score = Number(addValue(form, 'moodScore', '75'));
+    var parsed = parseMoodDate(dateParts.date);
     store.added.unshift({
       id: 'mood-local-' + Date.now(),
-      year: 2026,
-      month: 4,
+      year: parsed.year,
+      month: parsed.month,
       day: dateParts.day,
       date: dateParts.date,
       time: dateParts.time,
       score: score,
       weather: addSelectedMood(form),
-      sleep: Number(addValue(form, 'moodSleep', '7.2')),
-      pressure: Number(addValue(form, 'moodPressure', '35')),
-      energy: Number(addValue(form, 'healthEnergy', String(Math.min(100, score + 2)))),
+      sleep: Number(addValue(form, 'moodSleep', '7.5')),
+      pressure: Number(addValue(form, 'moodPressure', '25')),
+      energy: Number(addValue(form, 'healthEnergy', '75')),
       feeling: addSelectedMood(form),
       note: moment.copy,
-      tags: splitLines(addValue(form, 'moodTriggers', '').replace(/,/g, '\n'), ['日常'])
+      tags: splitLines(addValue(form, 'moodTriggers', '').replace(/,/g, '\n'), ['工作日常'])
     });
     saveMoodStore(store);
   }
@@ -5864,7 +5883,8 @@
       tags: [],
       finished: true,
       progress: '',
-      cover: 'photo-river'
+      cover: 'photo-river',
+      linkTimeline: false
     });
     if (!source.date) source.date = todayISO();
     var linkedMoment = state.watchFormMode === 'edit' ? linkedTimelineMoment('watch', source.id) : null;
@@ -5881,7 +5901,7 @@
       '<label data-watch-watched-only>标签<textarea class="life-textarea" name="tags" placeholder="一行一个标签">' + escapeHtml((source.tags || []).join('\n')) + '</textarea></label>' +
       '<label data-watch-watched-only>封面样式<select class="life-select" name="cover">' + ['photo-camera','photo-river','photo-mountain','photo-garden','photo-night','photo-cafe','photo-book','photo-office'].map(function(cover) { return '<option value="' + cover + '"' + (source.cover === cover ? ' selected' : '') + '>' + cover.replace('photo-', '') + '</option>'; }).join('') + '</select></label>' +
       '<div data-watch-watched-only>' + renderWatchImageEditor(source) + '</div>' +
-      '<div data-watch-watched-only>' + renderTimelineLinkControls(state.watchFormMode === 'edit' ? !!linkedMoment : (source.linkTimeline !== false), linkedMoment ? linkedMoment.privacy : (source.timelinePrivacy || '仅自己可见'), state.watchFormMode === 'edit' && !!linkedMoment) + '</div>' +
+      '<div data-watch-watched-only>' + renderTimelineLinkControls(state.watchFormMode === 'edit' ? !!linkedMoment : source.linkTimeline === true, linkedMoment ? linkedMoment.privacy : (source.timelinePrivacy || '仅自己可见'), state.watchFormMode === 'edit' && !!linkedMoment) + '</div>' +
       '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-watch-action="cancel-form">取消</button>' + (state.watchFormMode === 'edit' ? '<button class="life-secondary-btn danger" type="button" data-watch-action="delete">删除</button>' : '') + '<button class="life-primary-btn" type="submit">保存</button></footer></form>';
   }
 
@@ -6509,6 +6529,18 @@
       showToast(addAssociation.classList.contains('active') ? '已加入关联' : '已取消关联');
       return;
     }
+    var moodNotePreset = event.target.closest('[data-mood-note-preset]');
+    if (moodNotePreset) {
+      var presetForm = moodNotePreset.closest('#lifeMoodForm');
+      if (!presetForm || !presetForm.elements.note) return;
+      var presetValue = moodNotePreset.getAttribute('data-mood-note-preset') || '';
+      presetForm.elements.note.value = presetValue;
+      Array.prototype.forEach.call(presetForm.querySelectorAll('[data-mood-note-preset]'), function(btn) {
+        btn.classList.toggle('active', btn === moodNotePreset);
+      });
+      refreshMoodAside();
+      return;
+    }
     var moodBtn = event.target.closest('[data-add-mood]');
     if (moodBtn) {
       Array.prototype.forEach.call(document.querySelectorAll('[data-add-mood]'), function(btn) { btn.classList.remove('active'); });
@@ -6537,6 +6569,7 @@
       return;
     }
     if (event.target.closest('#lifeMoodForm')) {
+      syncMoodNotePresetButtons(event.target.closest('#lifeMoodForm'));
       refreshMoodAside();
       return;
     }
