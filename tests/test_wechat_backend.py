@@ -800,6 +800,10 @@ class WeChatBackendTestCase(unittest.TestCase):
                         'badCount': 0,
                         'lastResult': 'good',
                         'lastCompletedAt': 1782720000000,
+                        'events': [
+                            {'at': 1782720000000, 'result': 'good', 'note': 'first'},
+                            {'at': 1782720000000, 'result': 'good', 'note': 'duplicate timestamp'},
+                        ],
                     },
                     'task_b': {
                         'goodCount': 0,
@@ -825,6 +829,10 @@ class WeChatBackendTestCase(unittest.TestCase):
                     'badCount': 0,
                     'lastResult': 'good',
                     'lastCompletedAt': 1782720000000,
+                    'events': [
+                        {'at': 1782720000000, 'result': 'good', 'note': 'first'},
+                        {'at': 1782720000000, 'result': 'good', 'note': 'duplicate timestamp'},
+                    ],
                 },
                 'task_b': {
                     'goodCount': 0,
@@ -841,6 +849,13 @@ class WeChatBackendTestCase(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(len(listed.get_json()['records']), 1)
         self.assertEqual(listed.get_json()['records'][0]['date'], '2026-06-29')
+        self.assertEqual(
+            listed.get_json()['records'][0]['customTaskStats']['task_a']['events'],
+            [
+                {'at': 1782720000000, 'result': 'good', 'note': 'first'},
+                {'at': 1782720000000, 'result': 'good', 'note': 'duplicate timestamp'},
+            ],
+        )
 
         isolated = self.client.get(
             '/api/timing/stats?startDate=2026-06-01&endDate=2026-06-30',

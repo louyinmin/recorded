@@ -888,6 +888,11 @@ def normalize_custom_task_stats(value):
             item['lastResult'] = last_result
         if last_completed_at is not None:
             item['lastCompletedAt'] = last_completed_at
+        if 'events' in stats:
+            events = stats.get('events')
+            if not isinstance(events, list):
+                raise ValueError('invalid timing stats record')
+            item['events'] = events
         result[task_id] = item
     return result
 
