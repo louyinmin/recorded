@@ -41,9 +41,9 @@ TEAM_INFO_BY_SLUG = {
     'knicks': ('New York Knicks', '纽约尼克斯', 'NYK'),
     'thunder': ('Oklahoma City Thunder', '俄克拉荷马城雷霆', 'OKC'),
     'magic': ('Orlando Magic', '奥兰多魔术', 'ORL'),
-    '76ers': ('Philadelphia 76ers', '费城76人', 'PHI'),
+    'sixers': ('Philadelphia 76ers', '费城76人', 'PHI'),
     'suns': ('Phoenix Suns', '菲尼克斯太阳', 'PHX'),
-    'trail-blazers': ('Portland Trail Blazers', '波特兰开拓者', 'POR'),
+    'trailblazers': ('Portland Trail Blazers', '波特兰开拓者', 'POR'),
     'kings': ('Sacramento Kings', '萨克拉门托国王', 'SAC'),
     'spurs': ('San Antonio Spurs', '圣安东尼奥马刺', 'SAS'),
     'raptors': ('Toronto Raptors', '多伦多猛龙', 'TOR'),
@@ -56,6 +56,11 @@ TEAM_CN_BY_EN = {
     for team_en, team_cn, _abbr in TEAM_INFO_BY_SLUG.values()
 }
 TEAM_CN_BY_EN.update({'Los Angeles Clippers': '洛杉矶快船'})
+
+TEAM_SLUG_ALIASES = {
+    '76ers': 'sixers',
+    'trail-blazers': 'trailblazers',
+}
 
 SUMMARY_LABELS = {
     'CAP HIT': ('cap_hit', '工资帽占用'),
@@ -178,17 +183,23 @@ def to_int(value):
         return None
 
 
+def canonical_team_slug(slug):
+    value = normalize_whitespace(slug).lower()
+    return TEAM_SLUG_ALIASES.get(value, value)
+
+
 def team_info(slug, fallback_name=''):
-    info = TEAM_INFO_BY_SLUG.get(slug)
+    canonical_slug = canonical_team_slug(slug)
+    info = TEAM_INFO_BY_SLUG.get(canonical_slug)
     if info:
         return {
-            'slug': slug,
+            'slug': canonical_slug,
             'name_en': info[0],
             'name_cn': info[1],
             'abbr': info[2],
         }
     return {
-        'slug': slug,
+        'slug': canonical_slug,
         'name_en': fallback_name,
         'name_cn': TEAM_CN_BY_EN.get(fallback_name, fallback_name),
         'abbr': '',
@@ -252,11 +263,11 @@ def hard_cap_cn(value):
 
 def extract_slug_from_url(url):
     match = re.search(r'/teams/([^/?#]+)', str(url or ''))
-    return match.group(1) if match else ''
+    return canonical_team_slug(match.group(1)) if match else ''
 
 
 def source_url_for_slug(slug):
-    return SALARYSWISH_BASE_URL + '/teams/' + slug
+    return SALARYSWISH_BASE_URL + '/teams/' + canonical_team_slug(slug)
 
 
 class SalarySwishHTMLParser(HTMLParser):
@@ -402,6 +413,7 @@ def parse_salaryswish_home(html, fetched_at=None):
 
 
 def parse_summary(html, slug, season, fetched_at):
+    slug = canonical_team_slug(slug)
     info = team_info(slug)
     heading = re.search(r'<h1[^>]*>(.*?)</h1>', html or '', re.I | re.S)
     team_name_en = strip_tags(heading.group(1)) if heading else info['name_en']
@@ -1061,6 +1073,7 @@ def replace_team_detail(conn, parsed):
 
 
 def collect_salaryswish_team(slug, season=''):
+    slug = canonical_team_slug(slug)
     html = fetch_salaryswish_html(source_url_for_slug(slug))
     return parse_salaryswish_team_page(html, slug, season=season)
 
@@ -1072,7 +1085,11 @@ def sync_salaryswish(conn, team_slugs=None, concurrency=SALARYSWISH_DEFAULT_CONC
     home = parse_salaryswish_home(home_html, fetched_at=fetched_at)
     upsert_home_caps(conn, home)
     all_slugs = [item['team_slug'] for item in home.get('teams') or []] or sorted(TEAM_INFO_BY_SLUG)
-    requested = [slug.strip() for slug in (team_slugs or all_slugs) if slug and slug.strip()]
+    requested = [
+        canonical_team_slug(slug.strip())
+        for slug in (team_slugs or all_slugs)
+        if slug and slug.strip()
+    ]
     if not requested:
         requested = all_slugs
     requested = list(dict.fromkeys(requested))
@@ -1283,6 +1300,7 @@ def row_to_draft_asset(row):
 
 
 def get_salaryswish_team(conn, team_slug):
+    team_slug = canonical_team_slug(team_slug)
     summary = conn.execute(
         'SELECT * FROM nba_salaryswish_team_summaries WHERE team_slug=?',
         (team_slug,),

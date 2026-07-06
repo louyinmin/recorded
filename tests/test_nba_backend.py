@@ -201,6 +201,16 @@ def salaryswish_home_html():
           <td>19/21</td><td>3/3</td><td>$194,139,108</td><td>-$29,178,108</td>
           <td>$6,288,892</td><td>$14,875,892</td><td>$27,546,892</td><td>-</td>
         </tr>
+        <tr>
+          <td><a href="/teams/sixers">Philadelphia 76ersPHI</a></td>
+          <td>17/21</td><td>2/3</td><td>$207,923,540</td><td>-$42,962,540</td>
+          <td>-$7,495,540</td><td>$1,091,460</td><td>$13,762,460</td><td>-</td>
+        </tr>
+        <tr>
+          <td><a href="/teams/trailblazers">Portland Trail BlazersPOR</a></td>
+          <td>16/21</td><td>2/3</td><td>$190,654,096</td><td>-$25,693,096</td>
+          <td>$9,773,904</td><td>$18,360,904</td><td>$31,031,904</td><td>-</td>
+        </tr>
       </table>
     </body></html>
     '''
@@ -490,6 +500,11 @@ class NbaBackendTestCase(unittest.TestCase):
         self.assertEqual(team['teamNameCn'], '洛杉矶湖人')
         self.assertEqual(team['capHit'], '$194,139,108')
         self.assertEqual(team['rosterSize']['count'], 19)
+        teams_by_slug = {item['teamSlug']: item for item in teams.get_json()['items']}
+        self.assertEqual(teams_by_slug['sixers']['teamNameCn'], '费城76人')
+        self.assertEqual(teams_by_slug['sixers']['teamAbbr'], 'PHI')
+        self.assertEqual(teams_by_slug['trailblazers']['teamNameCn'], '波特兰开拓者')
+        self.assertEqual(teams_by_slug['trailblazers']['teamAbbr'], 'POR')
 
         detail = self.client.get('/api/nba/salaryswish/teams/lakers')
         self.assertEqual(detail.status_code, 200)
@@ -534,6 +549,14 @@ class NbaBackendTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json(), {'message': 'teamSlug must be a string'})
+
+    def test_salaryswish_supports_legacy_team_slug_aliases(self):
+        from nba_backend.salaryswish import canonical_team_slug, source_url_for_slug, team_info
+
+        self.assertEqual(canonical_team_slug('76ers'), 'sixers')
+        self.assertEqual(canonical_team_slug('trail-blazers'), 'trailblazers')
+        self.assertEqual(source_url_for_slug('76ers'), 'https://www.salaryswish.com/teams/sixers')
+        self.assertEqual(team_info('trail-blazers')['name_cn'], '波特兰开拓者')
 
     def test_list_players_supports_search_after_batch_sync(self):
         self.patch_sina_fetch()
