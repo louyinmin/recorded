@@ -187,6 +187,102 @@ def rookie_okorie_detail_html():
     '''
 
 
+def salaryswish_home_html():
+    return '''
+    <html><body>
+      <h1>2026-27 SALARY CAP</h1>
+      <table id="sw_homepage__table">
+        <tr>
+          <th>Team</th><th>Roster Size</th><th>Two-Ways</th><th>Cap Hit</th>
+          <th>Cap Room</th><th>Luxury Room</th><th>1st Apron Rm</th><th>2nd Apron Rm</th><th>Hard Cap</th>
+        </tr>
+        <tr>
+          <td><a href="/teams/lakers">Los Angeles LakersLAL</a></td>
+          <td>19/21</td><td>3/3</td><td>$194,139,108</td><td>-$29,178,108</td>
+          <td>$6,288,892</td><td>$14,875,892</td><td>$27,546,892</td><td>-</td>
+        </tr>
+      </table>
+    </body></html>
+    '''
+
+
+def salaryswish_lakers_html():
+    return '''
+    <html><body>
+      <h1 class="c">LOS ANGELES LAKERS</h1>
+      <div class="c">
+        <h5>CAP HIT : <span>$194,139,108</span></h5>
+        <h5>CAP ROOM : <span>-$29,178,108</span></h5>
+        <h5>TEAM SALARY : <span>$325,260,191</span></h5>
+        <h5>TEAM SALARY ROOM : <span>-$160,299,191</span></h5>
+        <h5>LUXURY TAX ROOM : <span>$6,288,892</span></h5>
+        <h5>1ST APRON ROOM : <span>$14,875,892</span></h5>
+        <h5>2ND APRON ROOM : <span>$27,546,892</span></h5>
+        <h5>HARD CAPPED : <span><a href="/hard-cap-tracker">No</a></span></h5>
+      </div>
+      <div class="mb10">
+        <div>ROSTER SIZE: <span>19/21</span></div>
+        <div>TWO-WAY CONTRACTS: 3/3</div>
+      </div>
+      <div>HEAD EXECUTIVE: <a href="/staff/rob-pelinka">Rob Pelinka</a></div>
+      <div>HEAD COACH: <a href="/staff/jj-redick">J.J. Redick</a></div>
+      <div id="team_progress_list">
+        <span class="progress_list_text"><a href="/bi-annual-exception"><strong>Bi-Annual:</strong></a> $0 of $0 remaining</span><span style="width:100%"></span>
+        <span class="progress_list_text"><a href="/mid-level-exception"><strong>Mid-Level:</strong></a> $5,775,707 of $15,044,000 remaining</span><span style="width:61%"></span>
+      </div>
+      <table id="sw_table__tradeExptn_tm">
+        <tr><th>Player</th><th>Exception</th><th>Used</th><th>Remaining</th><th>Start Date</th><th>End Date</th></tr>
+        <tr>
+          <td><a href="/players/luke-kennard">Kennard, Luke</a></td>
+          <td><a href="/trades/466">$500,000</a></td><td>$0</td><td>$500,000</td>
+          <td>Feb 5, 2026</td><td>Feb 5, 2027</td>
+        </tr>
+      </table>
+      <table id="sw_teamProfile__draftTable">
+        <tr><th>Draft</th><th>2027</th></tr>
+        <tr>
+          <td>Round 1</td>
+          <td><a href="/draft/2027?pick=14"></a><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"></td>
+        </tr>
+      </table>
+      <table class="sw_teamProfileRosterSection__table">
+        <tr>
+          <th>Active (1 - $188,691,232)</th><th>Status</th><th>Acquired</th><th>Age</th><th>Pos</th><th>Terms</th>
+          <th>2026-27</th><th>2027-28</th>
+        </tr>
+        <tr>
+          <td><a href="/players/luke-kennard">Kennard, Luke</a></td><td>Active List</td><td>Trade</td><td>29</td><td>SG</td><td>MLE</td>
+          <td>$11,000,000$11,000,000$0</td>
+          <td><a href="/bird-rights-calculator/luke-kennard"></a><img alt="Bird" src="bird.svg">UFA</td>
+        </tr>
+        <tr>
+          <td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td>$11,000,000</td><td></td>
+        </tr>
+      </table>
+      <table class="sw_teamProfileRosterSection__table">
+        <tr>
+          <th>1st Rd Picks (1 - $3,315,360)</th><th>Status</th><th>Acquired</th><th>Age</th><th>Pos</th><th>Terms</th>
+          <th>2026-27</th><th>2027-28</th>
+        </tr>
+        <tr>
+          <td><a href="/players/cameron-carr">Carr, Cameron</a></td><td>120% RSC Hold</td><td></td><td>21</td><td>SG</td><td></td>
+          <td>$3,315,360</td><td></td>
+        </tr>
+      </table>
+      <table class="sw_teamProfileRosterSection__table">
+        <tr>
+          <th>Buyout (1 - $1,000,000)</th><th>Status</th><th>Acquired</th><th>Age</th><th>Pos</th><th>Terms</th>
+          <th>2026-27</th><th>2027-28</th>
+        </tr>
+        <tr>
+          <td><a href="/players/example-buyout">Buyout, Example</a></td><td>Buyout</td><td></td><td>30</td><td>SF</td><td></td>
+          <td>$1,000,000</td><td></td>
+        </tr>
+      </table>
+    </body></html>
+    '''
+
+
 class NbaBackendTestCase(unittest.TestCase):
     def setUp(self):
         self.base_dir = tempfile.mkdtemp(prefix='nba-backend-test-')
@@ -243,6 +339,23 @@ class NbaBackendTestCase(unittest.TestCase):
         original = service.fetch_zhibo8_html
         service.fetch_zhibo8_html = fake_fetch
         self.addCleanup(lambda: setattr(service, 'fetch_zhibo8_html', original))
+
+    def patch_salaryswish_fetch(self):
+        import nba_backend.salaryswish as salaryswish
+
+        pages = {
+            'https://www.salaryswish.com/': salaryswish_home_html(),
+            'https://www.salaryswish.com/teams/lakers': salaryswish_lakers_html(),
+        }
+
+        def fake_fetch(url, timeout=20):
+            if url not in pages:
+                raise AssertionError('unexpected SalarySwish URL: {}'.format(url))
+            return pages[url]
+
+        original = salaryswish.fetch_salaryswish_html
+        salaryswish.fetch_salaryswish_html = fake_fetch
+        self.addCleanup(lambda: setattr(salaryswish, 'fetch_salaryswish_html', original))
 
     def test_asset_name_matching_handles_short_names_and_middle_names(self):
         from nba_backend.service import collect_image_index, match_image_filename
@@ -356,6 +469,71 @@ class NbaBackendTestCase(unittest.TestCase):
         detail = self.client.get('/api/nba/players/{}'.format(PLAYER_PID))
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.get_json()['source'], 'sina_nba')
+
+    def test_sync_salaryswish_collects_team_salary_data_for_miniprogram(self):
+        self.patch_sina_fetch()
+        self.patch_salaryswish_fetch()
+        synced_player = self.client.post('/api/nba/sync/player', json={'pid': PLAYER_PID})
+        self.assertEqual(synced_player.status_code, 200)
+
+        synced = self.client.post('/api/nba/sync/salaryswish', json={'teamSlug': 'lakers', 'concurrency': 1})
+
+        self.assertEqual(synced.status_code, 200)
+        result = synced.get_json()['result']
+        self.assertEqual(result['season'], '2026-27')
+        self.assertEqual(result['succeeded_count'], 1)
+        self.assertEqual(result['failed_count'], 0)
+
+        teams = self.client.get('/api/nba/salaryswish/teams')
+        self.assertEqual(teams.status_code, 200)
+        team = teams.get_json()['items'][0]
+        self.assertEqual(team['teamNameCn'], '洛杉矶湖人')
+        self.assertEqual(team['capHit'], '$194,139,108')
+        self.assertEqual(team['rosterSize']['count'], 19)
+
+        detail = self.client.get('/api/nba/salaryswish/teams/lakers')
+        self.assertEqual(detail.status_code, 200)
+        payload = detail.get_json()
+        self.assertEqual(payload['summary']['hardCappedCn'], '否')
+        self.assertEqual(payload['summary']['headCoach'], 'J.J. Redick')
+        self.assertEqual(payload['signingExceptions'][1]['nameCn'], '中产特例')
+        self.assertEqual(payload['tradeExceptions'][0]['playerNameCn'], '卢克-肯纳德')
+        self.assertEqual(payload['draftAssets'][0]['assets'][0]['teamNameCn'], '洛杉矶湖人')
+
+        active = payload['rosterSections'][0]
+        self.assertEqual(active['titleCn'], '现役')
+        contract = active['items'][0]
+        self.assertEqual(contract['playerNameEn'], 'Luke Kennard')
+        self.assertEqual(contract['playerNameCn'], '卢克-肯纳德')
+        self.assertEqual(contract['playerPid'], PLAYER_PID)
+        self.assertEqual(contract['statusCn'], '活跃名单')
+        self.assertEqual(contract['acquiredCn'], '交易')
+        self.assertEqual(contract['positionsCn'], '分卫')
+        self.assertEqual(contract['termsCn'], '中产特例')
+        self.assertEqual(contract['seasonSalaries'][0]['value'], '$11,000,000')
+        self.assertEqual(contract['seasonSalaries'][1]['freeAgentStatusCn'], '完全自由球员')
+        sections_by_key = {section['sectionKey']: section for section in payload['rosterSections']}
+        self.assertEqual(sections_by_key['1st_rd_picks']['titleCn'], '首轮签')
+        self.assertEqual(sections_by_key['buyout']['titleCn'], '买断')
+        self.assertEqual(sections_by_key['buyout']['items'][0]['statusCn'], '买断')
+
+    def test_sync_salaryswish_rejects_string_team_slugs(self):
+        response = self.client.post('/api/nba/sync/salaryswish', json={'teamSlugs': 'lakers'})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'message': 'teamSlugs must be an array of team slugs'})
+
+    def test_sync_salaryswish_rejects_non_string_team_slug_items(self):
+        response = self.client.post('/api/nba/sync/salaryswish', json={'teamSlugs': [123]})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'message': 'teamSlugs must contain only strings'})
+
+    def test_sync_salaryswish_rejects_non_string_single_team_slug(self):
+        response = self.client.post('/api/nba/sync/salaryswish', json={'teamSlug': 123})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'message': 'teamSlug must be a string'})
 
     def test_list_players_supports_search_after_batch_sync(self):
         self.patch_sina_fetch()

@@ -15,6 +15,8 @@ from html.parser import HTMLParser
 
 from flask import current_app, g
 
+from .salaryswish import ensure_salaryswish_schema
+
 
 SINA_API_URL = 'https://slamdunk.sports.sina.com.cn/api'
 SINA_PLAYER_PAGE = 'https://slamdunk.sports.sina.com.cn/player?pid={pid}'
@@ -176,6 +178,7 @@ def init_nba_db(db_path):
             ON nba_player_cards(pid, sort_order, created_at, card_id);
             '''
         )
+        ensure_salaryswish_schema(conn)
         migrate_nba_db(conn)
         conn.commit()
     finally:
@@ -234,6 +237,7 @@ def migrate_nba_db(conn):
         ON nba_player_cards(pid, sort_order, created_at, card_id);
         '''
     )
+    ensure_salaryswish_schema(conn)
     backfill_default_player_cards(conn)
 
 

@@ -31,6 +31,11 @@ from .service import (
     sync_team_images,
     sync_single_player,
 )
+from .salaryswish import (
+    get_salaryswish_team,
+    list_salaryswish_teams,
+    sync_salaryswish,
+)
 
 
 nba_bp = Blueprint('nba', __name__, url_prefix='/api/nba')
@@ -149,6 +154,19 @@ def players_batch():
 @nba_bp.route('/filters', methods=['GET'])
 def filters():
     return jsonify(list_filter_options(get_nba_db()))
+
+
+@nba_bp.route('/salaryswish/teams', methods=['GET'])
+def salaryswish_teams():
+    return jsonify({'items': list_salaryswish_teams(get_nba_db())})
+
+
+@nba_bp.route('/salaryswish/teams/<team_slug>', methods=['GET'])
+def salaryswish_team_detail(team_slug):
+    item = get_salaryswish_team(get_nba_db(), team_slug)
+    if not item:
+        return jsonify({'error': '球队薪资数据不存在'}), 404
+    return jsonify(item)
 
 
 @nba_bp.route('/players/<pid>', methods=['GET'])
@@ -293,4 +311,31 @@ def sync_rookies_2026():
         result = sync_2026_rookies(get_nba_db())
     except Exception as exc:
         return jsonify({'error': '2026 NBA 新秀采集失败', 'detail': str(exc)}), 502
+    return jsonify({'ok': True, 'result': result})
+
+
+@nba_bp.route('/sync/salaryswish', methods=['POST'])
+def sync_salaryswish_data():
+    payload = parse_json()
+    error = require_sync_token(payload)
+    if error:
+        return error
+    team_slugs = payload.get('teamSlugs') or payload.get('team_slugs')
+    if team_slugs is not None and not isinstance(team_slugs, list):
+        return jsonify({'message': 'teamSlugs must be an array of team slugs'}), 400
+    if team_slugs is not None and any(not isinstance(slug, str) for slug in team_slugs):
+        return jsonify({'message': 'teamSlugs must contain only strings'}), 400
+    if not team_slugs:
+        single_slug = payload.get('teamSlug') or payload.get('team_slug') or request.args.get('teamSlug')
+        if single_slug is not None and not isinstance(single_slug, str):
+            return jsonify({'message': 'teamSlug must be a string'}), 400
+        team_slugs = [single_slug] if single_slug else None
+    try:
+        result = sync_salaryswish(
+            get_nba_db(),
+            team_slugs=team_slugs,
+            concurrency=payload.get('concurrency') or 4,
+        )
+    except Exception as exc:
+        return jsonify({'error': 'SalarySwish 薪资采集失败', 'detail': str(exc)}), 502
     return jsonify({'ok': True, 'result': result})
