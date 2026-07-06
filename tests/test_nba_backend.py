@@ -249,7 +249,7 @@ def salaryswish_lakers_html():
         </tr>
       </table>
       <table id="sw_teamProfile__draftTable">
-        <tr><th>Draft</th><th>2027</th><th>2028</th><th>2029</th></tr>
+        <tr><th>Draft</th><th>2027</th><th>2028</th><th>2029</th><th>2030</th></tr>
         <tr>
           <td>Round 1</td>
           <td>
@@ -263,6 +263,11 @@ def salaryswish_lakers_html():
             </div>
           </td>
           <td><div class="rel d_pick"><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"></div></td>
+          <td>
+            <div class="q" title="Conditional pick. Has swap option. Trade on Jul 1, 2026. Conditions: Team receives the more favorable pick. Click to view full trade details">
+              <a href="/draft/2030?pick=40"><div class="rel d_pick"><img alt="Logo of the Golden State Warriors" src="warriors.svg"><div class="condit"></div></div></a>
+            </div>
+          </td>
         </tr>
       </table>
       <table class="sw_teamProfileRosterSection__table">
@@ -532,6 +537,9 @@ class NbaBackendTestCase(unittest.TestCase):
         self.assertEqual(drafts_by_year['2028']['tradedAwayAssets'][0]['teamNameCn'], '洛杉矶湖人')
         self.assertEqual(drafts_by_year['2029']['ownedAssets'][0]['ownershipStatus'], 'owned')
         self.assertTrue(drafts_by_year['2029']['ownedAssets'][0]['isOwned'])
+        self.assertEqual(drafts_by_year['2030']['conditionalAssets'][0]['teamNameCn'], '金州勇士')
+        self.assertTrue(drafts_by_year['2030']['conditionalAssets'][0]['isConditional'])
+        self.assertTrue(drafts_by_year['2030']['conditionalAssets'][0]['hasSwapOption'])
 
         active = payload['rosterSections'][0]
         self.assertEqual(active['titleCn'], '现役')

@@ -130,8 +130,12 @@ Returns team summary, signing exceptions, trade exceptions, draft assets, and gr
 | `draftAssets[].ownedAssets` | Picks that are currently held outright. Use this field when the Mini Program needs to show only picks the team still owns. |
 | `draftAssets[].contentionAssets` | Picks whose final owner is unresolved, such as swap/in-contention picks. |
 | `draftAssets[].tradedAwayAssets` | Picks shown by SalarySwish as traded away. |
+| `draftAssets[].conditionalAssets` | Picks with SalarySwish conditional markers, such as protected or best/worst-of picks. |
 | `draftAssets[].assets[].ownershipStatus` | One of `owned`, `in_contention`, or `traded_away`. |
 | `draftAssets[].assets[].ownershipStatusCn` | Chinese status label: `持有`, `互换/待定`, or `已交易走`. |
+| `draftAssets[].assets[].isConditional` | `true` when SalarySwish marks the pick as conditional. |
+| `draftAssets[].assets[].hasSwapOption` | `true` when the condition text mentions a swap option. |
+| `draftAssets[].assets[].note` | Original SalarySwish tooltip text retained for condition/protection details. |
 | `rosterSections` | Contract tables grouped by section, such as active roster, training camp, G-League, RFA, UFA, and cap holds. |
 | `seasonSalaries[].value` | First visible salary value extracted from a SalarySwish season cell. |
 | `seasonSalaries[].raw` | Original cell text retained for audit/debug display. |

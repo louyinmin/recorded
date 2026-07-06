@@ -710,6 +710,15 @@ def draft_pick_status(pick_block):
     return 'owned'
 
 
+def draft_pick_flags(pick_block):
+    titles = ' '.join(pick_block.get('titles') or []).lower()
+    classes = set(pick_block.get('class_tokens') or [])
+    return {
+        'is_conditional': 'condit' in classes or 'conditional pick' in titles or 'conditions:' in titles,
+        'has_swap_option': 'swap option' in titles,
+    }
+
+
 def draft_asset_from_pick_block(pick_block, image_index=0):
     images = pick_block.get('images') or []
     if image_index >= len(images):
@@ -718,6 +727,7 @@ def draft_asset_from_pick_block(pick_block, image_index=0):
     links = pick_block.get('links') or []
     team_en = team_name_from_logo_alt(image.get('alt'))
     status = draft_pick_status(pick_block)
+    flags = draft_pick_flags(pick_block)
     note = '; '.join(unique_preserve_order(pick_block.get('titles') or []))
     return {
         'teamNameEn': team_en,
@@ -730,6 +740,8 @@ def draft_asset_from_pick_block(pick_block, image_index=0):
         'isOwned': status == 'owned',
         'isInContention': status == 'in_contention',
         'isTradedAway': status == 'traded_away',
+        'isConditional': flags['is_conditional'],
+        'hasSwapOption': flags['has_swap_option'],
         'note': note,
     }
 
@@ -771,6 +783,8 @@ def parse_draft_assets(tables, slug, season, fetched_at):
                         'isOwned': True,
                         'isInContention': False,
                         'isTradedAway': False,
+                        'isConditional': False,
+                        'hasSwapOption': False,
                         'note': '',
                     })
             rows.append({
@@ -1405,6 +1419,7 @@ def row_to_draft_asset(row):
         'ownedAssets': [asset for asset in assets if asset.get('isOwned')],
         'contentionAssets': [asset for asset in assets if asset.get('isInContention')],
         'tradedAwayAssets': [asset for asset in assets if asset.get('isTradedAway')],
+        'conditionalAssets': [asset for asset in assets if asset.get('isConditional')],
     }
 
 
