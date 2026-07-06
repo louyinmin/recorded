@@ -249,10 +249,20 @@ def salaryswish_lakers_html():
         </tr>
       </table>
       <table id="sw_teamProfile__draftTable">
-        <tr><th>Draft</th><th>2027</th></tr>
+        <tr><th>Draft</th><th>2027</th><th>2028</th><th>2029</th></tr>
         <tr>
           <td>Round 1</td>
-          <td><a href="/draft/2027?pick=14"></a><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"></td>
+          <td>
+            <div class="q" title="Pick is in contention due to an unresolved trade aspect, the final owner is to be determined. Contending teams: MEM, LAL. Click to view full details">
+              <a href="/draft/2027?pick=14"><div class="rel d_pick"><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"><div class="sw_teamProfile__draftPick_inContention"></div></div></a>
+            </div>
+          </td>
+          <td>
+            <div class="q" title="Pick traded away on Feb 2, 2025. click to view full details.">
+              <a href="/draft/2028?pick=14"><div class="rel d_pick d_pick_traded"><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"></div></a>
+            </div>
+          </td>
+          <td><div class="rel d_pick"><img alt="Logo of the Los Angeles Lakers" src="lakers.svg"></div></td>
         </tr>
       </table>
       <table class="sw_teamProfileRosterSection__table">
@@ -513,7 +523,15 @@ class NbaBackendTestCase(unittest.TestCase):
         self.assertEqual(payload['summary']['headCoach'], 'J.J. Redick')
         self.assertEqual(payload['signingExceptions'][1]['nameCn'], '中产特例')
         self.assertEqual(payload['tradeExceptions'][0]['playerNameCn'], '卢克-肯纳德')
-        self.assertEqual(payload['draftAssets'][0]['assets'][0]['teamNameCn'], '洛杉矶湖人')
+        drafts_by_year = {item['draftYear']: item for item in payload['draftAssets']}
+        self.assertEqual(drafts_by_year['2027']['assets'][0]['teamNameCn'], '洛杉矶湖人')
+        self.assertEqual(drafts_by_year['2027']['assets'][0]['ownershipStatus'], 'in_contention')
+        self.assertEqual(drafts_by_year['2027']['assets'][0]['ownershipStatusCn'], '互换/待定')
+        self.assertEqual(drafts_by_year['2027']['ownedAssets'], [])
+        self.assertEqual(drafts_by_year['2028']['assets'][0]['ownershipStatus'], 'traded_away')
+        self.assertEqual(drafts_by_year['2028']['tradedAwayAssets'][0]['teamNameCn'], '洛杉矶湖人')
+        self.assertEqual(drafts_by_year['2029']['ownedAssets'][0]['ownershipStatus'], 'owned')
+        self.assertTrue(drafts_by_year['2029']['ownedAssets'][0]['isOwned'])
 
         active = payload['rosterSections'][0]
         self.assertEqual(active['titleCn'], '现役')

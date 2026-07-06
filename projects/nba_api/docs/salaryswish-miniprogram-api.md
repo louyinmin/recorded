@@ -126,6 +126,12 @@ Returns team summary, signing exceptions, trade exceptions, draft assets, and gr
 | `signingExceptions` | Bi-Annual, Mid-Level, and other signing exception bars. |
 | `tradeExceptions` | Trade exception table. Player names include Chinese matches when available. |
 | `draftAssets` | Draft table grouped by year and round. Logo teams are translated to Chinese when known. |
+| `draftAssets[].assets` | All visible draft pick markers in that cell, including owned, in-contention/swap, and traded-away markers. |
+| `draftAssets[].ownedAssets` | Picks that are currently held outright. Use this field when the Mini Program needs to show only picks the team still owns. |
+| `draftAssets[].contentionAssets` | Picks whose final owner is unresolved, such as swap/in-contention picks. |
+| `draftAssets[].tradedAwayAssets` | Picks shown by SalarySwish as traded away. |
+| `draftAssets[].assets[].ownershipStatus` | One of `owned`, `in_contention`, or `traded_away`. |
+| `draftAssets[].assets[].ownershipStatusCn` | Chinese status label: `持有`, `互换/待定`, or `已交易走`. |
 | `rosterSections` | Contract tables grouped by section, such as active roster, training camp, G-League, RFA, UFA, and cap holds. |
 | `seasonSalaries[].value` | First visible salary value extracted from a SalarySwish season cell. |
 | `seasonSalaries[].raw` | Original cell text retained for audit/debug display. |

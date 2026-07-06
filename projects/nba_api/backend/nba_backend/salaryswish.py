@@ -261,6 +261,14 @@ def hard_cap_cn(value):
     return value
 
 
+def draft_pick_status_cn(status):
+    return {
+        'owned': '持有',
+        'in_contention': '互换/待定',
+        'traded_away': '已交易走',
+    }.get(status, status)
+
+
 def extract_slug_from_url(url):
     match = re.search(r'/teams/([^/?#]+)', str(url or ''))
     return canonical_team_slug(match.group(1)) if match else ''
@@ -278,6 +286,8 @@ class SalarySwishHTMLParser(HTMLParser):
         self.current_row = None
         self.current_cell = None
         self.current_link = None
+        self.current_pick = None
+        self.pick_depth = 0
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -295,24 +305,36 @@ class SalarySwishHTMLParser(HTMLParser):
                 'text': '',
                 'links': [],
                 'images': [],
+                'class_tokens': [],
+                'titles': [],
+                'pick_blocks': [],
             }
             self.current_row['cells'].append(self.current_cell)
         elif tag == 'a' and self.current_cell is not None:
             self.current_link = {'href': attrs.get('href', ''), 'text_parts': [], 'text': ''}
         elif tag == 'img' and self.current_cell is not None:
-            self.current_cell['images'].append({
+            image = {
                 'src': attrs.get('src', ''),
                 'alt': attrs.get('alt', ''),
                 'title': attrs.get('title', ''),
-            })
+            }
+            self.current_cell['images'].append(image)
+            if getattr(self, 'current_pick', None) is not None:
+                self.current_pick['images'].append(image)
+
+        if self.current_cell is not None:
+            self._capture_cell_metadata(tag, attrs)
 
     def handle_endtag(self, tag):
         if tag == 'a' and self.current_link is not None and self.current_cell is not None:
             self.current_link['text'] = normalize_whitespace(''.join(self.current_link['text_parts']))
-            self.current_cell['links'].append({
+            link = {
                 'href': self.current_link['href'],
                 'text': self.current_link['text'],
-            })
+            }
+            self.current_cell['links'].append(link)
+            if getattr(self, 'current_pick', None) is not None:
+                self.current_pick['links'].append(link)
             self.current_link = None
         elif tag in ('th', 'td') and self.current_cell is not None:
             self.current_cell['text'] = normalize_whitespace(''.join(self.current_cell['text_parts']))
@@ -322,12 +344,48 @@ class SalarySwishHTMLParser(HTMLParser):
             self.current_row = None
         elif tag == 'table':
             self.current_table = None
+        self._close_pick_block(tag)
 
     def handle_data(self, data):
         if self.current_cell is not None:
             self.current_cell['text_parts'].append(data)
         if self.current_link is not None:
             self.current_link['text_parts'].append(data)
+
+    def _capture_cell_metadata(self, tag, attrs):
+        class_tokens = (attrs.get('class') or '').split()
+        title = normalize_whitespace(attrs.get('title') or '')
+        if class_tokens:
+            self.current_cell['class_tokens'].extend(class_tokens)
+        if title:
+            self.current_cell['titles'].append(title)
+
+        starts_pick = tag == 'div' and ('q' in class_tokens or 'd_pick' in class_tokens)
+        if getattr(self, 'current_pick', None) is None and starts_pick:
+            self.current_pick = {
+                'class_tokens': [],
+                'titles': [],
+                'links': [],
+                'images': [],
+            }
+            self.pick_depth = 0
+        if getattr(self, 'current_pick', None) is not None:
+            if tag != 'img':
+                self.pick_depth += 1
+            if class_tokens:
+                self.current_pick['class_tokens'].extend(class_tokens)
+            if title:
+                self.current_pick['titles'].append(title)
+
+    def _close_pick_block(self, tag):
+        if getattr(self, 'current_pick', None) is None or tag == 'img':
+            return
+        self.pick_depth -= 1
+        if self.pick_depth <= 0:
+            if self.current_cell is not None:
+                self.current_cell['pick_blocks'].append(self.current_pick)
+            self.current_pick = None
+            self.pick_depth = 0
 
 
 def parse_tables(html):
@@ -642,6 +700,40 @@ def team_name_from_logo_alt(alt):
     return match.group(1) if match else ''
 
 
+def draft_pick_status(pick_block):
+    titles = ' '.join(pick_block.get('titles') or []).lower()
+    classes = set(pick_block.get('class_tokens') or [])
+    if 'd_pick_traded' in classes or 'pick traded away' in titles:
+        return 'traded_away'
+    if 'sw_teamProfile__draftPick_inContention' in classes or 'in contention' in titles:
+        return 'in_contention'
+    return 'owned'
+
+
+def draft_asset_from_pick_block(pick_block, image_index=0):
+    images = pick_block.get('images') or []
+    if image_index >= len(images):
+        return None
+    image = images[image_index]
+    links = pick_block.get('links') or []
+    team_en = team_name_from_logo_alt(image.get('alt'))
+    status = draft_pick_status(pick_block)
+    note = '; '.join(unique_preserve_order(pick_block.get('titles') or []))
+    return {
+        'teamNameEn': team_en,
+        'teamNameCn': TEAM_CN_BY_EN.get(team_en, team_en),
+        'logo': image.get('src') or '',
+        'draftUrl': urllib.parse.urljoin(SALARYSWISH_BASE_URL, links[image_index]['href'])
+        if image_index < len(links) else '',
+        'ownershipStatus': status,
+        'ownershipStatusCn': draft_pick_status_cn(status),
+        'isOwned': status == 'owned',
+        'isInContention': status == 'in_contention',
+        'isTradedAway': status == 'traded_away',
+        'note': note,
+    }
+
+
 def parse_draft_assets(tables, slug, season, fetched_at):
     table = table_by_id(tables, 'sw_teamProfile__draftTable')
     if not table or not table.get('rows'):
@@ -657,17 +749,30 @@ def parse_draft_assets(tables, slug, season, fetched_at):
         for index, cell in enumerate(cells[1:], start=1):
             draft_year = headers[index] if index < len(headers) else ''
             assets = []
-            links = cell.get('links') or []
-            images = cell.get('images') or []
-            for image_index, image in enumerate(images):
-                team_en = team_name_from_logo_alt(image.get('alt'))
-                assets.append({
-                    'teamNameEn': team_en,
-                    'teamNameCn': TEAM_CN_BY_EN.get(team_en, team_en),
-                    'logo': image.get('src') or '',
-                    'draftUrl': urllib.parse.urljoin(SALARYSWISH_BASE_URL, links[image_index]['href'])
-                    if image_index < len(links) else '',
-                })
+            pick_blocks = cell.get('pick_blocks') or []
+            for pick_block in pick_blocks:
+                for image_index, _image in enumerate(pick_block.get('images') or []):
+                    asset = draft_asset_from_pick_block(pick_block, image_index)
+                    if asset:
+                        assets.append(asset)
+            if not pick_blocks:
+                links = cell.get('links') or []
+                images = cell.get('images') or []
+                for image_index, image in enumerate(images):
+                    team_en = team_name_from_logo_alt(image.get('alt'))
+                    assets.append({
+                        'teamNameEn': team_en,
+                        'teamNameCn': TEAM_CN_BY_EN.get(team_en, team_en),
+                        'logo': image.get('src') or '',
+                        'draftUrl': urllib.parse.urljoin(SALARYSWISH_BASE_URL, links[image_index]['href'])
+                        if image_index < len(links) else '',
+                        'ownershipStatus': 'owned',
+                        'ownershipStatusCn': draft_pick_status_cn('owned'),
+                        'isOwned': True,
+                        'isInContention': False,
+                        'isTradedAway': False,
+                        'note': '',
+                    })
             rows.append({
                 'asset_id': stable_id(slug, season, round_label, draft_year),
                 'team_slug': slug,
@@ -1290,12 +1395,16 @@ def row_to_signing_exception(row):
 
 
 def row_to_draft_asset(row):
+    assets = load_json_list(row['assets_json'])
     return {
         'draftYear': row['draft_year'] or '',
         'roundLabelEn': row['round_label_en'] or '',
         'roundLabelCn': row['round_label_cn'] or '',
         'roundNumber': row['round_number'],
-        'assets': load_json_list(row['assets_json']),
+        'assets': assets,
+        'ownedAssets': [asset for asset in assets if asset.get('isOwned')],
+        'contentionAssets': [asset for asset in assets if asset.get('isInContention')],
+        'tradedAwayAssets': [asset for asset in assets if asset.get('isTradedAway')],
     }
 
 
