@@ -188,7 +188,28 @@
     var text = String(value || '').trim().replace(/\//g, '-');
     var full = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (!full) return '';
+    var year = Number(full[1]);
+    var month = Number(full[2]);
+    var day = Number(full[3]);
+    var date = new Date(0);
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCFullYear(year, month - 1, day);
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
     return full[1] + '-' + String(full[2]).padStart(2, '0') + '-' + String(full[3]).padStart(2, '0');
+  }
+
+  var MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  /** Uses UTC calendar-day ordinals so daylight-saving transitions cannot change the visible day count. */
+  function daysUntilISODate(value, fromValue) {
+    var due = parseISODateStrict(value);
+    var from = parseISODateStrict(fromValue || todayISO());
+    if (!due || !from) return 0;
+    var dueParts = due.split('-').map(Number);
+    var fromParts = from.split('-').map(Number);
+    var dueDay = Date.UTC(dueParts[0], dueParts[1] - 1, dueParts[2]);
+    var fromDay = Date.UTC(fromParts[0], fromParts[1] - 1, fromParts[2]);
+    return Math.max(0, Math.round((dueDay - fromDay) / MILLISECONDS_PER_DAY));
   }
 
   function parseMonthDayWithYear(value, year) {
@@ -1309,8 +1330,11 @@
       future: '可以更自由地记录和表达，让生活更有仪式感。',
       completedPlan: []
     }, item);
-    normalized.days = Math.max(0, Number(normalized.days || 0));
-    if (!hasDue) normalized.due = addDateDays(todayISO(), normalized.days);
+    var storedDays = Math.max(0, Number(normalized.days || 0));
+    normalized.due = hasDue
+      ? normalizeISODate(normalized.due, addDateDays(todayISO(), storedDays))
+      : addDateDays(todayISO(), storedDays);
+    normalized.days = normalized.status === '愿望冷却中' ? daysUntilISODate(normalized.due) : 0;
     normalized.desire = Math.max(0, Math.min(100, Number(normalized.desire || 0)));
     normalized.alternatives = Array.isArray(normalized.alternatives) ? normalized.alternatives : splitLines(normalized.alternatives, []);
     normalized.plan = Array.isArray(normalized.plan) ? normalized.plan : splitLines(normalized.plan, []);
@@ -4282,8 +4306,7 @@
     if (!current) return;
     var next = normalizeWish(Object.assign({}, current));
     if (actionName === 'extend') {
-      next.days += 7;
-      next.due = addDateDays(todayISO(), next.days);
+      next.due = addDateDays(next.days > 0 ? next.due : todayISO(), 7);
       next.coolStart = todayISO();
       next.status = '愿望冷却中';
       persistWishUpdate(next, '冷却期已延长 7 天');
@@ -4350,13 +4373,12 @@
       '<footer class="life-wish-actions"><button class="life-secondary-btn" type="button" data-wish-action="extend">延长冷却期</button>' + (item.status === '已放弃' ? '<button class="life-secondary-btn" type="button" data-wish-action="decide">重新考虑</button>' : '<button class="life-secondary-btn" type="button" data-wish-action="drop">放入放弃区</button>') + (item.status === '已实现' ? '' : '<button class="life-primary-btn" type="button" data-wish-action="decide">可以决定了</button><button class="life-primary-btn amber" type="button" data-wish-action="realize">已实现</button>') + '</footer></article>';
   }
 
-  function syncWishDueFromDays(form) {
+  function syncWishRemainingFromDue(form) {
     if (!form || !form.elements.days || !form.elements.due) return;
-    var days = Math.max(0, Number(form.elements.days.value || 0));
-    form.elements.days.value = days;
-    if (!form.elements.status || form.elements.status.value === '愿望冷却中') {
-      form.elements.due.value = addDateDays(todayISO(), days);
-    }
+    var isCooling = !form.elements.status || form.elements.status.value === '愿望冷却中';
+    form.elements.due.required = isCooling;
+    form.elements.due.setCustomValidity('');
+    form.elements.days.value = isCooling ? daysUntilISODate(form.elements.due.value) : 0;
   }
 
   function renderWishForm(item) {
@@ -4380,7 +4402,7 @@
     return '<form id="lifeWishForm" class="life-wish-detail life-wish-form"><div class="life-form-title"><h2>' + title + '</h2><p>记录想要的原因、冷却期、替代方案和下一步计划，保存后进入对应状态栏。</p></div>' +
       '<input type="hidden" name="id" value="' + escapeHtml(source.id) + '">' +
       '<div class="life-two-grid"><label>愿望名称<input class="life-input" name="name" value="' + escapeHtml(source.name) + '" placeholder="例如：主机电脑" required></label><label>分类<select class="life-select" name="category">' + ['数码','旅行','学习','生活','关系','职业','健康'].map(function(category) { return '<option value="' + category + '"' + (source.category === category ? ' selected' : '') + '>' + category + '</option>'; }).join('') + '</select></label></div>' +
-      '<div class="life-three-grid"><label>状态<select class="life-select" name="status">' + ['愿望冷却中','可以决定','已放弃','已实现'].map(function(status) { return '<option value="' + status + '"' + (source.status === status ? ' selected' : '') + '>' + status + '</option>'; }).join('') + '</select></label><label>剩余天数<input class="life-input" type="number" min="0" name="days" value="' + escapeHtml(source.days) + '"></label><label>冷却到<input class="life-input" type="date" name="due" value="' + escapeHtml(source.due) + '"></label></div>' +
+      '<div class="life-three-grid"><label>状态<select class="life-select" name="status">' + ['愿望冷却中','可以决定','已放弃','已实现'].map(function(status) { return '<option value="' + status + '"' + (source.status === status ? ' selected' : '') + '>' + status + '</option>'; }).join('') + '</select></label><label>剩余天数<input class="life-input" type="number" min="0" name="days" value="' + escapeHtml(source.days) + '" readonly></label><label>冷却到<input class="life-input" type="date" name="due" value="' + escapeHtml(source.due) + '"' + (source.status === '愿望冷却中' ? ' required' : '') + '></label></div>' +
       '<label>价格<input class="life-input" name="price" value="' + escapeHtml(source.price) + '" placeholder="例如：9000"></label>' +
       renderWishProductImageEditor(source) +
       '<label class="life-wish-range">当前想要程度 <strong><span data-wish-desire-value>' + source.desire + '</span>/100</strong><input type="range" min="0" max="100" name="desire" value="' + escapeHtml(source.desire) + '" style="accent-color:' + wishDesireColor(source.desire) + '" data-wish-desire-range></label>' +
@@ -4397,8 +4419,8 @@
   function wishFromForm(form) {
     var existing = state.wishFormMode === 'edit' ? selectedWish(allWishes()) : null;
     var status = form.elements.status.value;
-    var days = Math.max(0, Number(form.elements.days.value || 0));
-    var due = status === '愿望冷却中' ? addDateDays(todayISO(), days) : (form.elements.due.value || todayISO());
+    var due = normalizeISODate(form.elements.due.value, todayISO());
+    var days = status === '愿望冷却中' ? daysUntilISODate(due) : 0;
     var item = normalizeWish(Object.assign({}, existing || {}, {
       id: form.elements.id.value || 'w-local-' + Date.now(),
       name: form.elements.name.value.trim() || '未命名愿望',
@@ -4443,6 +4465,11 @@
   }
 
   function saveWishForm(form) {
+    if (form.elements.status.value === '愿望冷却中' && !parseISODateStrict(form.elements.due.value)) {
+      form.elements.due.setCustomValidity('请选择冷却到日期');
+      form.elements.due.reportValidity();
+      return;
+    }
     var item = wishFromForm(form);
     upsertWishTimelineFromForm(form, item);
     state.wishFormMode = null;
@@ -6597,8 +6624,8 @@
       event.target.style.accentColor = wishDesireColor(wishValue);
       return;
     }
-    if (event.target.matches('#lifeWishForm input[name="days"], #lifeWishForm select[name="status"]')) {
-      syncWishDueFromDays(event.target.closest('#lifeWishForm'));
+    if (event.target.matches('#lifeWishForm input[name="due"], #lifeWishForm select[name="status"]')) {
+      syncWishRemainingFromDue(event.target.closest('#lifeWishForm'));
       return;
     }
     if (event.target.matches('[data-add-wish-desire-range]')) {
@@ -6710,8 +6737,8 @@
       syncRelationshipNextFromDate(event.target.closest('#lifeRelationshipForm'));
       return;
     }
-    if (event.target.matches('#lifeWishForm input[name="days"], #lifeWishForm select[name="status"]')) {
-      syncWishDueFromDays(event.target.closest('#lifeWishForm'));
+    if (event.target.matches('#lifeWishForm input[name="due"], #lifeWishForm select[name="status"]')) {
+      syncWishRemainingFromDue(event.target.closest('#lifeWishForm'));
       return;
     }
     if (event.target.matches('#lifeAxisEditForm select[name="year"]')) {
