@@ -336,6 +336,49 @@ class LifeBackendTestCase(unittest.TestCase):
         self.assertEqual(custom_ext_upload.status_code, 200)
         self.assertTrue(custom_ext_upload.get_json()['url'].endswith('.notimageext'))
 
+    def test_uploaded_image_urls_survive_snapshot_and_bootstrap(self):
+        token = self.login()
+        upload = self.client.post(
+            '/api/life/uploads',
+            headers=self.headers(token),
+            data={'file': (io.BytesIO(b'\x89PNG\r\n\x1a\nimage-data'), 'persistent.png')},
+            content_type='multipart/form-data'
+        )
+        self.assertEqual(upload.status_code, 200)
+        url = upload.get_json()['url']
+
+        downloaded = self.client.get(url)
+        try:
+            self.assertEqual(downloaded.status_code, 200)
+            self.assertEqual(downloaded.data, b'\x89PNG\r\n\x1a\nimage-data')
+        finally:
+            downloaded.close()
+
+        snapshots = {
+            'wishes': [{'id': 'wish-image', 'image': url}],
+            'axis': [{'id': 'axis-image', 'photos': [url]}],
+            'relationships': [{
+                'id': 'relationship-image',
+                'memories': [{'text': 'Shared memory', 'image': url}],
+            }],
+            'moments': [{'id': 'moment-image', 'photos': [url]}],
+        }
+        for module, items in snapshots.items():
+            response = self.client.put(
+                '/api/life/snapshot/{}'.format(module),
+                headers=self.headers(token),
+                json={'items': items},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        bootstrap = self.client.get('/api/life/bootstrap', headers=self.headers(token))
+        self.assertEqual(bootstrap.status_code, 200)
+        data = bootstrap.get_json()['data']
+        self.assertEqual(data['wishes'][0]['image'], url)
+        self.assertEqual(data['axis'][0]['photos'], [url])
+        self.assertEqual(data['relationships'][0]['memories'][0]['image'], url)
+        self.assertEqual(data['moments'][0]['photos'], [url])
+
     def test_admin_can_reset_normal_user_password(self):
         admin_token = self.login()
         create_user = self.client.post('/api/life/admin/users', headers=self.headers(admin_token), json={

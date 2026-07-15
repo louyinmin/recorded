@@ -2482,6 +2482,7 @@
   }
 
   function saveAxisEdit(form) {
+    if (blockPendingLifeImageSave(form, '里程碑图片仍在上传，请稍后保存')) return;
     var store = getAxisStore();
     var title = form.elements.title.value.trim() || '未命名里程碑';
     var desc = form.elements.desc.value.trim() || '暂无说明';
@@ -4066,6 +4067,7 @@
   }
 
   function saveRelationshipInlineForm(form) {
+    if (blockPendingLifeImageSave(form, '关系图片仍在上传，请稍后保存')) return;
     var selected = getSelectedRelationship(allRelationships());
     if (!selected) return;
     var field = form.elements.field.value;
@@ -4465,6 +4467,7 @@
   }
 
   function saveWishForm(form) {
+    if (blockPendingLifeImageSave(form, '愿望图片仍在上传，请稍后保存')) return;
     if (form.elements.status.value === '愿望冷却中' && !parseISODateStrict(form.elements.due.value)) {
       form.elements.due.setCustomValidity('请选择冷却到日期');
       form.elements.due.reportValidity();
@@ -5729,6 +5732,7 @@
   }
 
   var LIFE_IMAGE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+  var lifeImageUploadRequestId = 0;
 
   function uploadLifeImage(file) {
     var session = accountSession();
@@ -5747,6 +5751,44 @@
         return data.url;
       });
     });
+  }
+
+  /**
+   * Track uploads per form because axis and relationship editors can upload
+   * multiple images concurrently. Saving before every request settles would
+   * persist stale or empty image fields.
+   */
+  function beginLifeImageUpload(form, input) {
+    var pending = Number(form && form.dataset.lifeImageUploadPending || 0);
+    if (form) form.dataset.lifeImageUploadPending = String(pending + 1);
+    lifeImageUploadRequestId += 1;
+    var requestId = String(lifeImageUploadRequestId);
+    if (input) input.dataset.lifeImageUploadRequest = requestId;
+    return requestId;
+  }
+
+  function finishLifeImageUpload(form) {
+    if (!form) return;
+    var pending = Math.max(0, Number(form.dataset.lifeImageUploadPending || 0) - 1);
+    form.dataset.lifeImageUploadPending = String(pending);
+  }
+
+  function isCurrentLifeImageUpload(input, requestId, container) {
+    return !!input && input.dataset.lifeImageUploadRequest === requestId && (!container || container.isConnected !== false);
+  }
+
+  function blockPendingLifeImageSave(form, message) {
+    if (!form || Number(form.dataset.lifeImageUploadPending || 0) < 1) return false;
+    showToast(message || '图片仍在上传，请稍后保存');
+    return true;
+  }
+
+  function createLifeImagePreviewUrl(file) {
+    return window.URL && URL.createObjectURL ? URL.createObjectURL(file) : '';
+  }
+
+  function revokeLifeImagePreviewUrl(url) {
+    if (url && window.URL && URL.revokeObjectURL) URL.revokeObjectURL(url);
   }
 
   function previewWatchUpload(preview, imageUrl, label) {
@@ -5804,8 +5846,7 @@
   }
 
   function saveWatchForm(form) {
-    if (form.dataset.watchUploadPending === '1') {
-      showToast('影片图片仍在上传，请稍后保存');
+    if (blockPendingLifeImageSave(form, '影片图片仍在上传，请稍后保存')) {
       return;
     }
     var item = watchFromForm(form);
@@ -6716,13 +6757,27 @@
       var wishForm = event.target.closest('#lifeWishForm');
       var wishHidden = wishForm && wishForm.querySelector('[data-wish-uploaded-image]');
       var wishImagePreview = wishForm && wishForm.querySelector('[data-wish-image-preview]');
-      if (!wishFile || !wishHidden || typeof FileReader === 'undefined') return;
-      var wishReader = new FileReader();
-      wishReader.onload = function() {
-        wishHidden.value = String(wishReader.result || '');
-        if (wishImagePreview) wishImagePreview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(wishHidden.value) + '" alt=""></span><em>' + escapeHtml(wishFile.name) + '</em>';
-      };
-      wishReader.readAsDataURL(wishFile);
+      if (!wishFile || !wishHidden || !wishForm) return;
+      var wishUploadInput = event.target;
+      var previousWishImage = wishHidden.value;
+      var wishPreviewUrl = createLifeImagePreviewUrl(wishFile);
+      var wishRequestId = beginLifeImageUpload(wishForm, wishUploadInput);
+      if (wishImagePreview && wishPreviewUrl) wishImagePreview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(wishPreviewUrl) + '" alt=""></span><em>正在上传 ' + escapeHtml(wishFile.name) + '</em>';
+      uploadLifeImage(wishFile).then(function(url) {
+        if (!isCurrentLifeImageUpload(wishUploadInput, wishRequestId, wishForm)) return;
+        wishHidden.value = url;
+        if (wishImagePreview) wishImagePreview.innerHTML = '<span class="life-photo life-photo-upload"><img src="' + escapeHtml(url) + '" alt=""></span><em>' + escapeHtml(wishFile.name) + '</em>';
+        showToast('愿望图片已上传');
+      }).catch(function(err) {
+        if (!isCurrentLifeImageUpload(wishUploadInput, wishRequestId, wishForm)) return;
+        wishHidden.value = previousWishImage;
+        if (wishImagePreview) wishImagePreview.innerHTML = wishPhotoHtml({ image: previousWishImage, photo: wishForm.elements.photo.value }) + '<em>图片上传失败，已保留原图片</em>';
+        showToast(err.message || '图片上传失败');
+      }).then(function() {
+        revokeLifeImagePreviewUrl(wishPreviewUrl);
+        finishLifeImageUpload(wishForm);
+        if (isCurrentLifeImageUpload(wishUploadInput, wishRequestId)) wishUploadInput.value = '';
+      });
       return;
     }
     if (event.target.matches('#lifeAxisEditForm input[name="date"]')) {
@@ -6769,23 +6824,29 @@
       var watchHidden = watchForm && watchForm.querySelector('[data-watch-uploaded-image]');
       var watchPreview = watchForm && watchForm.querySelector('[data-watch-image-preview]');
       if (!watchFile || !watchHidden || !watchForm) return;
-      watchForm.dataset.watchUploadPending = '1';
-      if (watchPreview && window.URL && URL.createObjectURL) {
-        previewWatchUpload(watchPreview, URL.createObjectURL(watchFile), '正在上传 ' + watchFile.name);
+      var watchUploadInput = event.target;
+      var previousWatchImage = watchHidden.value;
+      var watchPreviewUrl = createLifeImagePreviewUrl(watchFile);
+      var watchRequestId = beginLifeImageUpload(watchForm, watchUploadInput);
+      if (watchPreview && watchPreviewUrl) {
+        previewWatchUpload(watchPreview, watchPreviewUrl, '正在上传 ' + watchFile.name);
       } else if (watchPreview) {
         watchPreview.innerHTML = '<span>正在上传 ' + escapeHtml(watchFile.name) + '</span>';
       }
       uploadLifeImage(watchFile).then(function(url) {
+        if (!isCurrentLifeImageUpload(watchUploadInput, watchRequestId, watchForm)) return;
         watchHidden.value = url;
         previewWatchUpload(watchPreview, url, watchFile.name);
         showToast('影片图片已上传');
       }).catch(function(err) {
-        watchHidden.value = '';
-        if (watchPreview) watchPreview.innerHTML = watchCoverHtml({}, '') + '<em>图片上传失败</em>';
+        if (!isCurrentLifeImageUpload(watchUploadInput, watchRequestId, watchForm)) return;
+        watchHidden.value = previousWatchImage;
+        if (watchPreview) watchPreview.innerHTML = watchCoverHtml({ image: previousWatchImage }, '') + '<em>图片上传失败，已保留原图片</em>';
         showToast(err.message || '图片上传失败');
       }).then(function() {
-        watchForm.dataset.watchUploadPending = '0';
-        event.target.value = '';
+        revokeLifeImagePreviewUrl(watchPreviewUrl);
+        finishLifeImageUpload(watchForm);
+        if (isCurrentLifeImageUpload(watchUploadInput, watchRequestId)) watchUploadInput.value = '';
       });
       return;
     }
@@ -6793,7 +6854,7 @@
       var axisFiles = Array.prototype.slice.call(event.target.files || []);
       var axisForm = event.target.closest('#lifeAxisEditForm');
       var axisHidden = axisForm && axisForm.elements.photos;
-      if (!axisFiles.length || !axisHidden || typeof FileReader === 'undefined') return;
+      if (!axisFiles.length || !axisHidden || !axisForm) return;
       var currentAxisPhotos = splitAxisList(axisHidden.value).slice(0, 3);
       var availableAxisSlots = Math.max(0, 3 - currentAxisPhotos.length);
       if (!availableAxisSlots) {
@@ -6803,17 +6864,19 @@
       }
       var selectedAxisFiles = axisFiles.slice(0, availableAxisSlots);
       if (axisFiles.length > availableAxisSlots) showToast('最多只能上传 3 张图片，已保留前 ' + availableAxisSlots + ' 张');
-      var loadedAxisPhotos = new Array(selectedAxisFiles.length);
-      selectedAxisFiles.forEach(function(axisFile, index) {
-        var axisReader = new FileReader();
-        axisReader.onload = function() {
-          loadedAxisPhotos[index] = String(axisReader.result || '');
-          if (loadedAxisPhotos.filter(Boolean).length !== selectedAxisFiles.length) return;
-          var nextAxisPhotos = currentAxisPhotos.concat(loadedAxisPhotos).slice(0, 3);
-          setAxisFormPhotos(axisForm, nextAxisPhotos);
-          event.target.value = '';
-        };
-        axisReader.readAsDataURL(axisFile);
+      var axisUploadInput = event.target;
+      var axisRequestId = beginLifeImageUpload(axisForm, axisUploadInput);
+      showToast('正在上传 ' + selectedAxisFiles.length + ' 张里程碑图片');
+      Promise.all(selectedAxisFiles.map(uploadLifeImage)).then(function(urls) {
+        if (!isCurrentLifeImageUpload(axisUploadInput, axisRequestId, axisForm)) return;
+        var latestAxisPhotos = splitAxisList(axisHidden.value).slice(0, 3);
+        setAxisFormPhotos(axisForm, latestAxisPhotos.concat(urls).slice(0, 3));
+        showToast('里程碑图片已上传');
+      }).catch(function(err) {
+        if (isCurrentLifeImageUpload(axisUploadInput, axisRequestId, axisForm)) showToast(err.message || '图片上传失败，已保留原图片');
+      }).then(function() {
+        finishLifeImageUpload(axisForm);
+        if (isCurrentLifeImageUpload(axisUploadInput, axisRequestId)) axisUploadInput.value = '';
       });
       return;
     }
@@ -6822,15 +6885,29 @@
       var replaceIndex = Number(event.target.getAttribute('data-axis-image-replace'));
       var replaceForm = event.target.closest('#lifeAxisEditForm');
       var replaceHidden = replaceForm && replaceForm.elements.photos;
-      if (!replaceFile || !replaceHidden || typeof FileReader === 'undefined' || replaceIndex < 0 || replaceIndex > 2) return;
+      if (!replaceFile || !replaceHidden || !replaceForm || replaceIndex < 0 || replaceIndex > 2) return;
       var replacePhotos = splitAxisList(replaceHidden.value).slice(0, 3);
       if (replaceIndex >= replacePhotos.length) return;
-      var replaceReader = new FileReader();
-      replaceReader.onload = function() {
-        replacePhotos[replaceIndex] = String(replaceReader.result || '');
-        setAxisFormPhotos(replaceForm, replacePhotos);
-      };
-      replaceReader.readAsDataURL(replaceFile);
+      var replacedPhoto = replacePhotos[replaceIndex];
+      var replaceUploadInput = event.target;
+      var replaceRequestId = beginLifeImageUpload(replaceForm, replaceUploadInput);
+      showToast('正在上传替换图片');
+      uploadLifeImage(replaceFile).then(function(url) {
+        if (!isCurrentLifeImageUpload(replaceUploadInput, replaceRequestId, replaceForm)) return;
+        var latestReplacePhotos = splitAxisList(replaceHidden.value).slice(0, 3);
+        if (latestReplacePhotos[replaceIndex] !== replacedPhoto) {
+          showToast('原图片已变化，本次替换未应用');
+          return;
+        }
+        latestReplacePhotos[replaceIndex] = url;
+        setAxisFormPhotos(replaceForm, latestReplacePhotos);
+        showToast('里程碑图片已替换');
+      }).catch(function(err) {
+        if (isCurrentLifeImageUpload(replaceUploadInput, replaceRequestId, replaceForm)) showToast(err.message || '图片上传失败，已保留原图片');
+      }).then(function() {
+        finishLifeImageUpload(replaceForm);
+        if (isCurrentLifeImageUpload(replaceUploadInput, replaceRequestId)) replaceUploadInput.value = '';
+      });
       return;
     }
     if (!event.target.matches('[data-relationship-editor-image-upload]')) return;
@@ -6838,25 +6915,31 @@
     var row = event.target.closest('[data-relationship-media-row]');
     if (row) {
       var imageInput = row.querySelector('[data-relationship-media-image]');
-      if (!file || !imageInput || typeof FileReader === 'undefined') return;
-      var rowReader = new FileReader();
-      rowReader.onload = function() {
-        imageInput.value = String(rowReader.result || '');
+      var relationshipForm = event.target.closest('#lifeRelationshipInlineForm');
+      if (!file || !imageInput || !relationshipForm) return;
+      var relationshipUploadInput = event.target;
+      var previousRelationshipImage = imageInput.value;
+      var relationshipPreview = row.querySelector('[data-relationship-media-preview]');
+      var relationshipPreviewUrl = createLifeImagePreviewUrl(file);
+      var relationshipRequestId = beginLifeImageUpload(relationshipForm, relationshipUploadInput);
+      if (relationshipPreview && relationshipPreviewUrl) relationshipPreview.innerHTML = relationshipMediaThumb({ image: relationshipPreviewUrl }, row.getAttribute('data-media-kind') || 'memory', 0);
+      uploadLifeImage(file).then(function(url) {
+        if (!isCurrentLifeImageUpload(relationshipUploadInput, relationshipRequestId, row)) return;
+        imageInput.value = url;
         refreshRelationshipMediaRowPreview(row);
-      };
-      rowReader.readAsDataURL(file);
+        showToast('关系图片已上传');
+      }).catch(function(err) {
+        if (!isCurrentLifeImageUpload(relationshipUploadInput, relationshipRequestId, row)) return;
+        imageInput.value = previousRelationshipImage;
+        refreshRelationshipMediaRowPreview(row);
+        showToast(err.message || '图片上传失败，已保留原图片');
+      }).then(function() {
+        revokeLifeImagePreviewUrl(relationshipPreviewUrl);
+        finishLifeImageUpload(relationshipForm);
+        if (isCurrentLifeImageUpload(relationshipUploadInput, relationshipRequestId)) relationshipUploadInput.value = '';
+      });
       return;
     }
-    var form = event.target.closest('#lifeRelationshipInlineForm');
-    var hidden = form && form.querySelector('[data-relationship-image-data]');
-    var preview = form && form.querySelector('[data-relationship-upload-preview]');
-    if (!file || !hidden || typeof FileReader === 'undefined') return;
-    var reader = new FileReader();
-    reader.onload = function() {
-      hidden.value = String(reader.result || '');
-      if (preview) preview.innerHTML = '<span class="life-media-thumb"><img src="' + escapeHtml(hidden.value) + '" alt=""></span><em>' + escapeHtml(file.name) + '</em>';
-    };
-    reader.readAsDataURL(file);
   });
 
   document.addEventListener('submit', function(event) {
