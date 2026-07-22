@@ -12,6 +12,7 @@ import io
 from expiry_backend import init_expiry_module
 from life_backend import init_life_module
 from nba_backend import init_nba_module
+from nbagame_backend import init_nbagame_module
 from timing_backend import init_timing_module
 from wechat_backend import init_wechat_module
 from expiry_backend.service import (
@@ -42,11 +43,13 @@ app = Flask(__name__, static_folder=None)
 DB_PATH = os.environ.get('RECORDED_DB_PATH', os.path.join(BASE_DIR, 'data.db'))
 LIFE_DB_PATH = os.environ.get('LIFE_DB_PATH', os.path.join(BASE_DIR, 'life.db'))
 NBA_DB_PATH = os.environ.get('NBA_DB_PATH', os.path.join(BASE_DIR, 'nba.db'))
+NBAGAME_DB_PATH = os.environ.get('NBAGAME_DB_PATH', os.path.join(BASE_DIR, 'nbagame.db'))
 WECHAT_DB_PATH = os.environ.get('WECHAT_DB_PATH', os.path.join(BASE_DIR, 'wechat.db'))
 
 init_expiry_module(app, BASE_DIR, DB_PATH)
 init_life_module(app, BASE_DIR, LIFE_DB_PATH)
 init_nba_module(app, BASE_DIR, NBA_DB_PATH)
+init_nbagame_module(app, APP_DIR, NBAGAME_DB_PATH)
 init_wechat_module(app, BASE_DIR, WECHAT_DB_PATH)
 init_timing_module(app, BASE_DIR)
 

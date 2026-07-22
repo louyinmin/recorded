@@ -261,6 +261,30 @@ sudo chmod 600 /etc/recorded/wechat-miniprogram.env
 
 `WECHAT_MINIPROGRAM_*_APPID` 和 `WECHAT_MINIPROGRAM_*_SECRET` 只保存在服务器环境变量或部署平台密钥管理中，不提交到 Git，也不返回给小程序。配置好本地文件后，后续部署继续使用：
 
+Court Deck uses its own database and credentials under `/nbagame/v1`. Add these values to the same server-side environment file. The first four are required by `redeploy.sh`; the remaining values pin production storage and application identity explicitly:
+
+```bash
+NBAGAME_DB_PATH=/var/lib/recorded/nbagame.db
+NBAGAME_APP_ID=court-deck-prod
+NBAGAME_ASSET_MANIFEST_VERSION=20260722.1
+NBAGAME_WECHAT_APPID=your-court-deck-appid
+NBAGAME_WECHAT_SECRET=your-court-deck-secret
+NBAGAME_TOKEN_SECRET=replace-with-a-long-random-server-secret
+NBAGAME_PUBLIC_BASE_URL=https://api.example.com
+NBAGAME_PUBLISHED_ASSETS_DIR=/var/lib/recorded/nbagame-assets
+NBAGAME_MAX_REQUEST_BYTES=2097152
+NBAGAME_LOGIN_RATE_LIMIT=20
+NBAGAME_LOGIN_RATE_WINDOW_SECONDS=60
+```
+
+Create the persistent database and asset directory before the first deployment:
+
+```bash
+sudo install -d -m 750 /var/lib/recorded /var/lib/recorded/nbagame-assets
+```
+
+The asset publisher reads a fixed whitelist from the repository's `nbagame/` directory and copies it into immutable version directories. Set `NBAGAME_ASSETS_DIR` only when the source directory differs. `NBAGAME_PUBLIC_BASE_URL` must be the HTTPS origin registered as a legal WeChat domain and must not include `/nbagame/v1`. See `projects/nbagame_api/docs/frontend-api.md` for the frontend contract.
+
 ```bash
 sudo ./redeploy.sh
 ```

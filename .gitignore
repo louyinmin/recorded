@@ -54,6 +54,7 @@ nba_avatar/
 nba_avatar*.zip
 nba_team_images/
 nba_team_images*.zip
+nbagame_published_assets/
 !projects/nba_api/docs/asset-manifests/
 !projects/nba_api/docs/asset-manifests/current-assets/
 !projects/nba_api/docs/asset-manifests/current-assets/nba_images/

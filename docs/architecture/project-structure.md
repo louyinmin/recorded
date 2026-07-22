@@ -1,6 +1,6 @@
 # Project Structure
 
-This repository hosts five product surfaces behind one Flask entrypoint.
+This repository hosts six product surfaces behind one Flask entrypoint.
 
 ## Runtime Entrypoint
 
@@ -17,6 +17,7 @@ This repository hosts five product surfaces behind one Flask entrypoint.
 | Expiry Radar | `projects/expiry_radar/` | `/expiry/*`, `/api/expiry/*` |
 | Timing API | `projects/timing_api/` | `/api/timing/*` |
 | NBA API | `projects/nba_api/` | `/api/nba/*` |
+| Court Deck Mini Game | `projects/nbagame_api/` | `/nbagame/v1/*` |
 
 Shared code and assets live under `projects/shared/`.
 
@@ -31,15 +32,16 @@ Shared code and assets live under `projects/shared/`.
 | Expiry Radar | `projects/expiry_radar/docs/` |
 | Timing API | `projects/timing_api/docs/` |
 | NBA API | `projects/nba_api/docs/` |
+| Court Deck Mini Game | `projects/nbagame_api/docs/` |
 | Shared modules | `projects/shared/docs/` |
 
 ## Compatibility Rules
 
-- Root backend packages such as `nba_backend` and `expiry_backend` are compatibility entries. Their real implementation files live under `projects/*/backend/`.
+- Root backend packages such as `nba_backend`, `nbagame_backend`, and `expiry_backend` are compatibility entries. Their real implementation files live under `projects/*/backend/`.
 - Project-specific frontend assets use stable prefixes:
   - `/life/assets/*`
   - `/travel/assets/*`
   - `/expiry/assets/*`
   - `/shared/assets/*`
 - Legacy asset paths such as `/assets/css/style.css` and `/assets/js/common.js` are still resolved by Flask for older cached pages.
-- `nginx.conf` falls back to Flask for moved static files, while `/api/*` continues to proxy to Flask directly.
+- `nginx.conf` falls back to Flask for moved static files, while `/api/*` and Court Deck's isolated `/nbagame/*` continue to proxy to Flask directly.

@@ -23,7 +23,7 @@ echo ""
 echo "[0/5] 加载微信小程序环境变量..."
 if [ ! -f "$WECHAT_ENV_FILE" ]; then
     echo "  ❌ 缺少微信小程序环境变量文件: $WECHAT_ENV_FILE"
-    echo "  请先创建该文件，并写入 WECHAT_MINIPROGRAM_NBA_* 和 WECHAT_MINIPROGRAM_TIMING_*。"
+    echo "  请先创建该文件，并写入 NBA、Timing 和 NBAGAME 的微信凭据。"
     exit 1
 fi
 
@@ -36,7 +36,11 @@ for name in \
     WECHAT_MINIPROGRAM_NBA_APPID \
     WECHAT_MINIPROGRAM_NBA_SECRET \
     WECHAT_MINIPROGRAM_TIMING_APPID \
-    WECHAT_MINIPROGRAM_TIMING_SECRET
+    WECHAT_MINIPROGRAM_TIMING_SECRET \
+    NBAGAME_WECHAT_APPID \
+    NBAGAME_WECHAT_SECRET \
+    NBAGAME_TOKEN_SECRET \
+    NBAGAME_PUBLIC_BASE_URL
 do
     if [ -z "${!name:-}" ]; then
         echo "  ❌ $WECHAT_ENV_FILE 缺少: $name"
