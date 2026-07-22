@@ -32,7 +32,10 @@ VALID_TEAMS = {
     'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS',
 }
 ASSET_SPECS = {
-    'home': [('broadcast-home-v5', 'images/broadcast-home-v5.jpg'), ('broadcast-arena-bg', 'images/broadcast-arena-bg.jpg')],
+    'home': [
+        ('broadcast-home-v6', 'images/broadcast-home-v6.png'),
+        ('broadcast-arena-bg', 'images/broadcast-arena-bg.jpg'),
+    ],
     'screen-shells': [
         ('battle-shell-v9', 'images/battle-shell-v9.jpg'),
         ('season-summary-leaderboard-v1', 'images/season-summary-leaderboard-v1.jpg'),

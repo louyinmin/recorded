@@ -119,7 +119,7 @@
 
 |资源组|资源键规则|现有来源|用途|加载时机|
 |---|---|---|---|---|
-|`home`|`broadcast-home-v5`、`broadcast-arena-bg`|`images/broadcast-home-v5.jpg` 等|首页和背景|首页首次进入|
+|`home`|`broadcast-home-v6`、`broadcast-arena-bg`|`images/broadcast-home-v6.png` 等|首页和背景|首页首次进入|
 |`screen-shells`|`battle-shell-v9`、`season-summary-leaderboard-v1`、`leaderboard-shell-v1`、`season-hub-shell-v1`、`playoff-hub-shell-v1`|`images/*.jpg`|战斗、赛季结算、排行榜、常规赛、季后赛框架|进入对应页面|
 |`screen-modals`|`season-modal-manual-v1`、`season-modal-standings-v1`、`season-modal-stats-v1`|`images/*.jpg`|赛季中心弹层|打开对应弹层|
 |`player-art`|`my-core-star-card-anime-v1`、`battle-die-body-v2`|`images/*.jpg/png`|自建球员卡、骰子|对应页面|

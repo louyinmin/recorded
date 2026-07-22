@@ -180,6 +180,18 @@ class NbaGameBackendTestCase(unittest.TestCase):
         forbidden = self.client.get('/nbagame/v1/assets/manifest', headers={'X-App-Id': 'nba'})
         self.assertEqual(forbidden.status_code, 403)
 
+    def test_home_manifest_publishes_v6_png(self):
+        manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(manifest.status_code, 200)
+        assets = {asset['key']: asset for asset in manifest.get_json()['data']['assets']}
+        self.assertIn('broadcast-home-v6', assets)
+        self.assertNotIn('broadcast-home-v5', assets)
+        self.assertEqual(assets['broadcast-home-v6']['contentType'], 'image/png')
+        self.assertTrue(assets['broadcast-home-v6']['url'].endswith('/broadcast-home-v6.png'))
+
     def test_write_routes_reject_non_json_malformed_json_and_oversized_bodies(self):
         headers = {'X-App-Id': 'court-deck-prod'}
         non_json = self.client.post(
