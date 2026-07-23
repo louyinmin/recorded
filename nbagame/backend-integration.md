@@ -1,7 +1,7 @@
 # Court Deck 微信小游戏后端对接文档
 
-**版本：** v1.0
-**日期：** 2026-07-22
+**版本：** v1.1
+**日期：** 2026-07-23
 **适用对象：** 后端、运维、小游戏前端
 **本阶段范围：** 后端先行开发；当前小游戏不改代码。接口、字段和缓存约定冻结后，前端再接入。
 
@@ -63,7 +63,7 @@
   "client": {
     "platform": "wechat-minigame",
     "clientVersion": "1.0.0",
-    "assetManifestVersion": "20260722.1"
+    "assetManifestVersion": "content-<sha256>"
   }
 }
 ```
@@ -104,7 +104,7 @@
   "data": {
     "profile": { "id": "usrapp_01", "nickname": null, "avatarUrl": null },
     "career": { "exists": true, "revision": 18, "updatedAt": "2026-07-22T08:00:00Z" },
-    "assets": { "manifestVersion": "20260722.1" }
+    "assets": { "manifestVersion": "content-<sha256>" }
   }
 }
 ```
@@ -137,7 +137,7 @@
 
 ```http
 Cache-Control: public, max-age=300, stale-while-revalidate=60
-ETag: "assets-court-deck-prod-20260722.1-screen-shells"
+ETag: "assets-court-deck-prod-content-<sha256>-screen-shells"
 Vary: X-App-Id
 ```
 
@@ -149,17 +149,17 @@ Vary: X-App-Id
   "data": {
     "appId": "court-deck-prod",
     "group": "screen-shells",
-    "manifestVersion": "20260722.1",
+    "manifestVersion": "content-<sha256>",
     "assets": [
       {
         "key": "season-hub-shell-v1",
-        "url": "https://api.example.com/nbagame/v1/assets/files/20260722.1/season-hub-shell-v1.jpg",
+        "url": "https://api.example.com/nbagame/v1/assets/files/asset-<sha256>/season-hub-shell-v1.jpg",
         "contentType": "image/jpeg",
         "bytes": 401408,
         "sha256": "base64-or-hex-digest",
         "width": 780,
         "height": 1688,
-        "version": "20260722.1"
+        "version": "asset-<sha256>"
       }
     ]
   }
@@ -170,7 +170,7 @@ Vary: X-App-Id
 
 - 文件访问必须验证 `version/key/ext` 属于请求应用；不存在返回 `404 ASSET_NOT_FOUND`。
 - 可以由 API 网关直接回源对象存储，或使用应用隔离的 CDN；对小游戏暴露的仍应是本 API 域名或该 API 授权的 CDN 域名。
-- 已发布的版本路径不可覆盖。内容变更必须发布新 `manifestVersion` 和新 URL（或新版本路径），从根源避免缓存污染。
+- 已发布的版本路径不可覆盖。后端启动时根据全部白名单内容自动生成 `content-<sha256>` manifest 版本，并为每个资源生成独立的 `asset-<sha256>` 版本。覆盖同名源图并重新部署后，只有变化资源获得新 URL，未变化资源继续使用原 URL；无需手工设置版本环境变量。
 - 成功文件响应：`Cache-Control: public, max-age=31536000, immutable`、`ETag`、正确 `Content-Type`、`Content-Length`、`X-Content-Type-Options: nosniff`。不需要 Cookie，也不得携带其他应用的鉴权信息。
 
 ### 4.3 客户端页面缓存契约（供后续前端接入）
@@ -347,6 +347,7 @@ Vary: X-App-Id
 |`season_start_aggregates`|`application_id`、`user_id`、`team`、`starts`、`first_reached_at`|唯一索引 `(application_id, user_id, team)`；用于榜单查询|
 |`asset_manifests`|`application_id`、`group`、`version`、`etag`、`published_at`|同应用、同组、同版本唯一；发布后不可变|
 |`asset_files`|`application_id`、`version`、`key`、`storage_key`、`sha256`、尺寸|唯一索引 `(application_id, version, key)`；对象存储路径按应用前缀隔离|
+|`asset_manifest_items`|`application_id`、`manifest_version`、`group`、`key`、`asset_version`|把自动 manifest 版本映射到独立内容版本；旧手工版本记录继续保留|
 
 所有含 `application_id` 的主查询、更新、删除条件必须显式带该字段。数据库行级安全可作为第二道防线，但不能替代应用层从 token 注入的租户过滤。
 

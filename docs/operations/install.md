@@ -266,7 +266,6 @@ Court Deck uses its own database and credentials under `/nbagame/v1`. Add these 
 ```bash
 NBAGAME_DB_PATH=/var/lib/recorded/nbagame.db
 NBAGAME_APP_ID=court-deck-prod
-NBAGAME_ASSET_MANIFEST_VERSION=20260722.1
 NBAGAME_WECHAT_APPID=your-court-deck-appid
 NBAGAME_WECHAT_SECRET=your-court-deck-secret
 NBAGAME_TOKEN_SECRET=replace-with-a-long-random-server-secret
@@ -283,7 +282,17 @@ Create the persistent database and asset directory before the first deployment:
 sudo install -d -m 750 /var/lib/recorded /var/lib/recorded/nbagame-assets
 ```
 
-The asset publisher reads a fixed whitelist from the repository's `nbagame/` directory and copies it into immutable version directories. Set `NBAGAME_ASSETS_DIR` only when the source directory differs. `NBAGAME_PUBLIC_BASE_URL` must be the HTTPS origin registered as a legal WeChat domain and must not include `/nbagame/v1`. See `projects/nbagame_api/docs/frontend-api.md` for the frontend contract.
+The asset publisher reads a fixed whitelist from the repository's `nbagame/` directory. It derives the manifest and file versions from SHA-256 content, copies only new content into immutable storage, and keeps old URLs available. `NBAGAME_ASSET_MANIFEST_VERSION` is no longer used and may be removed from existing environment files. Set `NBAGAME_ASSETS_DIR` only when the source directory differs. `NBAGAME_PUBLIC_BASE_URL` must be the HTTPS origin registered as a legal WeChat domain and must not include `/nbagame/v1`.
+
+To replace an existing image, upload it to a temporary path and atomically rename it over the whitelisted source before running `redeploy.sh`. No version environment change is required:
+
+```bash
+mv /home/admin/recorded/nbagame/images/broadcast-home-v6.png.upload \
+   /home/admin/recorded/nbagame/images/broadcast-home-v6.png
+sudo ./redeploy.sh
+```
+
+See `projects/nbagame_api/docs/frontend-api.md` for the frontend contract.
 
 ```bash
 sudo ./redeploy.sh

@@ -29,9 +29,6 @@ def init_nbagame_module(app, app_dir, db_path):
     app.config['NBAGAME_LOGIN_RATE_WINDOW_SECONDS'] = max(1, int(
         os.environ.get('NBAGAME_LOGIN_RATE_WINDOW_SECONDS', '60')
     ))
-    app.config['NBAGAME_ASSET_MANIFEST_VERSION'] = os.environ.get(
-        'NBAGAME_ASSET_MANIFEST_VERSION', '20260722.1'
-    )
     app.config['NBAGAME_ASSETS_DIR'] = os.environ.get(
         'NBAGAME_ASSETS_DIR', os.path.join(app_dir, 'nbagame')
     )

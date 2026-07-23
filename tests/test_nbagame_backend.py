@@ -1,3 +1,4 @@
+import hashlib
 import importlib
 import os
 import shutil
@@ -34,6 +35,7 @@ class NbaGameBackendTestCase(unittest.TestCase):
         'NBAGAME_ASSETS_DIR',
         'NBAGAME_PUBLISHED_ASSETS_DIR',
         'NBAGAME_PUBLIC_BASE_URL',
+        'NBAGAME_ASSET_MANIFEST_VERSION',
         'NBAGAME_MAX_REQUEST_BYTES',
         'NBAGAME_LOGIN_RATE_LIMIT',
         'NBAGAME_LOGIN_RATE_WINDOW_SECONDS',
@@ -57,6 +59,7 @@ class NbaGameBackendTestCase(unittest.TestCase):
         os.environ['NBAGAME_ASSETS_DIR'] = self.assets_dir
         os.environ['NBAGAME_PUBLISHED_ASSETS_DIR'] = self.published_assets_dir
         os.environ['NBAGAME_PUBLIC_BASE_URL'] = 'https://cdn.example.test'
+        os.environ['NBAGAME_ASSET_MANIFEST_VERSION'] = 'legacy-manual-version'
         os.environ['NBAGAME_MAX_REQUEST_BYTES'] = str(2 * 1024 * 1024)
         os.environ['NBAGAME_LOGIN_RATE_LIMIT'] = '1000'
         os.environ['NBAGAME_LOGIN_RATE_WINDOW_SECONDS'] = '60'
@@ -238,23 +241,48 @@ class NbaGameBackendTestCase(unittest.TestCase):
             )
             self.assertEqual(other_ip.status_code, 200)
 
-    def test_published_asset_version_remains_immutable_when_source_changes(self):
+    def test_source_change_automatically_publishes_a_new_content_version(self):
         headers = {'X-App-Id': 'court-deck-prod'}
-        manifest = self.client.get('/nbagame/v1/assets/manifest?group=home', headers=headers).get_json()['data']
-        asset_url = manifest['assets'][0]['url']
-        original = self.client.get(asset_url, headers=headers)
+        original_response = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home', headers=headers,
+        )
+        original_manifest = original_response.get_json()['data']
+        original_manifest_etag = original_response.headers['ETag']
+        self.assertTrue(original_manifest['manifestVersion'].startswith('content-'))
+        original_assets = {asset['key']: asset for asset in original_manifest['assets']}
+        original_home = original_assets['broadcast-home-v6']
+        original_arena = original_assets['broadcast-arena-bg']
+        original = self.client.get(original_home['url'], headers=headers)
         original_body, original_etag = original.data, original.headers['ETag']
         original.close()
 
         source = Path(self.assets_dir, ASSET_SPECS['home'][0][1])
-        source.write_bytes(JPEG_1X1 + b'changed-after-publication')
+        changed_body = PNG_1X1 + b'changed-after-publication'
+        source.write_bytes(changed_body)
         self.reload_app()
 
-        unchanged = self.client.get(asset_url, headers=headers)
-        self.assertEqual(unchanged.status_code, 200)
-        self.assertEqual(unchanged.data, original_body)
-        self.assertEqual(unchanged.headers['ETag'], original_etag)
-        unchanged.close()
+        updated_response = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home',
+            headers={**headers, 'If-None-Match': original_manifest_etag},
+        )
+        self.assertEqual(updated_response.status_code, 200)
+        self.assertNotEqual(updated_response.headers['ETag'], original_manifest_etag)
+        updated_manifest = updated_response.get_json()['data']
+        updated_assets = {asset['key']: asset for asset in updated_manifest['assets']}
+        self.assertNotEqual(updated_manifest['manifestVersion'], original_manifest['manifestVersion'])
+        self.assertNotEqual(updated_assets['broadcast-home-v6']['url'], original_home['url'])
+        self.assertEqual(updated_assets['broadcast-arena-bg']['url'], original_arena['url'])
+
+        updated = self.client.get(updated_assets['broadcast-home-v6']['url'], headers=headers)
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.data, changed_body)
+        updated.close()
+
+        immutable_old = self.client.get(original_home['url'], headers=headers)
+        self.assertEqual(immutable_old.status_code, 200)
+        self.assertEqual(immutable_old.data, original_body)
+        self.assertEqual(immutable_old.headers['ETag'], original_etag)
+        immutable_old.close()
 
     def test_missing_published_asset_is_restored_on_startup(self):
         headers = {'X-App-Id': 'court-deck-prod'}
@@ -262,8 +290,12 @@ class NbaGameBackendTestCase(unittest.TestCase):
         conn = sqlite3.connect(os.environ['NBAGAME_DB_PATH'])
         try:
             storage_path = conn.execute(
-                '''SELECT storage_path FROM nbagame_asset_files
-                   WHERE application_id=? AND version=? AND asset_key=?''',
+                '''SELECT files.storage_path FROM nbagame_asset_manifest_items items
+                   JOIN nbagame_asset_files files
+                     ON files.application_id=items.application_id
+                    AND files.version=items.asset_version
+                    AND files.asset_key=items.asset_key
+                   WHERE items.application_id=? AND items.manifest_version=? AND items.asset_key=?''',
                 ('court-deck-prod', manifest['manifestVersion'], manifest['assets'][0]['key']),
             ).fetchone()[0]
         finally:
@@ -274,9 +306,53 @@ class NbaGameBackendTestCase(unittest.TestCase):
         self.reload_app()
 
         self.assertTrue(published_path.is_file())
+        reloaded_manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home', headers=headers,
+        ).get_json()['data']
+        self.assertEqual(reloaded_manifest['manifestVersion'], manifest['manifestVersion'])
+        self.assertEqual(reloaded_manifest['assets'], manifest['assets'])
         restored = self.client.get(manifest['assets'][0]['url'], headers=headers)
         self.assertEqual(restored.status_code, 200)
         restored.close()
+
+    def test_legacy_database_migrates_and_manual_asset_url_remains_available(self):
+        legacy_body = PNG_1X1 + b'legacy-manual-version'
+        legacy_relative_path = 'court-deck-prod/legacy-v1/home/legacy-home.png'
+        legacy_path = Path(self.published_assets_dir, legacy_relative_path)
+        legacy_path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_path.write_bytes(legacy_body)
+        conn = sqlite3.connect(os.environ['NBAGAME_DB_PATH'])
+        try:
+            conn.execute('DROP TABLE nbagame_asset_manifest_items')
+            conn.execute(
+                '''INSERT INTO nbagame_asset_files
+                   (application_id, version, asset_group, asset_key, extension, storage_path,
+                    sha256, content_type, bytes, width, height)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    'court-deck-prod', 'legacy-v1', 'home', 'legacy-home', 'png',
+                    legacy_relative_path, hashlib.sha256(legacy_body).hexdigest(),
+                    'image/png', len(legacy_body), 1, 1,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        self.reload_app()
+
+        manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(manifest.status_code, 200)
+        legacy = self.client.get(
+            '/nbagame/v1/assets/files/legacy-v1/legacy-home.png',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(legacy.status_code, 200)
+        self.assertEqual(legacy.data, legacy_body)
+        legacy.close()
 
     def test_idempotency_key_must_be_a_uuid(self):
         login = self.login()

@@ -29,7 +29,7 @@ After the user authorizes `wx.getUserProfile`, send the authorization header and
 
 This endpoint is anonymous but requires `X-App-Id`. Supported groups are `home`, `screen-shells`, `screen-modals`, `player-art`, and `headshot-sprites`; omit `group` to return all groups. Each asset includes `key`, an absolute HTTPS `url`, `contentType`, `bytes`, `sha256`, dimensions, and `version`. Send `If-None-Match` to receive `304` when unchanged.
 
-Manifest URLs look like `https://api.example.com/nbagame/v1/assets/files/20260722.1/players-0.png`. Keep sending `X-App-Id` when reading a file. Versioned URLs are immutable and cacheable for one year. Cache by page lifecycle: merge concurrent requests for the same group, lazily load headshot sprites, reuse decoded images, and release page-specific images when leaving the page.
+Manifest URLs look like `https://api.example.com/nbagame/v1/assets/files/asset-<sha256>/players-0.png`. The top-level `manifestVersion` starts with `content-` and changes automatically when any whitelisted file, key, or extension changes. Each asset's `version` is content-addressed, so unchanged assets retain the same URL across manifest updates. Keep sending `X-App-Id` when reading a file. Versioned URLs are immutable and cacheable for one year. Cache by page lifecycle: merge concurrent requests for the same group, lazily load headshot sprites, reuse decoded images, and release page-specific images when leaving the page.
 
 ## Career synchronization
 

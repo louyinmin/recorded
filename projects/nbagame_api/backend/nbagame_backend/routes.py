@@ -245,8 +245,16 @@ def asset_manifest():
     else:
         assets = []
         for item_group in groups:
-            rows = conn.execute('''SELECT * FROM nbagame_asset_files
-                                   WHERE application_id=? AND version=? AND asset_group=? ORDER BY asset_key''', (app_id, version, item_group))
+            rows = conn.execute(
+                '''SELECT files.* FROM nbagame_asset_manifest_items items
+                   JOIN nbagame_asset_files files
+                     ON files.application_id=items.application_id
+                    AND files.version=items.asset_version
+                    AND files.asset_key=items.asset_key
+                   WHERE items.application_id=? AND items.manifest_version=?
+                     AND items.asset_group=? ORDER BY items.asset_key''',
+                (app_id, version, item_group),
+            )
             assets.extend(asset_payload(row) for row in rows)
         response, _ = success({'appId': app_id, 'group': group or None, 'manifestVersion': version, 'assets': assets})
     response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'

@@ -3,10 +3,10 @@
 import base64
 import hashlib
 import hmac
+import io
 import json
 import mimetypes
 import os
-import shutil
 import sqlite3
 import struct
 import time
@@ -139,6 +139,11 @@ def init_nbagame_db(db_path):
                 extension TEXT NOT NULL, storage_path TEXT NOT NULL, sha256 TEXT NOT NULL, content_type TEXT NOT NULL,
                 bytes INTEGER NOT NULL, width INTEGER, height INTEGER, PRIMARY KEY(application_id, version, asset_key)
             );
+            CREATE TABLE IF NOT EXISTS nbagame_asset_manifest_items (
+                application_id TEXT NOT NULL, manifest_version TEXT NOT NULL, asset_group TEXT NOT NULL,
+                asset_key TEXT NOT NULL, asset_version TEXT NOT NULL,
+                PRIMARY KEY(application_id, manifest_version, asset_group, asset_key)
+            );
             CREATE TABLE IF NOT EXISTS nbagame_rate_limits (
                 application_id TEXT NOT NULL, scope_key TEXT NOT NULL, window_start INTEGER NOT NULL,
                 request_count INTEGER NOT NULL, PRIMARY KEY(application_id, scope_key)
@@ -177,6 +182,11 @@ def migrate_nbagame_db(conn):
         CREATE TABLE IF NOT EXISTS nbagame_rate_limits (
             application_id TEXT NOT NULL, scope_key TEXT NOT NULL, window_start INTEGER NOT NULL,
             request_count INTEGER NOT NULL, PRIMARY KEY(application_id, scope_key)
+        );
+        CREATE TABLE IF NOT EXISTS nbagame_asset_manifest_items (
+            application_id TEXT NOT NULL, manifest_version TEXT NOT NULL, asset_group TEXT NOT NULL,
+            asset_key TEXT NOT NULL, asset_version TEXT NOT NULL,
+            PRIMARY KEY(application_id, manifest_version, asset_group, asset_key)
         );
     ''')
 
@@ -342,8 +352,8 @@ def validate_snapshot(payload):
     return snapshot
 
 
-def image_dimensions(path):
-    with open(path, 'rb') as handle:
+def image_dimensions(content):
+    with io.BytesIO(content) as handle:
         data = handle.read(24)
         if data[:8] == b'\x89PNG\r\n\x1a\n':
             return struct.unpack('>II', data[16:24])
@@ -366,81 +376,133 @@ def image_dimensions(path):
             handle.seek(segment_size, 1)
 
 
-def copy_asset_atomically(source_path, destination_path):
+def write_asset_atomically(content, destination_path):
     temporary_path = destination_path.with_name(
         '{}.{}.tmp'.format(destination_path.name, uuid.uuid4().hex)
     )
     try:
-        shutil.copyfile(source_path, temporary_path)
+        with open(temporary_path, 'xb') as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary_path, destination_path)
     finally:
         if temporary_path.exists():
             temporary_path.unlink()
 
 
-def restore_published_group(conn, app_id, version, group, specs, source_root, published_root):
-    """Restore missing or corrupted files only from bytes matching the immutable DB digest."""
-    rows = {
-        row['asset_key']: row
-        for row in conn.execute(
-            '''SELECT * FROM nbagame_asset_files
-               WHERE application_id=? AND version=? AND asset_group=?''',
-            (app_id, version, group),
+def snapshot_local_assets(source_root):
+    """Read one consistent source snapshot before publishing any database state."""
+    groups, manifest_items, seen_keys = {}, [], set()
+    for group, specs in sorted(ASSET_SPECS.items()):
+        entries = []
+        for asset_key, relative_path in sorted(specs):
+            if asset_key in seen_keys:
+                raise RuntimeError('duplicate nbagame asset key: {}'.format(asset_key))
+            seen_keys.add(asset_key)
+            source_path = (source_root / relative_path).resolve()
+            if source_root not in source_path.parents or not source_path.is_file():
+                raise RuntimeError('missing required nbagame asset: {}'.format(relative_path))
+            content = source_path.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            extension = source_path.suffix.lower().lstrip('.')
+            asset_version = 'asset-' + hashlib.sha256(
+                extension.encode() + b'\0' + content
+            ).hexdigest()
+            width, height = image_dimensions(content)
+            entry = {
+                'asset_key': asset_key,
+                'asset_version': asset_version,
+                'content': content,
+                'content_type': mimetypes.guess_type(str(source_path))[0] or 'application/octet-stream',
+                'digest': digest,
+                'extension': extension,
+                'height': height,
+                'width': width,
+            }
+            entries.append(entry)
+            manifest_items.append({
+                'assetGroup': group,
+                'assetKey': asset_key,
+                'assetVersion': asset_version,
+                'extension': extension,
+            })
+        groups[group] = entries
+    manifest_digest = hashlib.sha256(json.dumps(
+        manifest_items, separators=(',', ':'), sort_keys=True,
+    ).encode()).hexdigest()
+    return 'content-' + manifest_digest, groups
+
+
+def ensure_content_asset(conn, app_id, group, entry, published_root):
+    asset_key, asset_version = entry['asset_key'], entry['asset_version']
+    published_path = (
+        published_root / app_id / 'objects' / asset_version /
+        '{}.{}'.format(asset_key, entry['extension'])
+    ).resolve()
+    if published_root not in published_path.parents:
+        raise RuntimeError('invalid nbagame published asset path: {}'.format(asset_key))
+    published_path.parent.mkdir(parents=True, exist_ok=True)
+    if not published_path.is_file() or hashlib.sha256(published_path.read_bytes()).hexdigest() != entry['digest']:
+        write_asset_atomically(entry['content'], published_path)
+    storage_path = str(published_path.relative_to(published_root))
+    existing = conn.execute(
+        '''SELECT * FROM nbagame_asset_files
+           WHERE application_id=? AND version=? AND asset_key=?''',
+        (app_id, asset_version, asset_key),
+    ).fetchone()
+    expected = (
+        entry['extension'], storage_path, entry['digest'], entry['content_type'],
+        len(entry['content']), entry['width'], entry['height'],
+    )
+    if existing:
+        actual = (
+            existing['extension'], existing['storage_path'], existing['sha256'],
+            existing['content_type'], existing['bytes'], existing['width'], existing['height'],
         )
-    }
-    if set(rows) != {asset_key for asset_key, _ in specs}:
-        raise RuntimeError('published nbagame manifest is incomplete: {}'.format(group))
-    for asset_key, relative_path in specs:
-        row = rows[asset_key]
-        source_path = (source_root / relative_path).resolve()
-        destination_path = (published_root / row['storage_path']).resolve()
-        if source_root not in source_path.parents or published_root not in destination_path.parents:
-            raise RuntimeError('invalid nbagame asset path: {}'.format(asset_key))
-        if destination_path.is_file() and hashlib.sha256(destination_path.read_bytes()).hexdigest() == row['sha256']:
-            continue
-        if not source_path.is_file() or hashlib.sha256(source_path.read_bytes()).hexdigest() != row['sha256']:
-            raise RuntimeError('cannot restore immutable nbagame asset: {}'.format(asset_key))
-        destination_path.parent.mkdir(parents=True, exist_ok=True)
-        copy_asset_atomically(source_path, destination_path)
+        if actual != expected:
+            raise RuntimeError('content-addressed nbagame asset metadata differs: {}'.format(asset_key))
+        return
+    conn.execute(
+        '''INSERT INTO nbagame_asset_files
+           (application_id, version, asset_group, asset_key, extension, storage_path,
+            sha256, content_type, bytes, width, height)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        (app_id, asset_version, group, asset_key) + expected,
+    )
 
 
 def publish_local_assets(app):
-    """Publish a fixed runtime whitelist; published versions are never overwritten."""
+    """Publish immutable assets using versions derived only from source content."""
     with app.app_context():
+        root = Path(app.config['NBAGAME_ASSETS_DIR']).resolve()
+        published_root = Path(app.config['NBAGAME_PUBLISHED_ASSETS_DIR']).resolve()
+        version, groups = snapshot_local_assets(root)
         conn = connect_db(app.config['NBAGAME_DB_PATH'])
         try:
-            app_id, version = configured_app_id(), app.config['NBAGAME_ASSET_MANIFEST_VERSION']
+            app_id = configured_app_id()
+            conn.execute('BEGIN IMMEDIATE')
             ensure_application(conn, app_id)
-            root = Path(app.config['NBAGAME_ASSETS_DIR']).resolve()
-            published_root = Path(app.config['NBAGAME_PUBLISHED_ASSETS_DIR']).resolve()
-            for group, specs in ASSET_SPECS.items():
-                if conn.execute('SELECT 1 FROM nbagame_asset_manifests WHERE application_id=? AND asset_group=? AND version=?', (app_id, group, version)).fetchone():
-                    restore_published_group(conn, app_id, version, group, specs, root, published_root)
-                    continue
-                entries = []
-                for asset_key, relative_path in specs:
-                    file_path = (root / relative_path).resolve()
-                    if root not in file_path.parents or not file_path.is_file():
-                        raise RuntimeError('missing required nbagame asset: {}'.format(relative_path))
-                    digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
-                    extension = file_path.suffix.lower().lstrip('.')
-                    width, height = image_dimensions(file_path)
-                    published_path = published_root / app_id / version / group / '{}.{}'.format(asset_key, extension)
-                    published_path.parent.mkdir(parents=True, exist_ok=True)
-                    if published_path.exists():
-                        published_digest = hashlib.sha256(published_path.read_bytes()).hexdigest()
-                        if published_digest != digest:
-                            raise RuntimeError('published nbagame asset version is immutable: {}'.format(asset_key))
-                    else:
-                        copy_asset_atomically(file_path, published_path)
-                    storage_path = str(published_path.relative_to(published_root))
-                    entries.append((asset_key, extension, storage_path, digest, mimetypes.guess_type(str(file_path))[0] or 'application/octet-stream', file_path.stat().st_size, width, height))
-                etag = '"assets-{}-{}-{}-{}"'.format(app_id, version, group, hashlib.sha256(''.join(item[3] for item in entries).encode()).hexdigest()[:16])
-                conn.execute('INSERT INTO nbagame_asset_manifests (application_id, asset_group, version, etag, published_at) VALUES (?, ?, ?, ?, ?)', (app_id, group, version, etag, iso()))
+            for group, entries in groups.items():
+                etag = '"assets-{}-{}-{}"'.format(app_id, version, group)
+                conn.execute(
+                    '''INSERT OR IGNORE INTO nbagame_asset_manifests
+                       (application_id, asset_group, version, etag, published_at)
+                       VALUES (?, ?, ?, ?, ?)''',
+                    (app_id, group, version, etag, iso()),
+                )
                 for entry in entries:
-                    conn.execute('''INSERT INTO nbagame_asset_files
-                        (application_id, version, asset_group, asset_key, extension, storage_path, sha256, content_type, bytes, width, height)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (app_id, version, group) + entry)
+                    ensure_content_asset(conn, app_id, group, entry, published_root)
+                    conn.execute(
+                        '''INSERT OR IGNORE INTO nbagame_asset_manifest_items
+                           (application_id, manifest_version, asset_group, asset_key, asset_version)
+                           VALUES (?, ?, ?, ?, ?)''',
+                        (app_id, version, group, entry['asset_key'], entry['asset_version']),
+                    )
             conn.commit()
+            app.config['NBAGAME_ASSET_MANIFEST_VERSION'] = version
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
