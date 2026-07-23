@@ -33,6 +33,7 @@ VALID_TEAMS = {
     'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS',
 }
 ASSET_NAME_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]*$')
+AUTO_DISCOVER_EXTENSIONS = {'.jpeg': 1, '.jpg': 2, '.png': 3}
 
 
 class ValidationError(ValueError):
@@ -365,7 +366,7 @@ def write_asset_atomically(content, destination_path):
             temporary_path.unlink()
 
 
-def load_asset_specs(config_path):
+def load_asset_specs(config_path, source_root):
     def reject_duplicate_keys(pairs):
         value = {}
         for key, item in pairs:
@@ -384,7 +385,14 @@ def load_asset_specs(config_path):
     if not isinstance(raw_specs, dict) or not raw_specs:
         raise RuntimeError('nbagame asset config must be a non-empty object')
 
-    specs, seen_keys = {}, set()
+    auto_discover = raw_specs.pop('autoDiscover', {
+        'images': ['home', 'screen-shells', 'screen-modals', 'player-art'],
+    })
+    if not isinstance(auto_discover, dict):
+        raise RuntimeError('nbagame autoDiscover config must be an object')
+
+    source_root = Path(source_root).resolve()
+    specs, configured_paths, configured_source_paths = {}, {}, set()
     for group, assets in raw_specs.items():
         if not isinstance(group, str) or not ASSET_NAME_PATTERN.fullmatch(group):
             raise RuntimeError('invalid nbagame asset group: {!r}'.format(group))
@@ -394,7 +402,7 @@ def load_asset_specs(config_path):
         for asset_key, relative_path in assets.items():
             if not isinstance(asset_key, str) or not ASSET_NAME_PATTERN.fullmatch(asset_key):
                 raise RuntimeError('invalid nbagame asset key: {!r}'.format(asset_key))
-            if asset_key in seen_keys:
+            if asset_key in configured_paths:
                 raise RuntimeError('duplicate nbagame asset key: {}'.format(asset_key))
             if (
                 not isinstance(relative_path, str)
@@ -406,47 +414,106 @@ def load_asset_specs(config_path):
                 raise RuntimeError(
                     'invalid nbagame asset path for {}: {!r}'.format(asset_key, relative_path)
                 )
-            seen_keys.add(asset_key)
+            configured_paths[asset_key] = relative_path
+            configured_source_paths.add((source_root / relative_path).resolve())
             entries.append((asset_key, relative_path))
         specs[group] = entries
+
+    for relative_directory, configured_groups in auto_discover.items():
+        if (
+            not isinstance(relative_directory, str)
+            or not relative_directory
+            or '\\' in relative_directory
+            or Path(relative_directory).is_absolute()
+            or '..' in Path(relative_directory).parts
+        ):
+            raise RuntimeError(
+                'invalid nbagame autoDiscover directory: {!r}'.format(relative_directory)
+            )
+        if isinstance(configured_groups, str):
+            configured_groups = [configured_groups]
+        if not isinstance(configured_groups, list) or not configured_groups:
+            raise RuntimeError('nbagame autoDiscover groups must be a non-empty list')
+        groups = []
+        for group in configured_groups:
+            if not isinstance(group, str) or not ASSET_NAME_PATTERN.fullmatch(group):
+                raise RuntimeError('invalid nbagame autoDiscover group: {!r}'.format(group))
+            if group not in groups:
+                groups.append(group)
+        directory = (source_root / relative_directory).resolve()
+        if source_root not in directory.parents or not directory.is_dir():
+            raise RuntimeError(
+                'missing nbagame autoDiscover directory: {}'.format(relative_directory)
+            )
+
+        discovered = {}
+        for source_path in sorted(directory.iterdir()):
+            extension = source_path.suffix.lower()
+            if not source_path.is_file() or extension not in AUTO_DISCOVER_EXTENSIONS:
+                continue
+            asset_key = source_path.stem
+            if not ASSET_NAME_PATTERN.fullmatch(asset_key):
+                continue
+            if asset_key in configured_paths or source_path.resolve() in configured_source_paths:
+                continue
+            previous = discovered.get(asset_key)
+            if (
+                previous is None
+                or AUTO_DISCOVER_EXTENSIONS[extension]
+                > AUTO_DISCOVER_EXTENSIONS[previous.suffix.lower()]
+            ):
+                discovered[asset_key] = source_path
+        discovered_entries = [
+            (asset_key, source_path.relative_to(source_root).as_posix())
+            for asset_key, source_path in sorted(discovered.items())
+        ]
+        for group in groups:
+            specs.setdefault(group, []).extend(discovered_entries)
+        configured_paths.update(discovered_entries)
+    if not specs:
+        raise RuntimeError('nbagame asset config did not produce any assets')
     return specs
 
 
 def snapshot_local_assets(source_root, asset_specs):
     """Read one consistent source snapshot before publishing any database state."""
-    groups, manifest_items, seen_keys = {}, [], set()
+    groups, manifest_items, seen_keys, asset_cache = {}, [], {}, {}
     for group, specs in sorted(asset_specs.items()):
         entries = []
         for asset_key, relative_path in sorted(specs):
-            if asset_key in seen_keys:
+            if asset_key in seen_keys and seen_keys[asset_key] != relative_path:
                 raise RuntimeError('duplicate nbagame asset key: {}'.format(asset_key))
-            seen_keys.add(asset_key)
+            seen_keys[asset_key] = relative_path
             source_path = (source_root / relative_path).resolve()
             if source_root not in source_path.parents or not source_path.is_file():
                 raise RuntimeError('missing required nbagame asset: {}'.format(relative_path))
-            content = source_path.read_bytes()
-            digest = hashlib.sha256(content).hexdigest()
-            extension = source_path.suffix.lower().lstrip('.')
-            asset_version = 'asset-' + hashlib.sha256(
-                extension.encode() + b'\0' + content
-            ).hexdigest()
-            width, height = image_dimensions(content)
-            entry = {
-                'asset_key': asset_key,
-                'asset_version': asset_version,
-                'content': content,
-                'content_type': mimetypes.guess_type(str(source_path))[0] or 'application/octet-stream',
-                'digest': digest,
-                'extension': extension,
-                'height': height,
-                'width': width,
-            }
+            cache_key = (asset_key, relative_path)
+            entry = asset_cache.get(cache_key)
+            if entry is None:
+                content = source_path.read_bytes()
+                digest = hashlib.sha256(content).hexdigest()
+                extension = source_path.suffix.lower().lstrip('.')
+                asset_version = 'asset-' + hashlib.sha256(
+                    extension.encode() + b'\0' + content
+                ).hexdigest()
+                width, height = image_dimensions(content)
+                entry = {
+                    'asset_key': asset_key,
+                    'asset_version': asset_version,
+                    'content': content,
+                    'content_type': mimetypes.guess_type(str(source_path))[0] or 'application/octet-stream',
+                    'digest': digest,
+                    'extension': extension,
+                    'height': height,
+                    'width': width,
+                }
+                asset_cache[cache_key] = entry
             entries.append(entry)
             manifest_items.append({
                 'assetGroup': group,
                 'assetKey': asset_key,
-                'assetVersion': asset_version,
-                'extension': extension,
+                'assetVersion': entry['asset_version'],
+                'extension': entry['extension'],
             })
         groups[group] = entries
     manifest_digest = hashlib.sha256(json.dumps(
@@ -498,7 +565,7 @@ def publish_local_assets(app):
     with app.app_context():
         root = Path(app.config['NBAGAME_ASSETS_DIR']).resolve()
         published_root = Path(app.config['NBAGAME_PUBLISHED_ASSETS_DIR']).resolve()
-        asset_specs = load_asset_specs(app.config['NBAGAME_ASSET_SPECS_FILE'])
+        asset_specs = load_asset_specs(app.config['NBAGAME_ASSET_SPECS_FILE'], root)
         version, groups = snapshot_local_assets(root, asset_specs)
         conn = connect_db(app.config['NBAGAME_DB_PATH'])
         try:

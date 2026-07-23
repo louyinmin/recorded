@@ -23,6 +23,7 @@ BUNDLED_ASSET_SPECS_FILE = (
 ASSET_SPECS = {
     group: list(assets.items())
     for group, assets in json.loads(BUNDLED_ASSET_SPECS_FILE.read_text(encoding='utf-8')).items()
+    if group != 'autoDiscover'
 }
 
 
@@ -236,6 +237,45 @@ class NbaGameBackendTestCase(unittest.TestCase):
         self.assertEqual(manifest.status_code, 200)
         assets = manifest.get_json()['data']['assets']
         self.assertEqual([asset['key'] for asset in assets], ['server-managed-shell'])
+
+    def test_new_image_is_automatically_added_to_the_configured_manifest_group(self):
+        source = Path(self.assets_dir, 'images/new-career-shell.png')
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(PNG_1X1)
+        Path(self.assets_dir, 'images/new-career-shell.jpg').write_bytes(JPEG_1X1)
+        Path(self.assets_dir, 'images/listed-shell.png').write_bytes(PNG_1X1)
+        Path(self.assets_dir, 'images/Common.png').write_bytes(PNG_1X1)
+        config_path = Path(self.base_dir, 'auto-discovery-assets.json')
+        config_path.write_text(json.dumps({
+            'autoDiscover': {
+                'images': ['home', 'screen-shells', 'screen-modals', 'player-art'],
+            },
+            'screen-shells': {
+                'listed-shell': 'images/battle-shell-v9.jpg',
+            },
+        }), encoding='utf-8')
+        os.environ['NBAGAME_ASSET_SPECS_FILE'] = str(config_path)
+
+        self.reload_app()
+
+        manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=screen-shells',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(manifest.status_code, 200)
+        assets = {asset['key']: asset for asset in manifest.get_json()['data']['assets']}
+        self.assertIn('listed-shell', assets)
+        self.assertIn('new-career-shell', assets)
+        self.assertNotIn('battle-shell-v9', assets)
+        self.assertNotIn('Common', assets)
+        self.assertEqual(assets['listed-shell']['contentType'], 'image/jpeg')
+        self.assertEqual(assets['new-career-shell']['contentType'], 'image/png')
+        home_manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=home',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        home_assets = {asset['key'] for asset in home_manifest.get_json()['data']['assets']}
+        self.assertIn('new-career-shell', home_assets)
 
     def test_invalid_server_asset_config_stops_startup(self):
         config_path = Path(self.base_dir, 'invalid-server-assets.json')

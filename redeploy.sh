@@ -78,7 +78,7 @@ NBAGAME_ASSETS_DIR="${NBAGAME_ASSETS_DIR:-$APP_DIR/nbagame}"
 export NBAGAME_ASSETS_DIR
 cd "$APP_DIR"
 "$APP_DIR/venv/bin/python3" -c \
-    "import os; from pathlib import Path; from nbagame_backend.service import load_asset_specs, snapshot_local_assets; snapshot_local_assets(Path(os.environ['NBAGAME_ASSETS_DIR']).resolve(), load_asset_specs(os.environ['NBAGAME_ASSET_SPECS_FILE']))"
+    "import os; from pathlib import Path; from nbagame_backend.service import load_asset_specs, snapshot_local_assets; root = Path(os.environ['NBAGAME_ASSETS_DIR']).resolve(); snapshot_local_assets(root, load_asset_specs(os.environ['NBAGAME_ASSET_SPECS_FILE'], root))"
 echo "  ✅ nbagame 图片配置与文件完整"
 
 # ===== 3. 停止现有服务 =====

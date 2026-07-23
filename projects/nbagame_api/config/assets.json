@@ -1,4 +1,12 @@
 {
+  "autoDiscover": {
+    "images": [
+      "home",
+      "screen-shells",
+      "screen-modals",
+      "player-art"
+    ]
+  },
   "home": {
     "broadcast-home-v6": "images/broadcast-home-v6.png",
     "broadcast-arena-bg": "images/broadcast-arena-bg.jpg"

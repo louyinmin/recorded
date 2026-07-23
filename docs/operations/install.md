@@ -296,6 +296,14 @@ objects:
 
 ```json
 {
+  "autoDiscover": {
+    "images": [
+      "home",
+      "screen-shells",
+      "screen-modals",
+      "player-art"
+    ]
+  },
   "screen-shells": {
     "career-team-choice-shell-v1": "images/career-team-choice-shell-v1.png"
   }
@@ -303,10 +311,23 @@ objects:
 ```
 
 Every configured source path is relative to `NBAGAME_ASSETS_DIR`, which defaults
-to the repository's `nbagame/` runtime directory. Groups and asset keys use
-lowercase letters, digits, and hyphens. Duplicate keys, absolute paths, `..`
-paths, malformed JSON, empty groups, and missing files stop deployment instead
-of publishing a partial manifest.
+to the repository's `nbagame/` runtime directory. On the production server this
+is `/home/admin/recorded/nbagame`, so the default `autoDiscover` rule scans
+`/home/admin/recorded/nbagame/images`.
+
+Auto-discovery inspects direct files only. New `.png`, `.jpg`, and `.jpeg` files
+use their filename without the extension as the asset key and join the configured
+manifest groups. The default rule adds each new image to the four ordinary image
+groups so existing frontend group requests can resolve it; `headshot-sprites`
+remains isolated. Explicit whitelist entries take precedence. When an
+unconfigured PNG and JPEG share a filename, PNG takes precedence, followed by JPG and JPEG.
+Temporary upload suffixes, subdirectories, and filenames that cannot form a
+lowercase asset key are ignored.
+
+Groups and asset keys use lowercase letters, digits, and hyphens. Duplicate
+explicit keys, absolute paths, `..` paths, malformed JSON, empty groups, and
+missing configured files stop deployment instead of publishing a partial
+manifest.
 
 The publisher derives manifest and file versions from SHA-256 content, copies
 only new content into immutable storage, and keeps old URLs available.
@@ -322,14 +343,17 @@ mv /home/admin/recorded/nbagame/images/broadcast-home-v6.png.upload \
 sudo ./redeploy.sh
 ```
 
-To add a new image without changing Git, upload the file, edit the server-local
-whitelist, validate the JSON, and redeploy:
+To add a new screen image without changing Git or editing the whitelist, upload
+it into the auto-discovered directory and redeploy:
 
 ```bash
-sudoedit /etc/recorded/nbagame-assets.json
-python3 -m json.tool /etc/recorded/nbagame-assets.json >/dev/null
+mv /home/admin/recorded/nbagame/images/new-screen.png.upload \
+   /home/admin/recorded/nbagame/images/new-screen.png
 sudo ./redeploy.sh
 ```
+
+Edit `/etc/recorded/nbagame-assets.json` only when an image belongs to a group
+other than the auto-discovery target or needs a key different from its filename.
 
 See `projects/nbagame_api/docs/frontend-api.md` for the frontend contract.
 
