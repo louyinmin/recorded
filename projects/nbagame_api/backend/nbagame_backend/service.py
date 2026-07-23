@@ -7,6 +7,7 @@ import io
 import json
 import mimetypes
 import os
+import re
 import sqlite3
 import struct
 import time
@@ -31,36 +32,7 @@ VALID_TEAMS = {
     'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK',
     'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS',
 }
-ASSET_SPECS = {
-    'home': [
-        ('broadcast-home-v6', 'images/broadcast-home-v6.png'),
-        ('broadcast-arena-bg', 'images/broadcast-arena-bg.jpg'),
-    ],
-    'screen-shells': [
-        ('battle-shell-v9', 'images/battle-shell-v9.jpg'),
-        ('season-summary-leaderboard-v1', 'images/season-summary-leaderboard-v1.jpg'),
-        ('leaderboard-shell-v1', 'images/leaderboard-shell-v1.jpg'),
-        ('season-hub-shell-v1', 'images/season-hub-shell-v1.jpg'),
-        ('playoff-hub-shell-v1', 'images/playoff-hub-shell-v1.jpg'),
-        ('career-team-list-shell-v1', 'images/career-team-list-shell-v1.png'),
-        ('career-team-choice-shell-v1', 'images/career-team-choice-shell-v1.png'),
-        ('broadcast-position', 'images/broadcast-position.jpg'),
-        ('broadcast-build-v2', 'images/broadcast-build-v2.jpg'),
-        ('broadcast-reveal-v2', 'images/broadcast-reveal-v2.jpg'),
-        ('broadcast-profile', 'images/broadcast-profile.jpg'),
-        ('broadcast-hub', 'images/broadcast-hub.jpg'),
-    ],
-    'screen-modals': [
-        ('season-modal-manual-v1', 'images/season-modal-manual-v1.jpg'),
-        ('season-modal-standings-v1', 'images/season-modal-standings-v1.jpg'),
-        ('season-modal-stats-v1', 'images/season-modal-stats-v1.jpg'),
-    ],
-    'player-art': [
-        ('my-core-star-card-anime-v1', 'images/my-core-star-card-anime-v1.jpg'),
-        ('battle-die-body-v2', 'images/battle-die-body-v2.png'),
-    ],
-    'headshot-sprites': [('players-{}'.format(i), 'subpackages/headshots/images/players-{}.png'.format(i)) for i in range(15)],
-}
+ASSET_NAME_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]*$')
 
 
 class ValidationError(ValueError):
@@ -393,10 +365,57 @@ def write_asset_atomically(content, destination_path):
             temporary_path.unlink()
 
 
-def snapshot_local_assets(source_root):
+def load_asset_specs(config_path):
+    def reject_duplicate_keys(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise RuntimeError('duplicate nbagame asset config key: {}'.format(key))
+            value[key] = item
+        return value
+
+    try:
+        with open(config_path, encoding='utf-8') as handle:
+            raw_specs = json.load(handle, object_pairs_hook=reject_duplicate_keys)
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            'unable to load nbagame asset config {}: {}'.format(config_path, error)
+        ) from error
+    if not isinstance(raw_specs, dict) or not raw_specs:
+        raise RuntimeError('nbagame asset config must be a non-empty object')
+
+    specs, seen_keys = {}, set()
+    for group, assets in raw_specs.items():
+        if not isinstance(group, str) or not ASSET_NAME_PATTERN.fullmatch(group):
+            raise RuntimeError('invalid nbagame asset group: {!r}'.format(group))
+        if not isinstance(assets, dict) or not assets:
+            raise RuntimeError('nbagame asset group must be a non-empty object: {}'.format(group))
+        entries = []
+        for asset_key, relative_path in assets.items():
+            if not isinstance(asset_key, str) or not ASSET_NAME_PATTERN.fullmatch(asset_key):
+                raise RuntimeError('invalid nbagame asset key: {!r}'.format(asset_key))
+            if asset_key in seen_keys:
+                raise RuntimeError('duplicate nbagame asset key: {}'.format(asset_key))
+            if (
+                not isinstance(relative_path, str)
+                or not relative_path
+                or '\\' in relative_path
+                or Path(relative_path).is_absolute()
+                or '..' in Path(relative_path).parts
+            ):
+                raise RuntimeError(
+                    'invalid nbagame asset path for {}: {!r}'.format(asset_key, relative_path)
+                )
+            seen_keys.add(asset_key)
+            entries.append((asset_key, relative_path))
+        specs[group] = entries
+    return specs
+
+
+def snapshot_local_assets(source_root, asset_specs):
     """Read one consistent source snapshot before publishing any database state."""
     groups, manifest_items, seen_keys = {}, [], set()
-    for group, specs in sorted(ASSET_SPECS.items()):
+    for group, specs in sorted(asset_specs.items()):
         entries = []
         for asset_key, relative_path in sorted(specs):
             if asset_key in seen_keys:
@@ -479,7 +498,8 @@ def publish_local_assets(app):
     with app.app_context():
         root = Path(app.config['NBAGAME_ASSETS_DIR']).resolve()
         published_root = Path(app.config['NBAGAME_PUBLISHED_ASSETS_DIR']).resolve()
-        version, groups = snapshot_local_assets(root)
+        asset_specs = load_asset_specs(app.config['NBAGAME_ASSET_SPECS_FILE'])
+        version, groups = snapshot_local_assets(root, asset_specs)
         conn = connect_db(app.config['NBAGAME_DB_PATH'])
         try:
             app_id = configured_app_id()

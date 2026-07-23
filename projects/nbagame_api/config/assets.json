@@ -1,0 +1,46 @@
+{
+  "home": {
+    "broadcast-home-v6": "images/broadcast-home-v6.png",
+    "broadcast-arena-bg": "images/broadcast-arena-bg.jpg"
+  },
+  "screen-shells": {
+    "battle-shell-v9": "images/battle-shell-v9.jpg",
+    "season-summary-leaderboard-v1": "images/season-summary-leaderboard-v1.jpg",
+    "leaderboard-shell-v1": "images/leaderboard-shell-v1.jpg",
+    "season-hub-shell-v1": "images/season-hub-shell-v1.jpg",
+    "playoff-hub-shell-v1": "images/playoff-hub-shell-v1.jpg",
+    "career-team-list-shell-v1": "images/career-team-list-shell-v1.png",
+    "career-team-choice-shell-v1": "images/career-team-choice-shell-v1.png",
+    "broadcast-position": "images/broadcast-position.jpg",
+    "broadcast-build-v2": "images/broadcast-build-v2.jpg",
+    "broadcast-reveal-v2": "images/broadcast-reveal-v2.jpg",
+    "broadcast-profile": "images/broadcast-profile.jpg",
+    "broadcast-hub": "images/broadcast-hub.jpg"
+  },
+  "screen-modals": {
+    "season-modal-manual-v1": "images/season-modal-manual-v1.jpg",
+    "season-modal-standings-v1": "images/season-modal-standings-v1.jpg",
+    "season-modal-stats-v1": "images/season-modal-stats-v1.jpg"
+  },
+  "player-art": {
+    "my-core-star-card-anime-v1": "images/my-core-star-card-anime-v1.jpg",
+    "battle-die-body-v2": "images/battle-die-body-v2.png"
+  },
+  "headshot-sprites": {
+    "players-0": "subpackages/headshots/images/players-0.png",
+    "players-1": "subpackages/headshots/images/players-1.png",
+    "players-2": "subpackages/headshots/images/players-2.png",
+    "players-3": "subpackages/headshots/images/players-3.png",
+    "players-4": "subpackages/headshots/images/players-4.png",
+    "players-5": "subpackages/headshots/images/players-5.png",
+    "players-6": "subpackages/headshots/images/players-6.png",
+    "players-7": "subpackages/headshots/images/players-7.png",
+    "players-8": "subpackages/headshots/images/players-8.png",
+    "players-9": "subpackages/headshots/images/players-9.png",
+    "players-10": "subpackages/headshots/images/players-10.png",
+    "players-11": "subpackages/headshots/images/players-11.png",
+    "players-12": "subpackages/headshots/images/players-12.png",
+    "players-13": "subpackages/headshots/images/players-13.png",
+    "players-14": "subpackages/headshots/images/players-14.png"
+  }
+}

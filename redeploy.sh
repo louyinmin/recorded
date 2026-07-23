@@ -11,6 +11,7 @@ FLASK_PORT=5000
 NGINX_SITE_NAME="travel-recorder"
 CRON_FILE="/etc/cron.d/recorded-expiry-reminder"
 WECHAT_ENV_FILE="${WECHAT_ENV_FILE:-/etc/recorded/wechat-miniprogram.env}"
+NBAGAME_ASSET_SPECS_TEMPLATE="$APP_DIR/projects/nbagame_api/config/assets.json"
 
 echo "=============================="
 echo "  Recorded 双模块 - 重新部署"
@@ -20,7 +21,7 @@ echo "项目目录: $APP_DIR"
 echo ""
 
 # ===== 0. 加载服务器本地密钥配置 =====
-echo "[0/5] 加载微信小程序环境变量..."
+echo "[0/6] 加载微信小程序环境变量..."
 if [ ! -f "$WECHAT_ENV_FILE" ]; then
     echo "  ❌ 缺少微信小程序环境变量文件: $WECHAT_ENV_FILE"
     echo "  请先创建该文件，并写入 NBA、Timing 和 NBAGAME 的微信凭据。"
@@ -47,23 +48,46 @@ do
         exit 1
     fi
 done
+
+NBAGAME_ASSET_SPECS_FILE="${NBAGAME_ASSET_SPECS_FILE:-/etc/recorded/nbagame-assets.json}"
+export NBAGAME_ASSET_SPECS_FILE
+if [ ! -f "$NBAGAME_ASSET_SPECS_FILE" ]; then
+    install -d -m 755 "$(dirname "$NBAGAME_ASSET_SPECS_FILE")"
+    install -m 644 "$NBAGAME_ASSET_SPECS_TEMPLATE" "$NBAGAME_ASSET_SPECS_FILE"
+    echo "  ✅ 已初始化 nbagame 图片白名单: $NBAGAME_ASSET_SPECS_FILE"
+else
+    echo "  ✅ 使用服务器 nbagame 图片白名单: $NBAGAME_ASSET_SPECS_FILE"
+fi
+if ! python3 -m json.tool "$NBAGAME_ASSET_SPECS_FILE" >/dev/null; then
+    echo "  ❌ nbagame 图片白名单不是有效 JSON: $NBAGAME_ASSET_SPECS_FILE"
+    exit 1
+fi
 echo "  ✅ 微信小程序环境变量已加载"
 
-# ===== 1. 停止现有服务 =====
-echo "[1/5] 停止现有服务..."
-pkill -f "python3.*app.py" 2>/dev/null || true
-echo "  ✅ Flask 进程已停止"
-
-# ===== 2. 安装/更新 Python 依赖 =====
-echo "[2/5] 更新 Python 依赖..."
+# ===== 1. 安装/更新 Python 依赖 =====
+echo "[1/6] 更新 Python 依赖..."
 if [ ! -d "$APP_DIR/venv" ]; then
     python3 -m venv "$APP_DIR/venv"
 fi
 "$APP_DIR/venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
 echo "  ✅ 依赖已更新"
 
-# ===== 3. 启动 Flask 后端 =====
-echo "[3/5] 检查数据库与提醒任务..."
+# ===== 2. Validate nbagame assets before stopping the running service =====
+echo "[2/6] 检查 nbagame 图片配置..."
+NBAGAME_ASSETS_DIR="${NBAGAME_ASSETS_DIR:-$APP_DIR/nbagame}"
+export NBAGAME_ASSETS_DIR
+cd "$APP_DIR"
+"$APP_DIR/venv/bin/python3" -c \
+    "import os; from pathlib import Path; from nbagame_backend.service import load_asset_specs, snapshot_local_assets; snapshot_local_assets(Path(os.environ['NBAGAME_ASSETS_DIR']).resolve(), load_asset_specs(os.environ['NBAGAME_ASSET_SPECS_FILE']))"
+echo "  ✅ nbagame 图片配置与文件完整"
+
+# ===== 3. 停止现有服务 =====
+echo "[3/6] 停止现有服务..."
+pkill -f "python3.*app.py" 2>/dev/null || true
+echo "  ✅ Flask 进程已停止"
+
+# ===== 4. 检查数据库与提醒任务 =====
+echo "[4/6] 检查数据库与提醒任务..."
 cd "$APP_DIR"
 "$APP_DIR/venv/bin/python3" -c "from app import init_db; init_db()"
 "$APP_DIR/venv/bin/python3" <<PY
@@ -80,8 +104,8 @@ EOF
 chmod 644 "$CRON_FILE"
 echo "  ✅ 数据库与提醒任务已就绪"
 
-# ===== 4. 启动 Flask 后端 =====
-echo "[4/5] 启动 Flask 后端..."
+# ===== 5. 启动 Flask 后端 =====
+echo "[5/6] 启动 Flask 后端..."
 cd "$APP_DIR"
 nohup "$APP_DIR/venv/bin/python3" "$APP_DIR/app.py" > "$APP_DIR/flask.log" 2>&1 &
 FLASK_PID=$!
@@ -94,8 +118,8 @@ else
     exit 1
 fi
 
-# ===== 5. 重启 Nginx（如果已安装）=====
-echo "[5/5] 重启 Nginx..."
+# ===== 6. 重启 Nginx（如果已安装）=====
+echo "[6/6] 重启 Nginx..."
 if command -v systemctl &> /dev/null && systemctl is-active --quiet nginx 2>/dev/null; then
     systemctl restart nginx
     systemctl restart cron 2>/dev/null || systemctl restart crond 2>/dev/null || true

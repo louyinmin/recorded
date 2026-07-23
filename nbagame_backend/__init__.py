@@ -32,6 +32,14 @@ def init_nbagame_module(app, app_dir, db_path):
     app.config['NBAGAME_ASSETS_DIR'] = os.environ.get(
         'NBAGAME_ASSETS_DIR', os.path.join(app_dir, 'nbagame')
     )
+    server_asset_specs_file = '/etc/recorded/nbagame-assets.json'
+    bundled_asset_specs_file = os.path.join(
+        app_dir, 'projects', 'nbagame_api', 'config', 'assets.json'
+    )
+    app.config['NBAGAME_ASSET_SPECS_FILE'] = os.environ.get(
+        'NBAGAME_ASSET_SPECS_FILE',
+        server_asset_specs_file if os.path.isfile(server_asset_specs_file) else bundled_asset_specs_file,
+    )
     app.config['NBAGAME_PUBLISHED_ASSETS_DIR'] = os.environ.get(
         'NBAGAME_PUBLISHED_ASSETS_DIR',
         os.path.join(app_dir, 'nbagame_published_assets'),

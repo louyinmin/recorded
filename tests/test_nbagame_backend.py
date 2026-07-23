@@ -1,5 +1,6 @@
 import hashlib
 import importlib
+import json
 import os
 import shutil
 import sqlite3
@@ -11,14 +12,18 @@ from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
-from nbagame_backend.service import ASSET_SPECS
-
-
 PNG_1X1 = (
     b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
     b'\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89'
 )
 JPEG_1X1 = b'\xff\xd8\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xd9'
+BUNDLED_ASSET_SPECS_FILE = (
+    Path(__file__).resolve().parents[1] / 'projects' / 'nbagame_api' / 'config' / 'assets.json'
+)
+ASSET_SPECS = {
+    group: list(assets.items())
+    for group, assets in json.loads(BUNDLED_ASSET_SPECS_FILE.read_text(encoding='utf-8')).items()
+}
 
 
 class NbaGameBackendTestCase(unittest.TestCase):
@@ -33,6 +38,7 @@ class NbaGameBackendTestCase(unittest.TestCase):
         'NBAGAME_WECHAT_SECRET',
         'NBAGAME_TOKEN_SECRET',
         'NBAGAME_ASSETS_DIR',
+        'NBAGAME_ASSET_SPECS_FILE',
         'NBAGAME_PUBLISHED_ASSETS_DIR',
         'NBAGAME_PUBLIC_BASE_URL',
         'NBAGAME_ASSET_MANIFEST_VERSION',
@@ -57,6 +63,9 @@ class NbaGameBackendTestCase(unittest.TestCase):
         os.environ['NBAGAME_WECHAT_SECRET'] = 'court-deck-secret'
         os.environ['NBAGAME_TOKEN_SECRET'] = 'court-deck-token-secret'
         os.environ['NBAGAME_ASSETS_DIR'] = self.assets_dir
+        asset_specs_file = os.path.join(self.base_dir, 'nbagame-assets.json')
+        shutil.copyfile(BUNDLED_ASSET_SPECS_FILE, asset_specs_file)
+        os.environ['NBAGAME_ASSET_SPECS_FILE'] = asset_specs_file
         os.environ['NBAGAME_PUBLISHED_ASSETS_DIR'] = self.published_assets_dir
         os.environ['NBAGAME_PUBLIC_BASE_URL'] = 'https://cdn.example.test'
         os.environ['NBAGAME_ASSET_MANIFEST_VERSION'] = 'legacy-manual-version'
@@ -205,6 +214,50 @@ class NbaGameBackendTestCase(unittest.TestCase):
         for key in ('career-team-list-shell-v1', 'career-team-choice-shell-v1'):
             self.assertIn(key, assets)
             self.assertEqual(assets[key]['contentType'], 'image/png')
+
+    def test_server_managed_asset_config_controls_the_manifest(self):
+        source = Path(self.assets_dir, 'images/server-managed-shell.png')
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(PNG_1X1)
+        config_path = Path(self.base_dir, 'server-assets.json')
+        config_path.write_text(json.dumps({
+            'server-managed': {
+                'server-managed-shell': 'images/server-managed-shell.png',
+            },
+        }), encoding='utf-8')
+        os.environ['NBAGAME_ASSET_SPECS_FILE'] = str(config_path)
+
+        self.reload_app()
+
+        manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=server-managed',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(manifest.status_code, 200)
+        assets = manifest.get_json()['data']['assets']
+        self.assertEqual([asset['key'] for asset in assets], ['server-managed-shell'])
+
+    def test_invalid_server_asset_config_stops_startup(self):
+        config_path = Path(self.base_dir, 'invalid-server-assets.json')
+        config_path.write_text('[]', encoding='utf-8')
+        os.environ['NBAGAME_ASSET_SPECS_FILE'] = str(config_path)
+
+        with self.assertRaisesRegex(
+            RuntimeError, 'nbagame asset config must be a non-empty object'
+        ):
+            importlib.reload(self.app_module)
+
+    def test_server_asset_config_rejects_paths_outside_the_asset_root(self):
+        config_path = Path(self.base_dir, 'unsafe-server-assets.json')
+        config_path.write_text(json.dumps({
+            'unsafe': {
+                'outside-shell': '../outside-shell.png',
+            },
+        }), encoding='utf-8')
+        os.environ['NBAGAME_ASSET_SPECS_FILE'] = str(config_path)
+
+        with self.assertRaisesRegex(RuntimeError, 'invalid nbagame asset path'):
+            importlib.reload(self.app_module)
 
     def test_write_routes_reject_non_json_malformed_json_and_oversized_bodies(self):
         headers = {'X-App-Id': 'court-deck-prod'}
