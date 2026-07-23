@@ -195,6 +195,17 @@ class NbaGameBackendTestCase(unittest.TestCase):
         self.assertEqual(assets['broadcast-home-v6']['contentType'], 'image/png')
         self.assertTrue(assets['broadcast-home-v6']['url'].endswith('/broadcast-home-v6.png'))
 
+    def test_screen_shells_manifest_publishes_career_team_pngs(self):
+        manifest = self.client.get(
+            '/nbagame/v1/assets/manifest?group=screen-shells',
+            headers={'X-App-Id': 'court-deck-prod'},
+        )
+        self.assertEqual(manifest.status_code, 200)
+        assets = {asset['key']: asset for asset in manifest.get_json()['data']['assets']}
+        for key in ('career-team-list-shell-v1', 'career-team-choice-shell-v1'):
+            self.assertIn(key, assets)
+            self.assertEqual(assets[key]['contentType'], 'image/png')
+
     def test_write_routes_reject_non_json_malformed_json_and_oversized_bodies(self):
         headers = {'X-App-Id': 'court-deck-prod'}
         non_json = self.client.post(

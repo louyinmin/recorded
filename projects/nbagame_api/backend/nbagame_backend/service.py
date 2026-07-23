@@ -42,6 +42,8 @@ ASSET_SPECS = {
         ('leaderboard-shell-v1', 'images/leaderboard-shell-v1.jpg'),
         ('season-hub-shell-v1', 'images/season-hub-shell-v1.jpg'),
         ('playoff-hub-shell-v1', 'images/playoff-hub-shell-v1.jpg'),
+        ('career-team-list-shell-v1', 'images/career-team-list-shell-v1.png'),
+        ('career-team-choice-shell-v1', 'images/career-team-choice-shell-v1.png'),
         ('broadcast-position', 'images/broadcast-position.jpg'),
         ('broadcast-build-v2', 'images/broadcast-build-v2.jpg'),
         ('broadcast-reveal-v2', 'images/broadcast-reveal-v2.jpg'),
