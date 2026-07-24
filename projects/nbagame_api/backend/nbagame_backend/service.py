@@ -82,7 +82,8 @@ def init_nbagame_db(db_path):
                 FOREIGN KEY(application_id) REFERENCES nbagame_applications(app_id)
             );
             CREATE TABLE IF NOT EXISTS nbagame_careers (
-                application_id TEXT NOT NULL, user_id TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, snapshot_json TEXT NOT NULL,
+                application_id TEXT NOT NULL, user_id TEXT NOT NULL, career_instance_id TEXT NOT NULL,
+                revision INTEGER NOT NULL DEFAULT 0, snapshot_json TEXT NOT NULL,
                 client_revision INTEGER NOT NULL DEFAULT 0, snapshot_sha256 TEXT NOT NULL DEFAULT '',
                 season_number INTEGER, career_team TEXT, phase TEXT, wins INTEGER, losses INTEGER, is_champion INTEGER NOT NULL DEFAULT 0,
                 playoff_result TEXT, updated_at TEXT NOT NULL, PRIMARY KEY(application_id, user_id),
@@ -105,6 +106,21 @@ def init_nbagame_db(db_path):
             );
             CREATE INDEX IF NOT EXISTS idx_nbagame_global_leaderboard
                 ON nbagame_season_start_aggregates(application_id, starts DESC, first_reached_at, user_id);
+            CREATE TABLE IF NOT EXISTS nbagame_season_completion_events (
+                application_id TEXT NOT NULL, user_id TEXT NOT NULL, event_id TEXT NOT NULL, team TEXT NOT NULL,
+                season_number INTEGER NOT NULL, occurred_at TEXT NOT NULL, created_at TEXT NOT NULL,
+                career_instance_id TEXT NOT NULL, career_revision INTEGER NOT NULL, result_json TEXT NOT NULL,
+                PRIMARY KEY(application_id, user_id, event_id)
+            );
+            CREATE TABLE IF NOT EXISTS nbagame_season_completion_aggregates (
+                application_id TEXT NOT NULL, user_id TEXT NOT NULL, team TEXT NOT NULL,
+                highest_season INTEGER NOT NULL, highest_season_reached_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, PRIMARY KEY(application_id, user_id, team)
+            );
+            CREATE INDEX IF NOT EXISTS idx_nbagame_completion_leaderboard_v2
+                ON nbagame_season_completion_aggregates(
+                    application_id, highest_season DESC, highest_season_reached_at, user_id, team
+                );
             CREATE TABLE IF NOT EXISTS nbagame_asset_manifests (
                 application_id TEXT NOT NULL, asset_group TEXT NOT NULL, version TEXT NOT NULL, etag TEXT NOT NULL,
                 published_at TEXT NOT NULL, PRIMARY KEY(application_id, asset_group, version)
@@ -137,6 +153,7 @@ def has_column(conn, table_name, column_name):
 
 def migrate_nbagame_db(conn):
     career_columns = {
+        'career_instance_id': "TEXT NOT NULL DEFAULT ''",
         'client_revision': 'INTEGER NOT NULL DEFAULT 0',
         'snapshot_sha256': "TEXT NOT NULL DEFAULT ''",
     }
@@ -150,10 +167,29 @@ def migrate_nbagame_db(conn):
     for column_name, definition in event_columns.items():
         if not has_column(conn, 'nbagame_season_start_events', column_name):
             conn.execute('ALTER TABLE nbagame_season_start_events ADD COLUMN {} {}'.format(column_name, definition))
+    conn.execute(
+        '''UPDATE nbagame_careers SET career_instance_id=lower(hex(randomblob(16)))
+           WHERE career_instance_id='' '''
+    )
     conn.executescript('''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_nbagame_event_career_revision
         ON nbagame_season_start_events(application_id, user_id, career_revision)
         WHERE career_revision IS NOT NULL;
+        CREATE TABLE IF NOT EXISTS nbagame_season_completion_events (
+            application_id TEXT NOT NULL, user_id TEXT NOT NULL, event_id TEXT NOT NULL, team TEXT NOT NULL,
+            season_number INTEGER NOT NULL, occurred_at TEXT NOT NULL, created_at TEXT NOT NULL,
+            career_instance_id TEXT NOT NULL, career_revision INTEGER NOT NULL, result_json TEXT NOT NULL,
+            PRIMARY KEY(application_id, user_id, event_id)
+        );
+        CREATE TABLE IF NOT EXISTS nbagame_season_completion_aggregates (
+            application_id TEXT NOT NULL, user_id TEXT NOT NULL, team TEXT NOT NULL,
+            highest_season INTEGER NOT NULL, highest_season_reached_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL, PRIMARY KEY(application_id, user_id, team)
+        );
+        CREATE INDEX IF NOT EXISTS idx_nbagame_completion_leaderboard_v2
+            ON nbagame_season_completion_aggregates(
+                application_id, highest_season DESC, highest_season_reached_at, user_id, team
+            );
         CREATE TABLE IF NOT EXISTS nbagame_rate_limits (
             application_id TEXT NOT NULL, scope_key TEXT NOT NULL, window_start INTEGER NOT NULL,
             request_count INTEGER NOT NULL, PRIMARY KEY(application_id, scope_key)
@@ -163,6 +199,21 @@ def migrate_nbagame_db(conn):
             asset_key TEXT NOT NULL, asset_version TEXT NOT NULL,
             PRIMARY KEY(application_id, manifest_version, asset_group, asset_key)
         );
+    ''')
+    if not has_column(conn, 'nbagame_season_completion_events', 'career_instance_id'):
+        conn.execute(
+            "ALTER TABLE nbagame_season_completion_events ADD COLUMN career_instance_id TEXT NOT NULL DEFAULT ''"
+        )
+    conn.execute(
+        '''UPDATE nbagame_season_completion_events SET career_instance_id='legacy-' || event_id
+           WHERE career_instance_id='' '''
+    )
+    conn.executescript('''
+        DROP INDEX IF EXISTS idx_nbagame_completion_career_revision;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_nbagame_completion_career_revision_v2
+            ON nbagame_season_completion_events(
+                application_id, user_id, career_instance_id, career_revision
+            );
     ''')
 
 

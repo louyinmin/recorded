@@ -132,9 +132,13 @@ class NbaGameBackendTestCase(unittest.TestCase):
                 ))
         return {'Authorization': 'Bearer ' + login_data['accessToken'], **extra}
 
-    def write_career(self, login_data, *, key, expected_revision=0, client_revision=0, season_number=1, team='LAL'):
+    def write_career(
+        self, login_data, *, key, expected_revision=0, client_revision=0,
+        season_number=1, team='LAL', phase='season',
+    ):
         body = self.career_payload()
         body['clientRevision'] = client_revision
+        body['snapshot']['phase'] = phase
         body['snapshot']['careerTeam'] = team
         body['snapshot']['progression']['seasonNumber'] = season_number
         body['snapshot']['season']['seasonNumber'] = season_number
@@ -617,32 +621,77 @@ class NbaGameBackendTestCase(unittest.TestCase):
         profile = self.client.put('/nbagame/v1/profile', headers=self.auth_headers(login, **{'Idempotency-Key': 'profile-1'}), json={'nickname': 'Court Player', 'avatarUrl': 'https://example.com/avatar.png'})
         self.assertEqual(profile.status_code, 200)
         self.assertEqual(profile.get_json()['data']['user']['nickname'], 'Court Player')
-        self.assertEqual(self.write_career(login, key='career-before-event').status_code, 200)
+        self.assertEqual(self.write_career(
+            login, key='career-before-event', phase='results',
+        ).status_code, 200)
         event = self.create_season_start(
             login, key='event-1', event_id='event-1', occurred_at='2026-07-22T08:02:00Z',
         )
-        self.assertEqual(event.get_json()['data']['starts'], 1)
+        self.assertEqual(event.get_json()['data']['seasonNumber'], 1)
+        self.assertTrue(event.get_json()['data']['improved'])
         retry = self.create_season_start(
             login, key='event-1', event_id='event-1', occurred_at='2026-07-22T08:02:00Z',
         )
-        self.assertEqual(retry.get_json()['data']['starts'], 1)
+        self.assertEqual(retry.get_json()['data'], event.get_json()['data'])
         personal = self.client.get('/nbagame/v1/leaderboards/season-starts?scope=personal', headers=self.auth_headers(login))
         self.assertEqual(personal.get_json()['data']['rows'][0]['playerName'], 'Court Player')
+        self.assertEqual(personal.get_json()['data']['rows'][0]['seasonNumber'], 1)
+        self.assertNotIn('starts', personal.get_json()['data']['rows'][0])
         friends = self.client.get('/nbagame/v1/leaderboards/season-starts?scope=friends', headers=self.auth_headers(login))
         self.assertFalse(friends.get_json()['data']['friendsAvailable'])
 
     def test_delete_career_keeps_season_start_history(self):
         login = self.login()
-        self.assertEqual(self.write_career(login, key='career-2').status_code, 200)
+        self.assertEqual(self.write_career(login, key='career-2', phase='results').status_code, 200)
         self.assertEqual(self.create_season_start(login, key='event-2', event_id='event-2').status_code, 200)
         deleted = self.client.delete('/nbagame/v1/career', headers=self.auth_headers(login, **{'If-Match': '"career-1"', 'Idempotency-Key': 'delete-1'}))
         self.assertEqual(deleted.status_code, 200)
         personal = self.client.get('/nbagame/v1/leaderboards/season-starts?scope=personal', headers=self.auth_headers(login))
-        self.assertEqual(personal.get_json()['data']['rows'][0]['starts'], 1)
+        self.assertEqual(personal.get_json()['data']['rows'][0]['seasonNumber'], 1)
+
+    def test_new_career_after_delete_can_record_a_completion(self):
+        login = self.login('career-reset-player')
+        self.assertEqual(self.write_career(
+            login, key='career-reset-first', team='LAL', phase='results',
+        ).status_code, 200)
+        first = self.create_season_start(
+            login, key='career-reset-event-first', event_id='career-reset-event-first',
+            team='LAL',
+        )
+        self.assertEqual(first.status_code, 200)
+
+        deleted = self.client.delete(
+            '/nbagame/v1/career',
+            headers=self.auth_headers(login, **{
+                'If-Match': '"career-1"',
+                'Idempotency-Key': 'career-reset-delete',
+            }),
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(self.write_career(
+            login, key='career-reset-second', team='BOS', phase='results',
+        ).status_code, 200)
+        second = self.create_season_start(
+            login, key='career-reset-event-second', event_id='career-reset-event-second',
+            team='BOS',
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.get_json()['data']['team'], 'BOS')
+
+        personal = self.client.get(
+            '/nbagame/v1/leaderboards/season-starts?scope=personal',
+            headers=self.auth_headers(login),
+        )
+        self.assertEqual(
+            sorted(row['team'] for row in personal.get_json()['data']['rows']),
+            ['BOS', 'LAL'],
+        )
 
     def test_duplicate_event_returns_first_result_even_when_payload_changes(self):
         login = self.login()
-        self.assertEqual(self.write_career(login, key='career-duplicate-event').status_code, 200)
+        self.assertEqual(self.write_career(
+            login, key='career-duplicate-event', phase='results',
+        ).status_code, 200)
         first = self.create_season_start(login, key='event-key-1', event_id='stable-event-id')
         self.assertEqual(first.status_code, 200)
 
@@ -654,7 +703,9 @@ class NbaGameBackendTestCase(unittest.TestCase):
 
     def test_season_start_must_match_career_and_revision_can_only_count_once(self):
         login = self.login()
-        self.assertEqual(self.write_career(login, key='career-season-start').status_code, 200)
+        self.assertEqual(self.write_career(
+            login, key='career-season-start', phase='results',
+        ).status_code, 200)
 
         mismatch = self.create_season_start(
             login, key='event-mismatch', event_id='event-mismatch', team='BOS',
@@ -672,9 +723,9 @@ class NbaGameBackendTestCase(unittest.TestCase):
             '/nbagame/v1/leaderboards/season-starts?scope=personal',
             headers=self.auth_headers(login),
         )
-        self.assertEqual(personal.get_json()['data']['rows'][0]['starts'], 1)
+        self.assertEqual(personal.get_json()['data']['rows'][0]['seasonNumber'], 1)
 
-    def test_leaderboard_orders_by_server_time_each_count_was_reached(self):
+    def test_leaderboard_orders_by_highest_completed_season_then_server_time(self):
         player_a = self.login('ranking-player-a')
         player_b = self.login('ranking-player-b')
         for player, name, key in ((player_a, 'Player A', 'profile-a'), (player_b, 'Player B', 'profile-b')):
@@ -688,16 +739,20 @@ class NbaGameBackendTestCase(unittest.TestCase):
         import nbagame_backend.service as service
         clock = {'now': datetime(2026, 7, 22, 10, 0, 0)}
         with mock.patch.object(service, 'utcnow', side_effect=lambda: clock['now']):
-            self.assertEqual(self.write_career(player_a, key='rank-career-a-1').status_code, 200)
+            self.assertEqual(self.write_career(
+                player_a, key='rank-career-a-1', phase='results',
+            ).status_code, 200)
             self.assertEqual(self.create_season_start(player_a, key='rank-event-a-1', event_id='rank-event-a-1').status_code, 200)
             clock['now'] = datetime(2026, 7, 22, 10, 1, 0)
-            self.assertEqual(self.write_career(player_b, key='rank-career-b-1').status_code, 200)
+            self.assertEqual(self.write_career(
+                player_b, key='rank-career-b-1', phase='results',
+            ).status_code, 200)
             self.assertEqual(self.create_season_start(player_b, key='rank-event-b-1', event_id='rank-event-b-1').status_code, 200)
 
             clock['now'] = datetime(2026, 7, 22, 10, 2, 0)
             self.assertEqual(self.write_career(
                 player_b, key='rank-career-b-2', expected_revision=1,
-                client_revision=1, season_number=2,
+                client_revision=1, season_number=2, phase='results',
             ).status_code, 200)
             self.assertEqual(self.create_season_start(
                 player_b, key='rank-event-b-2', event_id='rank-event-b-2',
@@ -707,7 +762,7 @@ class NbaGameBackendTestCase(unittest.TestCase):
             clock['now'] = datetime(2026, 7, 22, 10, 3, 0)
             self.assertEqual(self.write_career(
                 player_a, key='rank-career-a-2', expected_revision=1,
-                client_revision=1, season_number=2,
+                client_revision=1, season_number=2, phase='results',
             ).status_code, 200)
             self.assertEqual(self.create_season_start(
                 player_a, key='rank-event-a-2', event_id='rank-event-a-2',
@@ -719,6 +774,75 @@ class NbaGameBackendTestCase(unittest.TestCase):
             headers=self.auth_headers(player_a),
         )
         rows = leaderboard.get_json()['data']['rows']
-        self.assertEqual([(row['playerName'], row['starts']) for row in rows[:2]], [
+        self.assertEqual([(row['playerName'], row['seasonNumber']) for row in rows[:2]], [
             ('Player B', 2), ('Player A', 2),
         ])
+
+    def test_lower_completed_season_does_not_replace_the_highest_score(self):
+        login = self.login('highest-season-player')
+        self.assertEqual(self.write_career(
+            login, key='highest-career-1', season_number=2, phase='results',
+        ).status_code, 200)
+        highest = self.create_season_start(
+            login, key='highest-event-1', event_id='highest-event-1', season_number=2,
+        )
+        self.assertEqual(highest.get_json()['data']['seasonNumber'], 2)
+        self.assertTrue(highest.get_json()['data']['improved'])
+
+        self.assertEqual(self.write_career(
+            login, key='highest-career-2', expected_revision=1,
+            client_revision=1, season_number=1, phase='results',
+        ).status_code, 200)
+        lower = self.create_season_start(
+            login, key='highest-event-2', event_id='highest-event-2', season_number=1,
+        )
+        self.assertEqual(lower.get_json()['data']['seasonNumber'], 2)
+        self.assertFalse(lower.get_json()['data']['improved'])
+
+        personal = self.client.get(
+            '/nbagame/v1/leaderboards/season-starts?scope=personal',
+            headers=self.auth_headers(login),
+        )
+        self.assertEqual(personal.get_json()['data']['rows'][0]['seasonNumber'], 2)
+
+    def test_legacy_start_totals_are_not_reinterpreted_as_completed_seasons(self):
+        login = self.login('legacy-start-player')
+        conn = sqlite3.connect(os.environ['NBAGAME_DB_PATH'])
+        try:
+            user_id = login['user']['id']
+            conn.execute(
+                '''INSERT INTO nbagame_season_start_aggregates
+                   (application_id, user_id, team, starts, first_reached_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)''',
+                (
+                    'court-deck-prod', user_id, 'LAL', 99,
+                    '2026-07-01T00:00:00Z', '2026-07-01T00:00:00Z',
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        personal = self.client.get(
+            '/nbagame/v1/leaderboards/season-starts?scope=personal',
+            headers=self.auth_headers(login),
+        )
+        self.assertEqual(personal.status_code, 200)
+        self.assertEqual(personal.get_json()['data']['rows'], [])
+
+    def test_completion_event_requires_a_results_phase_career(self):
+        login = self.login('incomplete-season-player')
+        self.assertEqual(self.write_career(
+            login, key='incomplete-career', phase='season',
+        ).status_code, 200)
+
+        response = self.create_season_start(
+            login, key='incomplete-event', event_id='incomplete-event',
+        )
+
+        self.assertEqual(response.status_code, 409)
+        personal = self.client.get(
+            '/nbagame/v1/leaderboards/season-starts?scope=personal',
+            headers=self.auth_headers(login),
+        )
+        self.assertEqual(personal.get_json()['data']['rows'], [])

@@ -356,8 +356,9 @@ def write_career():
             conn.rollback()
             return career_conflict(row)
         revision = expected_revision + 1
+        career_instance_id = row['career_instance_id'] if row else uuid.uuid4().hex
         values = (
-            revision, snapshot_json, body['clientRevision'], snapshot_sha256,
+            career_instance_id, revision, snapshot_json, body['clientRevision'], snapshot_sha256,
             progression['seasonNumber'], snapshot['careerTeam'], snapshot['phase'],
             season['wins'], season['losses'], int(bool(season.get('isChampion'))),
             season.get('playoffResult'), now,
@@ -365,7 +366,7 @@ def write_career():
         if row:
             updated = conn.execute(
                 '''UPDATE nbagame_careers SET
-                   revision=?, snapshot_json=?, client_revision=?, snapshot_sha256=?, season_number=?,
+                   career_instance_id=?, revision=?, snapshot_json=?, client_revision=?, snapshot_sha256=?, season_number=?,
                    career_team=?, phase=?, wins=?, losses=?, is_champion=?, playoff_result=?, updated_at=?
                    WHERE application_id=? AND user_id=? AND revision=?''',
                 values + (g.nbagame_app_id, user['id'], expected_revision),
@@ -380,9 +381,9 @@ def write_career():
         else:
             conn.execute(
                 '''INSERT INTO nbagame_careers
-                   (application_id, user_id, revision, snapshot_json, client_revision, snapshot_sha256,
+                   (application_id, user_id, career_instance_id, revision, snapshot_json, client_revision, snapshot_sha256,
                     season_number, career_team, phase, wins, losses, is_champion, playoff_result, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (g.nbagame_app_id, user['id']) + values,
             )
         data = {'revision': revision, 'etag': 'career-{}'.format(revision), 'updatedAt': now}
@@ -426,13 +427,13 @@ def delete_career():
 
 @nbagame_bp.route('/leaderboards/season-starts/events', methods=['POST'])
 @require_auth
-def create_season_start():
+def create_season_completion():
     key, error = require_idempotency_key()
     if error:
         return error
     conn, user, body = get_nbagame_db(), g.nbagame_user, payload()
     saved = idempotent_response(conn, g.nbagame_app_id, user['id'], request.path, key)
-    if saved:
+    if saved and 'seasonNumber' in saved:
         return success(saved)
     event_id, team, season_number = str(body.get('eventId') or '').strip(), body.get('team'), body.get('seasonNumber')
     try:
@@ -440,7 +441,7 @@ def create_season_start():
     except ValueError:
         is_valid_event_id = False
     if not is_valid_event_id or team not in VALID_TEAMS or not isinstance(season_number, int) or season_number < 1:
-        return failure('VALIDATION_ERROR', 'invalid season start event', 400)
+        return failure('VALIDATION_ERROR', 'invalid season completion event', 400)
     occurred_at = str(body.get('occurredAt') or '').strip() or iso()
     try:
         parsed_occurred_at = datetime.fromisoformat(occurred_at.replace('Z', '+00:00'))
@@ -451,11 +452,17 @@ def create_season_start():
     try:
         conn.execute('BEGIN IMMEDIATE')
         saved = idempotent_response(conn, g.nbagame_app_id, user['id'], request.path, key)
-        if saved:
+        if saved and 'seasonNumber' in saved:
             conn.rollback()
             return success(saved)
+        if saved:
+            conn.execute(
+                '''DELETE FROM nbagame_idempotency_records
+                   WHERE application_id=? AND user_id=? AND route=? AND idempotency_key=?''',
+                (g.nbagame_app_id, user['id'], request.path, key),
+            )
         existing_event = conn.execute(
-            '''SELECT result_json FROM nbagame_season_start_events
+            '''SELECT result_json FROM nbagame_season_completion_events
                WHERE application_id=? AND user_id=? AND event_id=?''',
             (g.nbagame_app_id, user['id'], event_id),
         ).fetchone()
@@ -465,22 +472,31 @@ def create_season_start():
             conn.commit()
             return success(data)
         career = conn.execute(
-            '''SELECT revision, season_number, career_team FROM nbagame_careers
+            '''SELECT career_instance_id, revision, season_number, career_team, phase
+               FROM nbagame_careers
                WHERE application_id=? AND user_id=?''',
             (g.nbagame_app_id, user['id']),
         ).fetchone()
-        if not career or career['season_number'] != season_number or career['career_team'] != team:
+        if (
+            not career
+            or career['phase'] != 'results'
+            or career['season_number'] != season_number
+            or career['career_team'] != team
+        ):
             conn.rollback()
             return failure(
                 'CAREER_CONFLICT',
-                'season start event does not match the current career',
+                'season completion event does not match the current career',
                 409,
                 {'revision': career['revision'] if career else 0},
             )
         career_event = conn.execute(
-            '''SELECT result_json FROM nbagame_season_start_events
-               WHERE application_id=? AND user_id=? AND career_revision=?''',
-            (g.nbagame_app_id, user['id'], career['revision']),
+            '''SELECT result_json FROM nbagame_season_completion_events
+               WHERE application_id=? AND user_id=? AND career_instance_id=? AND career_revision=?''',
+            (
+                g.nbagame_app_id, user['id'],
+                career['career_instance_id'], career['revision'],
+            ),
         ).fetchone()
         if career_event:
             data = json.loads(career_event['result_json'])
@@ -489,34 +505,56 @@ def create_season_start():
             return success(data)
         server_time = iso()
         aggregate = conn.execute(
-            '''SELECT starts FROM nbagame_season_start_aggregates
+            '''SELECT highest_season FROM nbagame_season_completion_aggregates
                WHERE application_id=? AND user_id=? AND team=?''',
             (g.nbagame_app_id, user['id'], team),
         ).fetchone()
-        starts = aggregate['starts'] + 1 if aggregate else 1
+        previous_highest = aggregate['highest_season'] if aggregate else 0
+        highest_season = max(previous_highest, season_number)
+        improved = season_number > previous_highest
         if aggregate:
-            conn.execute(
-                '''UPDATE nbagame_season_start_aggregates
-                   SET starts=?, first_reached_at=?, updated_at=?
-                   WHERE application_id=? AND user_id=? AND team=?''',
-                (starts, server_time, server_time, g.nbagame_app_id, user['id'], team),
-            )
+            if improved:
+                conn.execute(
+                    '''UPDATE nbagame_season_completion_aggregates
+                       SET highest_season=?, highest_season_reached_at=?, updated_at=?
+                       WHERE application_id=? AND user_id=? AND team=?''',
+                    (
+                        highest_season, server_time, server_time,
+                        g.nbagame_app_id, user['id'], team,
+                    ),
+                )
+            else:
+                conn.execute(
+                    '''UPDATE nbagame_season_completion_aggregates SET updated_at=?
+                       WHERE application_id=? AND user_id=? AND team=?''',
+                    (server_time, g.nbagame_app_id, user['id'], team),
+                )
         else:
             conn.execute(
-                '''INSERT INTO nbagame_season_start_aggregates
-                   (application_id, user_id, team, starts, first_reached_at, updated_at)
+                '''INSERT INTO nbagame_season_completion_aggregates
+                   (application_id, user_id, team, highest_season,
+                    highest_season_reached_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?)''',
-                (g.nbagame_app_id, user['id'], team, starts, server_time, server_time),
+                (
+                    g.nbagame_app_id, user['id'], team, highest_season,
+                    server_time, server_time,
+                ),
             )
-        data = {'eventId': event_id, 'team': team, 'starts': starts, 'duplicate': False}
+        data = {
+            'eventId': event_id,
+            'team': team,
+            'seasonNumber': highest_season,
+            'improved': improved,
+        }
         conn.execute(
-            '''INSERT INTO nbagame_season_start_events
+            '''INSERT INTO nbagame_season_completion_events
                (application_id, user_id, event_id, team, season_number, occurred_at, created_at,
-                career_revision, result_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                career_instance_id, career_revision, result_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (
                 g.nbagame_app_id, user['id'], event_id, team, season_number, occurred_at,
-                server_time, career['revision'], json.dumps(data, ensure_ascii=False),
+                server_time, career['career_instance_id'], career['revision'],
+                json.dumps(data, ensure_ascii=False),
             ),
         )
         save_idempotent_response(conn, g.nbagame_app_id, user['id'], request.path, key, data)
@@ -525,11 +563,17 @@ def create_season_start():
     except sqlite3.IntegrityError:
         conn.rollback()
         existing_event = conn.execute(
-            '''SELECT result_json FROM nbagame_season_start_events
-               WHERE application_id=? AND user_id=? AND (event_id=? OR career_revision=(
-                   SELECT revision FROM nbagame_careers WHERE application_id=? AND user_id=?
-               )) ORDER BY event_id=? DESC LIMIT 1''',
-            (g.nbagame_app_id, user['id'], event_id, g.nbagame_app_id, user['id'], event_id),
+            '''SELECT result_json FROM nbagame_season_completion_events
+               WHERE application_id=? AND user_id=? AND (
+                   event_id=? OR (career_instance_id, career_revision)=(
+                       SELECT career_instance_id, revision FROM nbagame_careers
+                       WHERE application_id=? AND user_id=?
+                   )
+               ) ORDER BY event_id=? DESC LIMIT 1''',
+            (
+                g.nbagame_app_id, user['id'], event_id,
+                g.nbagame_app_id, user['id'], event_id,
+            ),
         ).fetchone()
         if existing_event:
             return success(json.loads(existing_event['result_json']))
@@ -557,20 +601,31 @@ def season_starts_leaderboard():
     if scope == 'friends':
         rows, available = [], False
     else:
-        query = '''SELECT a.user_id, a.team, a.starts, u.nickname FROM nbagame_season_start_aggregates a
+        query = '''SELECT a.user_id, a.team, a.highest_season, u.nickname
+                   FROM nbagame_season_completion_aggregates a
                    JOIN nbagame_application_users u ON u.id=a.user_id AND u.application_id=a.application_id
                    WHERE a.application_id=?'''
         parameters = [g.nbagame_app_id]
         if scope == 'personal':
             query += ' AND a.user_id=?'
             parameters.append(user['id'])
-        rows = conn.execute(query + ' ORDER BY a.starts DESC, a.first_reached_at ASC, a.user_id ASC LIMIT ? OFFSET ?', parameters + [limit + 1, offset]).fetchall()
+        rows = conn.execute(
+            query + ''' ORDER BY a.highest_season DESC, a.highest_season_reached_at ASC,
+                        a.user_id ASC, a.team ASC LIMIT ? OFFSET ?''',
+            parameters + [limit + 1, offset],
+        ).fetchall()
         available = True
     has_more = len(rows) > limit
     rows = rows[:limit]
     next_cursor = (base64.urlsafe_b64encode(json.dumps({'offset': offset + limit}, separators=(',', ':')).encode()).rstrip(b'=').decode() if has_more else None)
     data = {'scope': scope, 'friendsAvailable': available, 'rows': [
-        {'rank': index, 'playerName': row['nickname'] or 'Player', 'team': row['team'], 'starts': row['starts'], 'isSelf': row['user_id'] == user['id']}
+        {
+            'rank': index,
+            'playerName': row['nickname'] or 'Player',
+            'team': row['team'],
+            'seasonNumber': row['highest_season'],
+            'isSelf': row['user_id'] == user['id'],
+        }
         for index, row in enumerate(rows, offset + 1)], 'nextCursor': next_cursor, 'generatedAt': iso()}
     response, status = success(data)
     response.headers['Cache-Control'] = 'private, max-age=30'
